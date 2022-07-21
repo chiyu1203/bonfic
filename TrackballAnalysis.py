@@ -17,7 +17,7 @@ from scipy.signal import savgol_filter
 
 # Set directory to data folder
 
-os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data")
+os.chdir("Z:\DATA\experiment_trackball_Optomotor")
 
 # get all folders in data (all animal IDs)
 
@@ -119,11 +119,20 @@ for ID in animals:
             curr_events.loc[ev_num, 'rot_v'] = (np.nansum(abs(ev_dat.loc[ev_dat.loc[:,'rot_v']<0,'rot_v'])) - np.nansum(abs(ev_dat.loc[ev_dat.loc[:,'rot_v']>0,'rot_v'])))/(np.nansum(abs(ev_dat.loc[ev_dat.loc[:,'rot_v']<0,'rot_v'])) + np.nansum(abs(ev_dat.loc[ev_dat.loc[:,'rot_v']>0,'rot_v'])))
 
         # takes the rotation vectors of all 4 and 8 Hz events and plots them
-        eight_four = curr_events.loc[(curr_events.loc[:, 'speed'] >= 4) | (curr_events.loc[:, 'speed'] <= -4), 'rot_v']
+        eight_four = curr_events.loc[(curr_events.loc[:, 'speed'] >= 4) | (curr_events.loc[:, 'speed'] <= -4), ['disttr', 'rot_v']]
 
-        plt.scatter(np.arange(1,len(eight_four)+1, 1), eight_four.abs())
+        # plt.scatter(np.arange(1,len(eight_four)+1, 1), eight_four.loc[:, 'rot_v'].abs())
+        # plt.xlabel('event number')
+        # plt.ylabel(' absolute Optomotor response index')
+        # plt.show()
+        #
+        # plt.scatter(np.arange(1, len(eight_four) + 1, 1), eight_four.loc[:, 'disttr'].abs())
+        # plt.xlabel('event number')
+        # plt.ylabel('distance travelled')
+        # plt.show()
+
+        plt.hist(curr_events.loc[:, 'disttr'])
         plt.show()
-
         # saves data so this doesnt have to be run for every future plot
         # os.chdir('data')
         # curr_data.to_csv('datatest.csv')
@@ -136,7 +145,7 @@ for ID in animals:
         print(ID)
 
         # get back to data folder so it can load next locust
-        os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data")
+        os.chdir("Z:\DATA\experiment_trackball_Optomotor")
 
         # # Make trajectory plots
         # # BEWARE this is incredibly slow.
