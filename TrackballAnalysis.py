@@ -13,7 +13,7 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
-from scipy.signal import savgol_filter
+import scipy.signal #import savgol_filter
 
 # Set directory to data folder
 
@@ -84,6 +84,26 @@ for ID in animals:
 
         curr_data.loc[:, 'rot_v'] = curr_data_raw.iloc[:, 7].replace({',': ''}, regex=True) # rotation around z axis
         curr_data.loc[:, 'rot_v'] = pd.to_numeric(curr_data.loc[:, 'rot_v']) * 144
+
+        # apply filter to the raw trace
+        x_pos=curr_data.loc[:, ['x_pos']]
+        y_pos=curr_data.loc[:, ['y_pos']]
+        x_pos_19 = scipy.signal.savgol_filter(x_pos, 19, 3, axis=1)
+        y_pos_19 = scipy.signal.savgol_filter(y_pos, 19, 3, axis=1)
+        x_pos_59 = scipy.signal.savgol_filter(x_pos, 59, 3, axis=1)
+        y_pos_59 = scipy.signal.savgol_filter(y_pos, 59, 3, axis=1)
+        x_pos_99 = scipy.signal.savgol_filter(x_pos, 99, 3, axis=1)
+        y_pos_99 = scipy.signal.savgol_filter(y_pos, 99, 3, axis=1)
+        plt.figure(1)
+        plt.subplot(221)
+        plt.plot(x_pos, y_pos)
+        plt.subplot(222)
+        plt.plot(x_pos_19, y_pos_19)
+        plt.subplot(223)
+        plt.plot(x_pos_59, y_pos_59)
+        plt.subplot(224)
+        plt.plot(x_pos_99, y_pos_99)
+
 
         # calculate distance between consecutive points
         diff_dat = curr_data.loc[:, ['x_pos', 'y_pos']].diff()
