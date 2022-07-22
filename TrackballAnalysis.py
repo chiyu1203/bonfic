@@ -17,7 +17,8 @@ import scipy.signal #import savgol_filter
 
 # Set directory to data folder
 
-os.chdir("Z:\DATA\experiment_trackball_Optomotor")
+# os.chdir("Z:\DATA\experiment_trackball_Optomotor")
+os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data")
 
 # get all folders in data (all animal IDs)
 
@@ -86,24 +87,16 @@ for ID in animals:
         curr_data.loc[:, 'rot_v'] = pd.to_numeric(curr_data.loc[:, 'rot_v']) * 144
 
         # apply filter to the raw trace
-        x_pos=curr_data.loc[:, ['x_pos']]
-        y_pos=curr_data.loc[:, ['y_pos']]
-        x_pos_19 = scipy.signal.savgol_filter(x_pos, 19, 3, axis=1)
-        y_pos_19 = scipy.signal.savgol_filter(y_pos, 19, 3, axis=1)
-        x_pos_59 = scipy.signal.savgol_filter(x_pos, 59, 3, axis=1)
-        y_pos_59 = scipy.signal.savgol_filter(y_pos, 59, 3, axis=1)
-        x_pos_99 = scipy.signal.savgol_filter(x_pos, 99, 3, axis=1)
-        y_pos_99 = scipy.signal.savgol_filter(y_pos, 99, 3, axis=1)
-        plt.figure(1)
-        plt.subplot(221)
-        plt.plot(x_pos, y_pos)
-        plt.subplot(222)
-        plt.plot(x_pos_19, y_pos_19)
-        plt.subplot(223)
-        plt.plot(x_pos_59, y_pos_59)
-        plt.subplot(224)
-        plt.plot(x_pos_99, y_pos_99)
-
+        curr_data.loc[:, ['x_pos']] = scipy.signal.savgol_filter(curr_data.loc[:, ['x_pos']], 99, 3, axis=0)
+        curr_data.loc[:, ['y_pos']] = scipy.signal.savgol_filter(curr_data.loc[:, ['y_pos']], 99, 3, axis=0)
+        # plt.subplot(222)
+        # plt.plot(curr_data.loc[:, ['x_pos']], curr_data.loc[:, ['y_pos']])
+        # # plt.plot(x_pos_19, y_pos_19)
+        # # plt.subplot(223)
+        # # plt.plot(x_pos_59, y_pos_59)
+        # # plt.subplot(224)
+        # # plt.plot(x_pos_99, y_pos_99)
+        # plt.show()
 
         # calculate distance between consecutive points
         diff_dat = curr_data.loc[:, ['x_pos', 'y_pos']].diff()
@@ -138,6 +131,17 @@ for ID in animals:
             # calculates optomotor response index
             curr_events.loc[ev_num, 'rot_v'] = (np.nansum(abs(ev_dat.loc[ev_dat.loc[:,'rot_v']<0,'rot_v'])) - np.nansum(abs(ev_dat.loc[ev_dat.loc[:,'rot_v']>0,'rot_v'])))/(np.nansum(abs(ev_dat.loc[ev_dat.loc[:,'rot_v']<0,'rot_v'])) + np.nansum(abs(ev_dat.loc[ev_dat.loc[:,'rot_v']>0,'rot_v'])))
 
+        # # Plots to figure out threshold for events ( decided on 1)
+        # plt.hist(curr_events.loc[:, 'disttr'], bins = 20)
+        # plt.xlabel('distance travelled')
+        # plt.show()
+
+        print('number events under treshold')
+        print(len(curr_events.loc[curr_events.loc[:, 'disttr'] <= 1, ['speed', 'disttr']]))
+        curr_events = curr_events.loc[curr_events.loc[:, 'disttr'] > 1, :]
+        plt.scatter(curr_events.loc[:, 'speed'], curr_events.loc[:, 'rot_v'])
+        plt.show()
+
         # takes the rotation vectors of all 4 and 8 Hz events and plots them
         eight_four = curr_events.loc[(curr_events.loc[:, 'speed'] >= 4) | (curr_events.loc[:, 'speed'] <= -4), ['disttr', 'rot_v']]
 
@@ -151,8 +155,9 @@ for ID in animals:
         # plt.ylabel('distance travelled')
         # plt.show()
 
-        plt.hist(curr_events.loc[:, 'disttr'])
-        plt.show()
+
+
+
         # saves data so this doesnt have to be run for every future plot
         # os.chdir('data')
         # curr_data.to_csv('datatest.csv')
@@ -165,7 +170,8 @@ for ID in animals:
         print(ID)
 
         # get back to data folder so it can load next locust
-        os.chdir("Z:\DATA\experiment_trackball_Optomotor")
+        #os.chdir("Z:\DATA\experiment_trackball_Optomotor")
+        os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data")
 
         # # Make trajectory plots
         # # BEWARE this is incredibly slow.
