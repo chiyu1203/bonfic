@@ -18,21 +18,25 @@ import scipy.signal #import savgol_filter
 # Set directory to data folder
 
 # os.chdir("Z:\DATA\experiment_trackball_Optomotor")
-os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data")
+os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data/Gratings")
 
 # get all folders in data (all animal IDs)
 
 animals = os.listdir()
 print(animals) # to see which animals
 
-# loop through animals
+zeros= np.zeros(shape=(3610, len(animals)))
+zeros.fill(np.nan)
+four_acc = pd.DataFrame(zeros, columns= animals)
+minfour_acc = pd.DataFrame(zeros, columns= animals)
+
 for ID in animals:
     # go into animal folder
     os.chdir(ID)
 
     # get all days in animals folder
     days = os.listdir()
-
+    
 
     # loop through days (currently only one per animal, but might change)
     for day in days:
@@ -139,25 +143,69 @@ for ID in animals:
         print('number events under treshold')
         print(len(curr_events.loc[curr_events.loc[:, 'disttr'] <= 1, ['speed', 'disttr']]))
         curr_events = curr_events.loc[curr_events.loc[:, 'disttr'] > 1, :]
-        plt.scatter(curr_events.loc[:, 'speed'], curr_events.loc[:, 'rot_v'])
-        plt.show()
+        # plt.scatter(curr_events.loc[:, 'speed'], curr_events.loc[:, 'rot_v'])
+        # plt.show()
 
         # takes the rotation vectors of all 4 and 8 Hz events and plots them
-        eight_four = curr_events.loc[(curr_events.loc[:, 'speed'] >= 4) | (curr_events.loc[:, 'speed'] <= -4), ['disttr', 'rot_v']]
+        # eight_four = curr_events.loc[(curr_events.loc[:, 'speed'] >= 4) | (curr_events.loc[:, 'speed'] <= -4), ['disttr', 'rot_v']]
 
         # plt.scatter(np.arange(1,len(eight_four)+1, 1), eight_four.loc[:, 'rot_v'].abs())
         # plt.xlabel('event number')
         # plt.ylabel(' absolute Optomotor response index')
         # plt.show()
-        #
+        
         # plt.scatter(np.arange(1, len(eight_four) + 1, 1), eight_four.loc[:, 'disttr'].abs())
         # plt.xlabel('event number')
         # plt.ylabel('distance travelled')
         # plt.show()
+        
+        
+        # calculate accumulated rotation for each event. take average for each frame
+        # save in dataframe
+        
+        four_event = curr_data.loc[curr_data.loc[:,'stim_speed']== 4, ['event', 'rot_v']]
+        acc_rot_v = np.zeros((5000, 15)) 
+        acc_rot_v.fill(np.nan)
+        
+        c=0
+        for ev in np.unique(four_event.loc[:, 'event']):
+            curr_four_ev = curr_data.loc[curr_data.loc[:, 'event']==ev, 'rot_v']
+            curr_four_ev = curr_four_ev.reset_index(drop=True)
+            for i in range(0, len(curr_four_ev)-1):
+                acc_rot_v[i,c] = sum(curr_four_ev[0:i])
+                
+            
+            c=c+1
+        
+        plt.plot(acc_rot_v)
+        plt.title(ID + 'four')
+        plt.xlabel('frames')
+        plt.ylabel('accumulated orientation change')
+        plt.ylim([-6000, 6000])
+        plt.show()
+        # four_acc.loc[:,ID] = acc_rot_v
+            
+        min_four_event = curr_data.loc[curr_data.loc[:,'stim_speed']== -4, ['event', 'rot_v']]
+        acc_rot_v_minfour = np.zeros((5000, 15)) 
+        acc_rot_v_minfour.fill(np.nan)
 
-
-
-
+        c=0
+        for ev in np.unique(min_four_event.loc[:, 'event']):
+            curr_minfour_ev = curr_data.loc[curr_data.loc[:, 'event']==ev, 'rot_v']
+            curr_minfour_ev = curr_minfour_ev.reset_index(drop=True)
+            for i in range(0, len(curr_minfour_ev)-1):
+                acc_rot_v_minfour[i,c] = sum(curr_minfour_ev[0:i])
+                
+            
+            c=c+1
+        
+        # minfour_acc.loc[:,ID]= acc_rot_v_minfour
+        plt.plot(acc_rot_v_minfour)
+        plt.title(ID + 'minus four')
+        plt.xlabel('frames')
+        plt.ylabel('accumulated orientation change')
+        plt.ylim([-6000, 6000])
+        plt.show()
         # saves data so this doesnt have to be run for every future plot
         # os.chdir('data')
         # curr_data.to_csv('datatest.csv')
@@ -171,7 +219,7 @@ for ID in animals:
 
         # get back to data folder so it can load next locust
         #os.chdir("Z:\DATA\experiment_trackball_Optomotor")
-        os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data")
+        os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data/Gratings")
 
         # # Make trajectory plots
         # # BEWARE this is incredibly slow.
@@ -213,6 +261,10 @@ for ID in animals:
 
         # plt.show() #show plot
 
+# for i in animals:
+#     plt.plot(four_acc.loc[:,i])
+# plt.show()
 
-
-
+# for i in animals:
+#     plt.plot(minfour_acc.loc[:,i])
+# plt.show()
