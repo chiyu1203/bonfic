@@ -15,10 +15,15 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import scipy.signal #import savgol_filter
 
+
+# def running_mean(x, N):
+#     cumsum = numpy.cumsum(numpy.insert(x, 0, 0)) 
+#     return (cumsum[N:] - cumsum[:-N]) / float(N)
+
 # Set directory to data folder
 
-# os.chdir("Z:\DATA\experiment_trackball_Optomotor")
-os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data")
+os.chdir("Z:\DATA\experiment_trackball_Optomotor")
+#os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data")
 
 # get all folders in data (all animal IDs)
 
@@ -85,7 +90,10 @@ for ID in animals:
 
         curr_data.loc[:, 'rot_v'] = curr_data_raw.iloc[:, 7].replace({',': ''}, regex=True) # rotation around z axis
         curr_data.loc[:, 'rot_v'] = pd.to_numeric(curr_data.loc[:, 'rot_v']) * 144
-
+        
+        instantspeed = pd.to_numeric(curr_data_raw.iloc[:, 5].replace({',': ''}, regex=True))*4000 # instant speed
+        speed_convolve=np.convolve(instantspeed, np.ones(10), 'valid') / 10
+        plt.hist(speed_convolve)
         # apply filter to the raw trace
         curr_data.loc[:, ['x_pos']] = scipy.signal.savgol_filter(curr_data.loc[:, ['x_pos']], 99, 3, axis=0)
         curr_data.loc[:, ['y_pos']] = scipy.signal.savgol_filter(curr_data.loc[:, ['y_pos']], 99, 3, axis=0)
@@ -170,8 +178,8 @@ for ID in animals:
         print(ID)
 
         # get back to data folder so it can load next locust
-        #os.chdir("Z:\DATA\experiment_trackball_Optomotor")
-        os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data")
+        os.chdir("Z:\DATA\experiment_trackball_Optomotor")
+        #os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data")
 
         # # Make trajectory plots
         # # BEWARE this is incredibly slow.
