@@ -15,29 +15,28 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import scipy.signal #import savgol_filter
 
-
-# def running_mean(x, N):
-#     cumsum = numpy.cumsum(numpy.insert(x, 0, 0)) 
-#     return (cumsum[N:] - cumsum[:-N]) / float(N)
-
 # Set directory to data folder
 
-os.chdir("Z:\DATA\experiment_trackball_Optomotor")
-#os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data")
+# os.chdir("Z:\DATA\experiment_trackball_Optomotor")
+os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data")
 
 # get all folders in data (all animal IDs)
 
 animals = os.listdir()
 print(animals) # to see which animals
 
-# loop through animals
+zeros= np.zeros(shape=(3610, len(animals)))
+zeros.fill(np.nan)
+four_acc = pd.DataFrame(zeros, columns= animals)
+minfour_acc = pd.DataFrame(zeros, columns= animals)
+
 for ID in animals:
     # go into animal folder
     os.chdir(ID)
 
     # get all days in animals folder
     days = os.listdir()
-
+    
 
     # loop through days (currently only one per animal, but might change)
     for day in days:
@@ -90,10 +89,7 @@ for ID in animals:
 
         curr_data.loc[:, 'rot_v'] = curr_data_raw.iloc[:, 7].replace({',': ''}, regex=True) # rotation around z axis
         curr_data.loc[:, 'rot_v'] = pd.to_numeric(curr_data.loc[:, 'rot_v']) * 144
-        
-        instantspeed = pd.to_numeric(curr_data_raw.iloc[:, 5].replace({',': ''}, regex=True))*4000 # instant speed
-        speed_convolve=np.convolve(instantspeed, np.ones(10), 'valid') / 10
-        plt.hist(speed_convolve)
+
         # apply filter to the raw trace
         curr_data.loc[:, ['x_pos']] = scipy.signal.savgol_filter(curr_data.loc[:, ['x_pos']], 99, 3, axis=0)
         curr_data.loc[:, ['y_pos']] = scipy.signal.savgol_filter(curr_data.loc[:, ['y_pos']], 99, 3, axis=0)
@@ -145,31 +141,114 @@ for ID in animals:
         # plt.show()
 
         print('number events under treshold')
-        print(len(curr_events.loc[curr_events.loc[:, 'disttr'] <= 1, ['speed', 'disttr']]))
-        curr_events = curr_events.loc[curr_events.loc[:, 'disttr'] > 1, :]
-        plt.scatter(curr_events.loc[:, 'speed'], curr_events.loc[:, 'rot_v'])
+        print(len(curr_events.loc[curr_events.loc[:, 'disttr'] <= 5, ['speed', 'disttr']]))
+        curr_events = curr_events.loc[curr_events.loc[:, 'disttr'] > 5, :]
+        
+        
+        #speed histograms
+        
+        n, bins, patches = plt.hist(curr_data.loc[:, 'speed'], 20,range =(-1, 10), density=True, facecolor='b', edgecolor= 'b',alpha=0.25, width= 0.5)
+        plt.title('animal ' + ID)
+        plt.xlabel('speed [cm/s]')
+        # plt.ylim((0,8))
+        plt.savefig('speedhist')
         plt.show()
+       
+        
+        
+        # disttr histograms
+        # Plots to figure out threshold for events 
+        plt.hist(curr_events.loc[:, 'disttr'], bins = 20, alpha= 0.25)
+        plt.title('animal ' + ID)
+        plt.xlabel('distance travelled')
+        plt.savefig('disthist')
+        plt.show()
+        
+        
+        #plot the effect of stim speed on optomotor response
+        ax =sns.stripplot(x='speed', y="rot_v", data=curr_events.loc[:, ['speed', 'rot_v']], dodge=True, jitter=True, alpha=.8, zorder=1, size=4)
+        ax =sns.pointplot(x='speed', y='rot_v', ci='sd', data=curr_events.loc[:, ['speed', 'rot_v']], join=False, scale=0.5, zorder=100, color='black', errwidth=1)
+        plt.title('Animal ' + ID )
+        plt.ylabel('optomotor response index')
+        plt.xlabel('<- Hz -> \n stimulus speed')
+        plt.ylim([-1, 1])
+        ax.set_xticklabels(['8', '4', '2', '1', '1', '2', '4', '8'])
+        # plt.xticks()
+        plt.savefig('optomotorresp')
+        plt.show()
+        
+        
+        # calculate accumulated rotation for each event. take average for each frame
+        # save in dataframe
+        
+        four_event = curr_data.loc[curr_data.loc[:,'stim_speed']== 4, ['event', 'rot_v']]
+        acc_rot_v = np.zeros((5000, 15)) 
+        acc_rot_v.fill(np.nan)
+        
+        c=0
+        for ev in np.unique(four_event.loc[:, 'event']):
+            curr_four_ev = curr_data.loc[curr_data.loc[:, 'event']==ev, 'rot_v']
+            curr_four_ev = curr_four_ev.reset_index(drop=True)
+            for i in range(0, len(curr_four_ev)-1):
+                acc_rot_v[i,c] = sum(curr_four_ev[0:i])
+                
+            
+            c=c+1
+        
+        plt.plot(acc_rot_v)
+        plt.title(ID + ' speed: 4')
+        plt.xlabel('frames')
+        plt.ylabel('accumulated orientation change')
+        plt.ylim([-6000, 6000])
+        plt.savefig('accorfour')
+        plt.show()
+        
+        
+        
+            
+        min_four_event = curr_data.loc[curr_data.loc[:,'stim_speed']== -4, ['event', 'rot_v']]
+        acc_rot_v_minfour = np.zeros((5000, 15)) 
+        acc_rot_v_minfour.fill(np.nan)
+
+        c=0
+        for ev in np.unique(min_four_event.loc[:, 'event']):
+            curr_minfour_ev = curr_data.loc[curr_data.loc[:, 'event']==ev, 'rot_v']
+            curr_minfour_ev = curr_minfour_ev.reset_index(drop=True)
+            for i in range(0, len(curr_minfour_ev)-1):
+                acc_rot_v_minfour[i,c] = sum(curr_minfour_ev[0:i])
+                
+            
+            c=c+1
+        
+     
+        plt.plot(acc_rot_v_minfour)
+        plt.title(ID + ' speed: -4')
+        plt.xlabel('frames')
+        plt.ylabel('accumulated orientation change')
+        plt.ylim([-6000, 6000])
+        plt.savefig('accorminfour')
+        plt.show()
+        
+        
+        # plt.scatter(curr_events.loc[:, 'speed'], curr_events.loc[:, 'rot_v'])
+        # plt.show()
 
         # takes the rotation vectors of all 4 and 8 Hz events and plots them
-        eight_four = curr_events.loc[(curr_events.loc[:, 'speed'] >= 4) | (curr_events.loc[:, 'speed'] <= -4), ['disttr', 'rot_v']]
+        # eight_four = curr_events.loc[(curr_events.loc[:, 'speed'] >= 4) | (curr_events.loc[:, 'speed'] <= -4), ['disttr', 'rot_v']]
 
         # plt.scatter(np.arange(1,len(eight_four)+1, 1), eight_four.loc[:, 'rot_v'].abs())
         # plt.xlabel('event number')
         # plt.ylabel(' absolute Optomotor response index')
         # plt.show()
-        #
+        
         # plt.scatter(np.arange(1, len(eight_four) + 1, 1), eight_four.loc[:, 'disttr'].abs())
         # plt.xlabel('event number')
         # plt.ylabel('distance travelled')
         # plt.show()
-
-
-
-
-        # saves data so this doesnt have to be run for every future plot
-        # os.chdir('data')
-        # curr_data.to_csv('datatest.csv')
-        # curr_events.to_csv('evtest.csv')
+        
+        
+        
+        
 
 
 
@@ -178,8 +257,8 @@ for ID in animals:
         print(ID)
 
         # get back to data folder so it can load next locust
-        os.chdir("Z:\DATA\experiment_trackball_Optomotor")
-        #os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data")
+        #os.chdir("Z:\DATA\experiment_trackball_Optomotor")
+        os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data")
 
         # # Make trajectory plots
         # # BEWARE this is incredibly slow.
@@ -220,7 +299,3 @@ for ID in animals:
         #         row = row + 1
 
         # plt.show() #show plot
-
-
-
-
