@@ -21,24 +21,35 @@ plt.rcParams['figure.dpi'] = 300
 # Set directory to data folder
 
 # os.chdir("Z:\DATA\experiment_trackball_Optomotor")
-os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data\smalldots")
+os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data\densities")
+
+calcnew = 0
 
 # get all folders in data (all animal IDs)
 
 animals = os.listdir()
+animals = animals[20:]
+befaver = pd.DataFrame(np.zeros(shape=(len(animals)*8,3)), columns={'ID', 'befaft', 'average'})
+averages = pd.DataFrame(np.zeros(shape=(len(animals)*8,3)), columns={'ID', 'dot_num', 'average'})
+c=0
+a=0
 print(animals) # to see which animals
 
 # loop through animals
 for ID in animals:
-    if ID == 'L22021':
-        continue
+    
     # go into animal folder
     os.chdir(ID)
-
-    # get all days in animals folder
+    
+    
+    # if not ID=='L22056' and not ID=='L22057' and not ID=='L22058' :
+    #         print('skip ' + ID )
+    #         os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data/densities")
+    #         continue
+    #get all days in animals folder
     
 
-    if  not os.listdir('data'):
+    if  not os.listdir('data') or calcnew == 1:
         # loop through days (currently only one per animal, but might change)
         
         #go into day folder
@@ -82,8 +93,8 @@ for ID in animals:
         curr_data_raw = pd.read_table(dat[0], sep="\s+")
     
         # create dataframe of zeros
-        zeros = np.zeros(shape=(len(curr_data_raw), 7))
-        curr_data = pd.DataFrame(zeros, columns={'timestamp', 'x_pos', 'y_pos', 'event', 'stim_speed', 'rot_v', 'dist'})
+        zeros = np.zeros(shape=(len(curr_data_raw), 8))
+        curr_data = pd.DataFrame(zeros, columns={'timestamp', 'x_pos', 'y_pos', 'event', 'stim_speed', 'rot_v', 'dist', 'head'})
     
         # assign values to columns
         curr_data.loc[:, 'timestamp'] = curr_data_raw.iloc[:,24] # timestamp later used to match data to event
@@ -95,10 +106,14 @@ for ID in animals:
     
         curr_data.loc[:, 'rot_v'] = curr_data_raw.iloc[:, 7].replace({',': ''}, regex=True) # rotation around z axis
         curr_data.loc[:, 'rot_v'] = pd.to_numeric(curr_data.loc[:, 'rot_v']) * 144
-    
+        
+        curr_data.loc[:, 'head'] = curr_data_raw.iloc[:, 16].replace({',': ''}, regex=True) # heading
+        curr_data.loc[:, 'head'] = pd.to_numeric(curr_data.loc[:, 'head']) * 144
+        
         #apply filter to the raw trace
         curr_data.loc[:, ['x_pos']] = scipy.signal.savgol_filter(curr_data.loc[:, ['x_pos']], 99, 3, axis=0)
         curr_data.loc[:, ['y_pos']] = scipy.signal.savgol_filter(curr_data.loc[:, ['y_pos']], 99, 3, axis=0)
+        #curr_data.loc[:, ['rot_v']] = scipy.signal.savgol_filter(curr_data.loc[:, ['rot_v']], 99, 3, axis=0)
         
         # curr_data.loc[:, 'dist'] = curr_data_raw.iloc[:, 18].replace({',': ''}, regex= True)
         # curr_data.loc[:, 'dist'] = pd.to_numeric(curr_data.loc[:, 'dist'])*4
@@ -118,7 +133,12 @@ for ID in animals:
         #speeds
         curr_data.loc[:,'speed'] = curr_data.loc[:,'dist'] *144
         
+        # heading change
         
+        curr_data.loc[:, 'headc'] = curr_data.loc[:, 'head'].diff()
+        
+        curr_data.loc[curr_data.loc[:, 'headc']> 2.967, 'headc'] = np.nan
+        curr_data.loc[curr_data.loc[:, 'headc']< -2.967, 'headc'] = np.nan
         
         # gets the differences between timesteps of events
         #differences = np.ediff1d(curr_events.loc[:,'timestamp'])
@@ -168,86 +188,131 @@ for ID in animals:
 
     print('percent of events under treshold')
     print(((len(curr_events.loc[curr_events.loc[:, 'disttr'] <= 5, ['speed', 'disttr']]))/120)*100)
+    
+    curr_events= curr_events.reset_index(drop=True)
     curr_events = curr_events.loc[curr_events.loc[:, 'disttr'] > 5, :]
-    curr_events.loc[curr_events.loc[:,'speed']<0,'dot_size'] =  curr_events.loc[curr_events.loc[:,'speed']<0,'dot_size'] * -1
+    curr_events.loc[curr_events.loc[:,'speed']<0,'dot_num'] =  curr_events.loc[curr_events.loc[:,'speed']<0,'dot_num'] * -1
+    
+    curr_events.loc[:,'ev_before']= curr_events.loc[:, 'speed'].shift()
+    conditions = [(curr_events.loc[:,'speed']<0) & (curr_events.loc[:,'ev_before']<0),
+    (curr_events.loc[:,'speed']<0) & (curr_events.loc[:,'ev_before']>0),
+    (curr_events.loc[:,'speed']>0) & (curr_events.loc[:,'ev_before']>0),
+    (curr_events.loc[:,'speed']>0) & (curr_events.loc[:,'ev_before']<0)]
+        
+    choices = ['negneg', 'posneg', 'pospos', 'negpos']
+    
+    curr_events.loc[:, 'befaft']=np.select(conditions, choices, 'NA').T
+    
+    if not len(np.unique(curr_events.loc[:,'dot_num']))== 8:
+        print(ID + ': not all events')
+        os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data/densities")
+        continue
+    ax =sns.stripplot(x="befaft", y="rot_v", data=curr_events.loc[:, ['befaft', 'rot_v']], dodge=True, jitter=True, alpha=.8, zorder=1, size=4)
+    ax =sns.pointplot(x='befaft', y='rot_v', ci='sd', data=curr_events.loc[:, ['befaft', 'rot_v']], join=False, scale=0.5, zorder=100, color='black', errwidth=1)
+    plt.show()
+    
+    for num in np.unique(curr_events.loc[:,'befaft']):
+        befaver.loc[a, 'ID']= ID
+        befaver.loc[a, 'befaft']= num
+        befaver.loc[a, 'average']= curr_events.loc[curr_events.loc[:,'befaft']==num, 'rot_v'].mean()
+        a=a+1
+    
+    dotdens= [-4096,-1024, -256, -64, 64, 256, 1024, 4096]    
+    for num in dotdens:
+        averages.loc[c, 'ID']= ID
+        averages.loc[c, 'dot_num']= num
+        averages.loc[c, 'average']= curr_events.loc[curr_events.loc[:,'dot_num']==num, 'rot_v'].mean()
+        c=c+1
     
     
-    # Speed histogram
-    n, bins, patches = plt.hist(curr_data.loc[:, 'speed'], 20, range =(0, 2), density=True, facecolor='b', edgecolor= 'b',alpha=0.25, width= 0.05)
-    # plt.ylim((0,8))
-    plt.xlabel('speeds')
-    plt.title(ID + ' - speed distribution across all trials')
-    plt.savefig('speedhist')
-    plt.show()
+    
+    # # Speed histogram
+    # n, bins, patches = plt.hist(curr_data.loc[:, 'speed'], 20, range =(0, 2), density=True, facecolor='b', edgecolor= 'b',alpha=0.25, width= 0.05)
+    # # plt.ylim((0,8))
+    # plt.xlabel('speeds')
+    # plt.title(ID + ' - speed distribution across all trials')
+    # plt.savefig('speedhist.svg')
+    # plt.show()
         
         
-    # Dist histogram
-    plt.hist(curr_events.loc[:, 'disttr'], bins = 20)
-    plt.xlabel(ID + ' - distance travelled')
-    plt.savefig('disthist')
-    plt.show()
+    # # Dist histogram
+    # plt.hist(curr_events.loc[:, 'disttr'], bins = 20)
+    # plt.xlabel(ID + ' - distance travelled')
+    # plt.savefig('disthist.svg')
+    # plt.show()
  
-    ax =sns.stripplot(x="dot_size", y="rot_v", data=curr_events.loc[:, ['dot_size', 'rot_v']], dodge=True, jitter=True, alpha=.8, zorder=1, size=4)
-    ax =sns.pointplot(x='dot_size', y='rot_v', ci='sd', data=curr_events.loc[:, ['dot_size', 'rot_v']], join=False, scale=0.5, zorder=100, color='black', errwidth=1)
-    plt.title('Animal ' + ID )
-    plt.ylabel('optomotor response index')
-    plt.xlabel('<- dot size ->')
-    plt.ylim([-1, 1])
-    ax.set_xticklabels(['8', '4', '2', '1', '1', '2', '4', '8'])
-    # plt.xticks()
-    plt.savefig('optomotor')
-    plt.show()
+    
+    # if len(np.unique(curr_events.loc[:,'dot_num'])) != 8:
+    #     print('skip ' + ID + ': not all events') 
+    #     os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data/densities")
+    #     continue
+       
+    # if not len(np.unique(curr_events.loc[:,'dot_num']))== 8:
+    #     print(ID + ': not all events')
+    #     os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data/densities")
+    #     continue
+    # ax =sns.stripplot(x="dot_num", y="rot_v", data=curr_events.loc[:, ['dot_num', 'rot_v']], dodge=True, jitter=True, alpha=.8, zorder=1, size=4)
+    # ax =sns.pointplot(x='dot_num', y='rot_v', ci='sd', data=curr_events.loc[:, ['dot_num', 'rot_v']], join=False, scale=0.5, zorder=100, color='black', errwidth=1)
+    # plt.title('Animal ' + ID )
+    # plt.ylabel('optomotor response index')
+    # plt.xlabel('<- dot number ->')
+    # plt.ylim([-1, 1])
+    # ax.set_xticklabels([ '4096', '1024', '256','64', '64', '256', '1024', '4096'])
+    # # plt.xticks()
+    # plt.savefig('optomotor.svg')
+    # plt.show()
     
     
-    min_event = curr_data.loc[curr_data.loc[:,'stim_speed']< 0, ['event', 'rot_v']]
-    acc_rot_v = np.zeros((5000, 120)) 
-    acc_rot_v.fill(np.nan)
+    # min_event = curr_data.loc[curr_data.loc[:,'stim_speed']< 0, ['event', 'rot_v']]
+    # acc_rot_v = np.zeros((5000, 120)) 
+    # acc_rot_v.fill(np.nan)
     
-    c=0
-    for ev in np.unique(min_event.loc[:, 'event']):
-        if ev == 0:
-            continue
-        curr_ev = curr_data.loc[curr_data.loc[:, 'event']==ev, 'rot_v']
-        curr_ev = curr_ev.reset_index(drop=True)
-        for i in range(0, len(curr_ev)-1):
-            acc_rot_v[i,c] = sum(curr_ev[0:i])
+    # c=0
+    # for ev in np.unique(min_event.loc[:, 'event']):
+    #     if ev == 0:
+    #         continue
+    #     curr_ev = curr_data.loc[curr_data.loc[:, 'event']==ev, 'rot_v']
+    #     curr_ev = curr_ev.reset_index(drop=True)
+    #     for i in range(0, len(curr_ev)-1):
+    #         acc_rot_v[i,c] = np.nansum(curr_ev[0:i])
             
         
-        c=c+1
+    #     c=c+1
     
-    plt.plot(acc_rot_v)
-    plt.title(ID + ' - accumulated response for dots moving right')
-    plt.xlabel('frames')
-    plt.ylabel('accumulated orientation change')
-    plt.ylim([-6000, 6000])
-    plt.savefig('accormin')
-    plt.show()
+    # plt.plot(acc_rot_v)
+    # plt.title(ID + ' - accumulated response for dots moving left')
+    # plt.xlabel('frames')
+    # plt.ylabel('accumulated orientation change')
+    # plt.ylim([-6000, 6000])
+    # plt.savefig('accormin.svg')
+    # plt.show()
     
         
-    min_four_event = curr_data.loc[curr_data.loc[:,'stim_speed']>0, ['event', 'rot_v']]
-    acc_rot_v_minfour = np.zeros((5000, 120)) 
-    acc_rot_v_minfour.fill(np.nan)
+    # min_four_event = curr_data.loc[curr_data.loc[:,'stim_speed']>0, ['event', 'rot_v']]
+    # acc_rot_v_minfour = np.zeros((5500, 120)) 
+    # acc_rot_v_minfour.fill(np.nan)
 
-    c=0
-    for ev in np.unique(min_four_event.loc[:, 'event']):
-        if ev == 0:
-            continue
-        curr_minfour_ev = curr_data.loc[curr_data.loc[:, 'event']==ev, 'rot_v']
-        curr_minfour_ev = curr_minfour_ev.reset_index(drop=True)
-        for i in range(0, len(curr_minfour_ev)-1):
-            acc_rot_v_minfour[i,c] = sum(curr_minfour_ev[0:i])
+    # c=0
+    # for ev in np.unique(min_four_event.loc[:, 'event']):
+    #     if ev == 0:
+    #         continue
+    #     curr_minfour_ev = curr_data.loc[curr_data.loc[:, 'event']==ev, 'rot_v']
+    #     curr_minfour_ev = curr_minfour_ev.reset_index(drop=True)
+    #     for i in range(0, len(curr_minfour_ev)-1):
+    #         acc_rot_v_minfour[i,c] = np.nansum(curr_minfour_ev[0:i])
             
         
-        c=c+1
+    #     c=c+1
     
-    # minfour_acc.loc[:,ID]= acc_rot_v_minfour
-    plt.plot(acc_rot_v_minfour)
-    plt.title(ID + ' - accumulated response for dots moving left')
-    plt.xlabel('frames')
-    plt.ylabel('accumulated orientation change')
-    plt.ylim([-6000, 6000])
-    plt.savefig('accorplus')
-    plt.show()
+    # # minfour_acc.loc[:,ID]= acc_rot_v_minfour
+    # plt.plot(acc_rot_v_minfour)
+    # plt.title(ID + ' - accumulated response for dots moving right')
+    # plt.xlabel('frames')
+    # plt.ylabel('accumulated orientation change')
+    # plt.ylim([-6000, 6000])
+    # plt.savefig('accorplus.svg')
+    # plt.show()
+    
     # # takes the rotation vectors of all 4 and 8 Hz events and plots them
     # eight_four = curr_events.loc[(curr_events.loc[:, 'speed'] >= 4) | (curr_events.loc[:, 'speed'] <= -4), ['disttr', 'rot_v']]
 
@@ -280,12 +345,12 @@ for ID in animals:
 
     # get back to data folder so it can load next locust
     #os.chdir("Z:\DATA\experiment_trackball_Optomotor")
-    os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data\smalldots")
+    os.chdir("C:/Users/excid/Documents/University/Master/experiment/trackball/data/densities")
 
-    # # Make trajectory plots
-    # # BEWARE this is incredibly slow.
-    # # gets all stimulus speeds and sorts them
-    # speeds = pd.unique(curr_events.loc[:, 'speed'])
+    # Make trajectory plots
+    # BEWARE this is incredibly slow.
+    # gets all stimulus speeds and sorts them
+    # speeds = pd.unique(curr_events.loc[:, 'dot_num'])
     # speeds = np.sort(speeds)
 
     # # gets color map for the trajectories
@@ -293,15 +358,15 @@ for ID in animals:
 
     # # loops through stimulus speeds and gets positions of  the events with that speed
     # for s in speeds:
-    #   s=-4
-    #   curr_speed= curr_events.loc[:, 'speed']== s
+      
+    #   curr_speed= curr_events.loc[:, 'dot_num']== s
     #   curr_speed=np.where(curr_speed)
 
     # # makes a plot of 15 subplots for current stimulus speed
     #   fig, ax = plt.subplots(3,5, figsize=(40,20))
-    #   fig.suptitle( 'Animal 01; speed:'+ str(s), fontsize=50)
+    #   fig.suptitle( 'Animal 01; dot_num:'+ str(s), fontsize=50)
 
-    #  # row and column of subplot position
+    #   # row and column of subplot position
     #   row=0
     #   col=0
 
@@ -315,10 +380,10 @@ for ID in animals:
     #       for p in range(0,len(curr_data.loc[curr_data.loc[:,'event']==i+1, 'x_pos'])-1):
     #           ax[row,col].scatter(plotdatx.iloc[p],plotdaty.iloc[p] , 1, color= color.colors[p])
 
-    #    col = col + 1 # new column
-    #    if col > 4: # when in every column of one row already is a plot go to next row
-    #         col = 0
-    #         row = row + 1
+    #       col = col + 1 # new column
+    #       if col > 4: # when in every column of one row already is a plot go to next row
+    #           col = 0
+    #           row = row + 1
 
     # plt.show() #show plot
 
