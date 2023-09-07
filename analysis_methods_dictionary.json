@@ -1,0 +1,14 @@
+{
+ "experiment_name": "dots",
+ "update_dataset": true,
+ "overwrite_curated_dataset": true,
+ "plot_trace": false,
+ "debug_mode": false,
+ "filtering_method": "sg_filter",
+ "load_experiment_condition": true,
+ "condition_of_interest": "single",
+ "analye_stimulus_by_time": false,
+ "plotting_tbt_overview": true,
+ "plotting_trajectory": false,
+ "plotting_optomotor_response": true
+}
