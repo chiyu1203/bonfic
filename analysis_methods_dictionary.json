@@ -7,8 +7,10 @@
  "filtering_method": "sg_filter",
  "load_experiment_condition": true,
  "condition_of_interest": "single",
- "analye_stimulus_by_time": false,
+ "analyse_stimulus_by_time": true,
  "plotting_tbt_overview": true,
  "plotting_trajectory": false,
- "plotting_optomotor_response": true
+ "plotting_event_related_histogram": false,
+ "plotting_event_related_velocity": false,
+ "plotting_optomotor_response": false
 }

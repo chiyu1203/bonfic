@@ -9,10 +9,11 @@ analysis_methods = {
     "filtering_method": "sg_filter",
     "load_experiment_condition": True,
     "condition_of_interest": "single",
-    "analye_stimulus_by_time" : True,
-    "plotting_tbt_overview": False,
+    "analyse_stimulus_by_time" : True,
+    "plotting_tbt_overview": True,
     "plotting_trajectory" : False,
     "plotting_event_related_trajectory" : False,
+    "plotting_optomotor_response": False,
 }
 json_string = json.dumps(analysis_methods, indent=1)
 with open(file_name, "w") as f:

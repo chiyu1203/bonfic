@@ -23,6 +23,7 @@ grey_duration=5
 #analysis_window=frame_rate*(stim_duration+grey_duration)
 analysis_window=[-5, 25]
 running_speed_threshold=5
+turning_threshold=0.33
 window_length=analysis_window[1]-analysis_window[0]
 #stim_type=["clock_coh100","clock_coh75","clock_coh50","clock_coh25","clock_coh0","anticlock_coh100","anticlock_coh75","anticlock_coh50","anticlock_coh25"]
 stim_type=[100,75,50,25,0,-25,-50,-75,-100]# plue value representing clockwise, counterclockwise is minus, then the rest is coherence leve
@@ -30,10 +31,9 @@ def optomotor_response_idx(ev_dat):
     opt_idx =(np.nansum(abs(ev_dat[ev_dat<0]))- np.nansum(abs(ev_dat[ev_dat>0])))/(np.nansum(abs(ev_dat[ev_dat<0]))+ np.nansum(abs(ev_dat[ev_dat>0])))
     return opt_idx
 
-def main(thisDir, analysis_methods):
-    #travel_distance_all_trials=[]
-    #travel_of_interest_in_the_experiment=[]
-    #opto_of_interest_in_the_experiment=[]
+def main(thisDir, json_file):
+    with open(json_file, "r") as f:
+        analysis_methods = json.loads(f.read())
     file = os.listdir(thisDir)
     file_name= fnmatch.filter(file, database_pattern)
     database= os.path.join(thisDir,file_name[0])
@@ -151,7 +151,9 @@ def main(thisDir, analysis_methods):
     #opto_of_interest_in_the_experiment=[]
     travel_distance_during_stim_all=[]
     travel_distance_prior_stim_all=[]
+    optomotor_response_during_stim_all=[]
     velocity_list=[]
+    index_list=[]
     opto_running_trials=[]
     travel_distance_running_trials=[]
     x_axis_value_running_trials=[]
@@ -159,12 +161,18 @@ def main(thisDir, analysis_methods):
     init_frame=init_time*frame_rate
     end_time=abs(analysis_window[0])+stim_duration
     end_frame=end_time*frame_rate
-    if analysis_methods.get("analye_stimulus_by_time")== True:
+    vz=df.loc[:, ['delta rotation vector lab z']].values
+    if analysis_methods.get("analyse_stimulus_by_time")== True:
         stim_to_analyse=stim_df.loc[:,'stim_onset']
         stim_name_list=np.array(stim_df["stim_type"])
         grey_onset=stim_to_analyse+np.ones(len(stim_to_analyse),dtype=int)*analysis_window[0]*frame_rate
         analysie_window_tile=np.tile(np.arange(window_length*frame_rate),(len(grey_onset),1))
         index_points=np.array(grey_onset).reshape(len(grey_onset),1)+analysie_window_tile
+        velocity_z=vz[index_points]
+        opto_all_trials=np.ones(velocity_z.shape[0])
+        for i in range(0,velocity_z.shape[0]):
+            opto_all_trials[i]=optomotor_response_idx(velocity_z[i,init_time*frame_rate:,0])
+        turning_trials=abs(opto_all_trials)>turning_threshold
         x=x_all[index_points]
         y=y_all[index_points]
         x_dif=np.diff(x,axis=1)
@@ -176,15 +184,34 @@ def main(thisDir, analysis_methods):
         cum_travel_distance=np.cumsum(np.sqrt(np.add(np.square(x_dif), np.square(y_dif))),axis=1)
         travel_distance_prior_stim=cum_travel_distance[:,init_frame,0]
         travel_distance_during_stim=cum_travel_distance[:,-1,0]-travel_distance_prior_stim
+        running_trial=travel_distance_during_stim>running_speed_threshold
+        trial_of_interest=(turning_trials==True)&(running_trial==True)
+        straight_walk_trials=opto_all_trials[(turning_trials==False)&(running_trial==True)]
+        stationary_trials=opto_all_trials[running_trial==False]
+        follow_response=opto_all_trials[trial_of_interest]*stim_name_list[trial_of_interest]>0
+        against_response=opto_all_trials[trial_of_interest]*stim_name_list[trial_of_interest]<0
+        spontaneous_turn=opto_all_trials[trial_of_interest]*stim_name_list[trial_of_interest]==0
         travel_distance_during_stim_all.append(travel_distance_during_stim)
         #travel_distance_prior_stim=cum_travel_distance[:,init_frame,0]
         travel_distance_prior_stim_all.append(travel_distance_prior_stim)
+        optomotor_response_during_stim_all.append(opto_all_trials)
             #travel_distance_tbt=np.concatenate(travel_distance_prior_stim_all)        
             ##concatenate travel distance for histogram
 
             ##instead of stim_duration, I used a fixed 3 sec that is the shortest stim_duration here
-        print("ready to plot graph")
+        print("ready to plot graph with some data")
+        # if analysis_methods.get("plotting_event_related_histogram")== True:
+        #     fig, axes = plt.subplots(1,len(opto_running_trials),figsize=(40,3),squeeze=False)
+        #     for i, ax in zip(range(0,index_points.shape[1]),axes.reshape(-1)):
+        #         this_response=opto_running_trials[i]
+        #         this_coherence=x_axis_value_running_trials[i]
+        #         ax.hist(this_response)
+        #         ax.set_title(f'stimulus coherence level: {this_coherence}')
+        #     plt.show()
+
+        
         if analysis_methods.get("plotting_tbt_overview")==True:
+            optomotor_response_during_stim=np.concatenate(optomotor_response_during_stim_all)
             travel_distance_prior_stim=np.concatenate(travel_distance_prior_stim_all)
             travel_distance_during_stim=np.concatenate(travel_distance_during_stim_all)
 
@@ -194,14 +221,14 @@ def main(thisDir, analysis_methods):
             heatmap_xticks=[init_frame, end_frame] 
             #trial_num_across_stim=np.cumsum(trial_num)
             fig, (ax,ax1,ax2) = plt.subplots(nrows=1, ncols=3, figsize=(18,7),tight_layout=True)
-            ax.hist(travel_distance_prior_stim, bins=20)
-            ax.set_xlabel('travel distance (mm)')
+            ax.hist(optomotor_response_during_stim, bins=20)
+            ax.set_xlabel('optomotor index')
             ax.set_ylabel('frequency')
-            ax.set_title('travel distance before a trial')
+            ax.set_title('optomotor response during stimulus presentation')
             ax1.hist(travel_distance_during_stim, bins=20)
             ax1.set_xlabel('travel distance (mm)')
             ax1.set_ylabel('frequency')
-            ax1.set_title('travel distance during a trial')
+            ax1.set_title('travel distance during stimulus presentation')
             ## draw subplot2
             pcm=ax2.pcolormesh(velocity_tbt, cmap = 'magma',vmin = 0, vmax =100)
             #pcm=ax2.pcolormesh(velocity_tbt, cmap = 'magma') ##sometimes, we dont need a vmax
@@ -224,7 +251,12 @@ def main(thisDir, analysis_methods):
             ax2.set_xlabel('Time (s)')
             ## add title
             ax2.set_title('stimulus evoked velocity preview')
-        return velocity_tbt
+        
+        #print(len(velocity_tbt))
+        #print(len(travel_distance_during_stim_all))
+        #try not to return variables as list. Instead, outputing them as array
+        return velocity_tbt,travel_distance_during_stim_all
+
     else:
         for stim_types in range(0,len(stim_type)):
             this_stim=stim_type[stim_types]
@@ -233,8 +265,9 @@ def main(thisDir, analysis_methods):
             grey_onset=stim_to_analyse+np.ones(len(stim_to_analyse),dtype=int)*analysis_window[0]*frame_rate
             analysie_window_tile=np.tile(np.arange(window_length*frame_rate),(len(grey_onset),1))
             index_points=np.array(grey_onset).reshape(len(grey_onset),1)+analysie_window_tile
-            vz=df.loc[:, ['delta rotation vector lab z']].values
+
             velocity_z=vz[index_points]
+            velocity_list.append(velocity_z[:,:,0])
             opto_all_trials=[]
             for i in range(0,velocity_z.shape[0]):
                 test=optomotor_response_idx(velocity_z[i,init_time*frame_rate:,0])
@@ -249,6 +282,7 @@ def main(thisDir, analysis_methods):
             travel_distance_prior_stim=cum_travel_distance[:,init_time*frame_rate,0]
             travel_distance_during_stim=cum_travel_distance[:,-1,0]-travel_distance_prior_stim
             travel_distance_during_stim_all.append(travel_distance_during_stim)
+            index_list.append(stim_to_analyse.index)
 
             ## analyse focus on moving trials
             trial_of_interest=travel_distance_during_stim>running_speed_threshold
@@ -258,13 +292,36 @@ def main(thisDir, analysis_methods):
             travel_distance_running_trials.append(travel_of_interest)
             #coherence_value=np.ones(trial_of_interest.shape[0])*this_stim
             x_axis_value_running_trials.append(this_stim)
+            
 
-            '''
-            if analysis_methods.get("plotting_event_related_velocity")== True:
-            '''
+        if analysis_methods.get("plotting_event_related_velocity")== True:
+            fig, axes = plt.subplots(1,len(velocity_list),figsize=(40,3),squeeze=False)
+            tp=np.linspace(0,window_length,velocity_list[0].shape[1])
+            for i, ax in zip(range(0,index_points.shape[1]),axes.reshape(-1)):
+                this_response=velocity_list[i]
+                this_coherence=x_axis_value_running_trials[i]
+                mean_response=np.mean(this_response, axis=0)
+                sem_response=np.std(this_response, axis=0, ddof=1) / np.sqrt(this_response.shape[0])
+                v_add_sem = mean_response + sem_response
+                v_min_sem = mean_response - sem_response
+                ax.plot(tp,mean_response)
+                ax.fill_between(tp,v_add_sem,v_min_sem, alpha=0.5, linewidth=0)
+                ax.axvline(x=abs(analysis_window[0]), color='black', linestyle='-', label='Stim start',linewidth=1)
+                #ax.axvline(x=(abs(analysis_window[0])+stim_duration), color='black', linestyle='--', label='Stim end',linewidth=1)
+                ax.set_title(f'stimulus coherence level: {this_coherence}')
+                #ax.title=(f'coherence_{this_coherence}_during_stimulus')
+                #plot_file=f'coherence_{this_coherence}_during_stimulus.png'
+                #plt.ylim(0.1, 100)
+                #ax.set_yticks([0,10,20])
+                #ax.set_yticklabels(['0','10','20'])
+                #ax.set_yscale('log')
+                
+                #plt.savefig(thisDir+plot_file)
+            plt.show()
+
         if analysis_methods.get("plotting_optomotor_response")== True:
             colormap = np.array(['r', 'y', 'm', 'c','k','b','g','r'])
-            fig, (ax,ax2)= plt.subplots(nrows=1, ncols=2, figsize=(18,7),tight_layout=True)
+            fig, (ax,ax1)= plt.subplots(nrows=1, ncols=2, figsize=(18,7),tight_layout=True)
             for i in range(len(opto_running_trials)):
                 this_response=opto_running_trials[i]
                 this_coherence=x_axis_value_running_trials[i]
@@ -278,16 +335,14 @@ def main(thisDir, analysis_methods):
             #ax.set_xticklabels(['100','75','50','25','0','25','50','75','100'],size=16)
             ax.set_xlabel('Coherence level (%)', fontsize=18)
             ax.set_ylabel('Optomotor Index', fontsize=18)
-            plt.show()
+            #plt.show()
+        return travel_distance_running_trials, opto_running_trials, index_list
             
 
 if __name__ == "__main__":
-    #thisDir=os.getcwd()
     thisDir='C:/Users/neuroLaptop/Documents/L23038/230824/dots'
     json_file = "analysis_methods_dictionary.json"
-    with open(json_file, "r") as f:
-        analysis_methods = json.loads(f.read())
     tic = time.perf_counter()
-    main(thisDir, analysis_methods)
+    main(thisDir, json_file)
     toc = time.perf_counter()
     print(f"it takes {toc-tic:0.4f} seconds to run the main function")

@@ -3,7 +3,9 @@ import json
 import time
 import pandas as pd
 
-def generate_curated_database(myList, analysis_methods):
+def generate_curated_database(myList, json_file):
+    with open(json_file, "r") as f:
+        analysis_methods = json.loads(f.read())
     #csv_pattern='trial_*.csv'
     dat_pattern='*.dat'    
     track_ball_radius=40
@@ -55,11 +57,9 @@ def generate_curated_database(myList, analysis_methods):
                 raw_data.to_pickle(database_directory)
 
 if __name__ == "__main__":
-    thisDir=os.getcwd()
+    thisDir='C:/Users/neuroLaptop/Documents/L23038/230824/dots'
     json_file = "analysis_methods_dictionary.json"
-    with open(json_file, "r") as f:
-        analysis_methods = json.loads(f.read())
     tic = time.perf_counter()
-    generate_curated_database(thisDir, analysis_methods)
+    generate_curated_database(thisDir, json_file)
     toc = time.perf_counter()
     print(f"it takes {toc-tic:0.4f} seconds to run the main function")
