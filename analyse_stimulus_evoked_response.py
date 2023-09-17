@@ -21,7 +21,7 @@ frame_rate=144
 stim_duration=25
 grey_duration=5
 #analysis_window=frame_rate*(stim_duration+grey_duration)
-analysis_window=[-5, 25]
+analysis_window=[grey_duration*-1, stim_duration]
 running_speed_threshold=5
 turning_threshold=0.33
 window_length=analysis_window[1]-analysis_window[0]
@@ -171,7 +171,8 @@ def main(thisDir, json_file):
         velocity_z=vz[index_points]
         opto_all_trials=np.ones(velocity_z.shape[0])
         for i in range(0,velocity_z.shape[0]):
-            opto_all_trials[i]=optomotor_response_idx(velocity_z[i,init_time*frame_rate:,0])
+            opto_all_trials[i]=optomotor_response_idx(velocity_z[i,init_frame:,0])
+        
         turning_trials=abs(opto_all_trials)>turning_threshold
         x=x_all[index_points]
         y=y_all[index_points]
@@ -185,12 +186,19 @@ def main(thisDir, json_file):
         travel_distance_prior_stim=cum_travel_distance[:,init_frame,0]
         travel_distance_during_stim=cum_travel_distance[:,-1,0]-travel_distance_prior_stim
         running_trial=travel_distance_during_stim>running_speed_threshold
-        trial_of_interest=(turning_trials==True)&(running_trial==True)
+        turning_walk_trials=opto_all_trials[(turning_trials==True)&(running_trial==True)]
+        stim_coherence_interest=stim_name_list[(turning_trials==True)&(running_trial==True)]
+        #opto_interest=opto_all_trials[turning_walk_trials]
         straight_walk_trials=opto_all_trials[(turning_trials==False)&(running_trial==True)]
         stationary_trials=opto_all_trials[running_trial==False]
-        follow_response=opto_all_trials[trial_of_interest]*stim_name_list[trial_of_interest]>0
-        against_response=opto_all_trials[trial_of_interest]*stim_name_list[trial_of_interest]<0
-        spontaneous_turn=opto_all_trials[trial_of_interest]*stim_name_list[trial_of_interest]==0
+        follow_trials=turning_walk_trials*stim_coherence_interest<0
+        against_trials=turning_walk_trials*stim_coherence_interest>0
+        spontaneous_turn_trials=turning_walk_trials*stim_coherence_interest==0
+        follow_trials_coherence=stim_coherence_interest[follow_trials]
+        against_trials_coherence=stim_coherence_interest[against_trials]
+        follow_trials_response=turning_walk_trials[follow_trials]
+        against_trials_response=turning_walk_trials[against_trials]
+        spontaneous_trials_response=turning_walk_trials[spontaneous_turn_trials]
         travel_distance_during_stim_all.append(travel_distance_during_stim)
         #travel_distance_prior_stim=cum_travel_distance[:,init_frame,0]
         travel_distance_prior_stim_all.append(travel_distance_prior_stim)
@@ -208,6 +216,13 @@ def main(thisDir, json_file):
         #         ax.hist(this_response)
         #         ax.set_title(f'stimulus coherence level: {this_coherence}')
         #     plt.show()
+        summary_list={
+            'opto_index':opto_all_trials,
+            'travel_distance':travel_distance_during_stim,
+            'stim_index':stim_to_analyse.index,
+            'coherence_level':stim_name_list
+        }
+        summary_df=pd.DataFrame(summary_list)
 
         
         if analysis_methods.get("plotting_tbt_overview")==True:
