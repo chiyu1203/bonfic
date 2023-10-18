@@ -16,6 +16,7 @@ from scipy.signal import savgol_filter
 import matplotlib.pyplot as plt
 
 csv_pattern = "trial_*.csv"
+tracking_csv_pattern = "tracking_*.csv"
 database_pattern = "*.pickle"
 exp_name = "dots"
 frame_rate = 144
@@ -72,6 +73,26 @@ def main(thisDir, json_file):
 
     ##here to start analying stimulus-evoked response.
     ##Firstly, load stimulus information
+    tracking_csv_file = fnmatch.filter(file, tracking_csv_pattern)
+    tracking_csv_file_directory = os.path.join(thisDir, tracking_csv_file[0])
+    # df = pd.read_csv('castle.dat', skiprows=3, names=['a', 'b', 'c'],
+    #                  sep=' |:', engine='python')
+    # tracking_info = pd.read_csv(tracking_csv_file_directory, delimiter=" ")
+    tracking_info = pd.read_csv(
+        tracking_csv_file_directory, delimiter="(", engine="python"
+    )
+    tracking_info = tracking_info.reset_index()
+    tracking_info[["timestamp", "value"]] = tracking_info.iloc[:, 1].str.split(
+        ", ", expand=True
+    )
+    tracking_info["value"] = tracking_info["value"].str.replace(r"[()]", "", regex=True)
+    tracking_info["value"] = tracking_info["value"].str.replace(r"[,]", ".", regex=True)
+    tracking_info["timestamp"] = tracking_info["timestamp"].str.replace(
+        r"[,]", ".", regex=True
+    )
+    tracking_info["timestamp"] = pd.to_numeric(tracking_info["timestamp"])
+    tracking_info["timestamp"] = tracking_info["timestamp"].astype("float32")
+    tracking_info["value"] = pd.to_numeric(tracking_info["value"])
     csv_file = fnmatch.filter(file, csv_pattern)
     csv_file_directory = os.path.join(thisDir, csv_file[0])
     stim_info = pd.read_csv(csv_file_directory)
@@ -115,71 +136,126 @@ def main(thisDir, json_file):
         # some bugs in the bonsai workflow. Needs to remove the first timestamp and the last row of stim variable here
         stimulus_timestamp.pop(0)
         stim_variable = np.delete(stim_variable, -1, axis=0)
-        stim_df = pd.DataFrame(stim_variable)
+        stim_info = pd.DataFrame(stim_variable)
         if exp_date in ["221015", "221016"]:
             filters = [
-                (stim_df.iloc[:, 0] == 1) & (stim_df.iloc[:, 2] > stim_df.iloc[:, 3]),
-                (stim_df.iloc[:, 0] == 8) & (stim_df.iloc[:, 2] > stim_df.iloc[:, 3]),
-                (stim_df.iloc[:, 0] == 1) & (stim_df.iloc[:, 2] < stim_df.iloc[:, 3]),
-                (stim_df.iloc[:, 0] == 8) & (stim_df.iloc[:, 2] < stim_df.iloc[:, 3]),
-                (stim_df.iloc[:, 0] == 1) & (stim_df.iloc[:, 2] == stim_df.iloc[:, 3]),
-                (stim_df.iloc[:, 0] == 8) & (stim_df.iloc[:, 2] == stim_df.iloc[:, 3]),
+                (stim_info.iloc[:, 0] == 1)
+                & (stim_info.iloc[:, 2] > stim_info.iloc[:, 3]),
+                (stim_info.iloc[:, 0] == 8)
+                & (stim_info.iloc[:, 2] > stim_info.iloc[:, 3]),
+                (stim_info.iloc[:, 0] == 1)
+                & (stim_info.iloc[:, 2] < stim_info.iloc[:, 3]),
+                (stim_info.iloc[:, 0] == 8)
+                & (stim_info.iloc[:, 2] < stim_info.iloc[:, 3]),
+                (stim_info.iloc[:, 0] == 1)
+                & (stim_info.iloc[:, 2] == stim_info.iloc[:, 3]),
+                (stim_info.iloc[:, 0] == 8)
+                & (stim_info.iloc[:, 2] == stim_info.iloc[:, 3]),
             ]
 
         else:
             filters = [
-                (stim_df.iloc[:, 6] == 1) & (stim_df.iloc[:, 2] > stim_df.iloc[:, 3]),
-                (stim_df.iloc[:, 6] == 2) & (stim_df.iloc[:, 2] > stim_df.iloc[:, 3]),
-                (stim_df.iloc[:, 6] == 1) & (stim_df.iloc[:, 2] < stim_df.iloc[:, 3]),
-                (stim_df.iloc[:, 6] == 2) & (stim_df.iloc[:, 2] < stim_df.iloc[:, 3]),
-                (stim_df.iloc[:, 6] == 1) & (stim_df.iloc[:, 2] == stim_df.iloc[:, 3]),
-                (stim_df.iloc[:, 6] == 2) & (stim_df.iloc[:, 2] == stim_df.iloc[:, 3]),
+                (stim_info.iloc[:, 6] == 1)
+                & (stim_info.iloc[:, 2] > stim_info.iloc[:, 3]),
+                (stim_info.iloc[:, 6] == 2)
+                & (stim_info.iloc[:, 2] > stim_info.iloc[:, 3]),
+                (stim_info.iloc[:, 6] == 1)
+                & (stim_info.iloc[:, 2] < stim_info.iloc[:, 3]),
+                (stim_info.iloc[:, 6] == 2)
+                & (stim_info.iloc[:, 2] < stim_info.iloc[:, 3]),
+                (stim_info.iloc[:, 6] == 1)
+                & (stim_info.iloc[:, 2] == stim_info.iloc[:, 3]),
+                (stim_info.iloc[:, 6] == 2)
+                & (stim_info.iloc[:, 2] == stim_info.iloc[:, 3]),
             ]
         ### use this criteria for experiments during exp_date=['221015','221016']
 
     elif analysis_methods.get("experiment_name") == "dots":
-        for row in range(0, len(stim_info)):
-            stim_variable.append(int(stim_info.iloc[row, 2].split("=", 1)[1]))
-            stim_variable.append(int(stim_info.iloc[row, 4].split("=", 1)[1]))
-            stim_variable.append(int(stim_info.iloc[row, 5].split("=", 1)[1]))
-            stim_variable.append(int(stim_info.iloc[row, 7].split("=", 1)[1]))
-            stim_variable.append(int(stim_info.iloc[row, 11].split("=", 1)[1]))
-            stim_variable.append(int(stim_info.iloc[row, 13].split("=", 1)[1]))
-            stim_variable.append(int(stim_info.iloc[row, 17].split("=", 1)[1]))
-            if isinstance(stim_info.loc[row, "Value"], float):
-                timestamp = stim_info.loc[row, "Timestamp"]
-            else:
-                timestamp = (
-                    str(stim_info.loc[row, "Timestamp"])
-                    + "."
-                    + stim_info.loc[row, "Value"]
-                )
-            stimulus_timestamp.append(float(timestamp.replace(")", "")))
-        stim_variable = np.array(stim_variable).reshape((len(stim_info), -1))
-        stim_df = pd.DataFrame(stim_variable)
-        filters = [
-            (stim_df.iloc[:, 5] < 1) & (stim_df.iloc[:, 6] == 100),
-            (stim_df.iloc[:, 5] < 1) & (stim_df.iloc[:, 6] == 75),
-            (stim_df.iloc[:, 5] < 1) & (stim_df.iloc[:, 6] == 50),
-            (stim_df.iloc[:, 5] < 1) & (stim_df.iloc[:, 6] == 25),
-            (stim_df.iloc[:, 5] < 1) & (stim_df.iloc[:, 6] == 0),
-            (stim_df.iloc[:, 5] > 1) & (stim_df.iloc[:, 6] == 25),
-            (stim_df.iloc[:, 5] > 1) & (stim_df.iloc[:, 6] == 50),
-            (stim_df.iloc[:, 5] > 1) & (stim_df.iloc[:, 6] == 75),
-            (stim_df.iloc[:, 5] > 1) & (stim_df.iloc[:, 6] == 100),
+        col_num = [2, 4, 5, 7, 11, 13, 15, 17]
+        col_name = [
+            "ID",
+            "Size",
+            "Colour",
+            "numDots",
+            "Contrast",
+            "VelX",
+            "VelY",
+            "Coherence",
         ]
+        for i, j in zip(col_num, col_name):
+            stim_info[["tmp", j]] = stim_info.iloc[:, i].str.split("=", expand=True)
+            stim_info[j] = pd.to_numeric(stim_info[j])
+        stim_info["Value"] = stim_info["Value"].str.replace(r"[()]", "", regex=True)
+        stim_info["Timestamp"] = stim_info["Timestamp"].astype(str)
+        stim_info["timestamp"] = stim_info[["Timestamp", "Value"]].agg(".".join, axis=1)
+        stim_info["timestamp"] = pd.to_numeric(stim_info["timestamp"])
+        stim_info["timestamp"] = stim_info["timestamp"].astype("float32")
+        stim_info.drop(columns=stim_info.columns[0:22], inplace=True)
+        # for row in range(0, len(stim_info)):
+        #     stim_variable.append(int(stim_info.iloc[row, 2].split("=", 1)[1]))
+        #     stim_variable.append(int(stim_info.iloc[row, 4].split("=", 1)[1]))
+        #     stim_variable.append(int(stim_info.iloc[row, 5].split("=", 1)[1]))
+        #     stim_variable.append(int(stim_info.iloc[row, 7].split("=", 1)[1]))
+        #     stim_variable.append(int(stim_info.iloc[row, 11].split("=", 1)[1]))
+        #     stim_variable.append(int(stim_info.iloc[row, 13].split("=", 1)[1]))
+        #     stim_variable.append(int(stim_info.iloc[row, 17].split("=", 1)[1]))
+        #     if isinstance(stim_info.loc[row, "Value"], float):
+        #         timestamp = stim_info.loc[row, "Timestamp"]
+        #     else:
+        #         timestamp = (
+        #             str(stim_info.loc[row, "Timestamp"])
+        #             + "."
+        #             + stim_info.loc[row, "Value"]
+        #         )
+        #     stimulus_timestamp.append(float(timestamp.replace(")", "")))
+        # stim_variable = np.array(stim_variable).reshape((len(stim_info), -1))
+        # stim_info = pd.DataFrame(stim_variable)
+        filters = [
+            (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 100),
+            (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 75),
+            (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 50),
+            (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 25),
+            (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 0),
+            (stim_info["VelX"] > 1) & (stim_info["Coherence"] == 25),
+            (stim_info["VelX"] > 1) & (stim_info["Coherence"] == 50),
+            (stim_info["VelX"] > 1) & (stim_info["Coherence"] == 75),
+            (stim_info["VelX"] > 1) & (stim_info["Coherence"] == 100),
+        ]
+
+        # filters = [
+        #     (stim_info.iloc[:, 5] < 1) & (stim_info.iloc[:, 6] == 100),
+        #     (stim_info.iloc[:, 5] < 1) & (stim_info.iloc[:, 6] == 75),
+        #     (stim_info.iloc[:, 5] < 1) & (stim_info.iloc[:, 6] == 50),
+        #     (stim_info.iloc[:, 5] < 1) & (stim_info.iloc[:, 6] == 25),
+        #     (stim_info.iloc[:, 5] < 1) & (stim_info.iloc[:, 6] == 0),
+        #     (stim_info.iloc[:, 5] > 1) & (stim_info.iloc[:, 6] == 25),
+        #     (stim_info.iloc[:, 5] > 1) & (stim_info.iloc[:, 6] == 50),
+        #     (stim_info.iloc[:, 5] > 1) & (stim_info.iloc[:, 6] == 75),
+        #     (stim_info.iloc[:, 5] > 1) & (stim_info.iloc[:, 6] == 100),
+        # ]
     else:
         warnings.warn("stimulus paradigm can not be recognised")
         return
 
     # compare the timestamp between event file and dat file
-    data_timestamp = df.loc[:, "timestamp"]
+    stimulus_timestamp = stim_info["timestamp"].to_numpy()
+    if df.loc[:, "timestamp"][0] > 0:
+        data_timestamp = df.loc[:, "timestamp"]
+    else:
+        data_timestamp = tracking_info["timestamp"]
+        stimulus_timestamp_b = np.tile(stimulus_timestamp, (len(data_timestamp), 1))
+        data_timestamp_b = np.tile(data_timestamp, (len(stimulus_timestamp), 1))
+        timestamp_diff = data_timestamp_b > np.transpose(stimulus_timestamp_b)
+        stim_onset1 = np.where(np.roll(timestamp_diff, 1, axis=1) != timestamp_diff)[1][
+            1::2
+        ]
+
     stimulus_timestamp_b = np.tile(stimulus_timestamp, (len(data_timestamp), 1))
     data_timestamp_b = np.tile(data_timestamp, (len(stimulus_timestamp), 1))
     timestamp_diff = data_timestamp_b > np.transpose(stimulus_timestamp_b)
     stim_onset = np.where(np.roll(timestamp_diff, 1, axis=1) != timestamp_diff)[1][1::2]
-    stim_df["stim_onset"] = stim_onset
-    stim_df["stim_type"] = np.select(filters, stim_type)
+    stim_info["stim_onset"] = stim_onset
+    stim_info["stim_type"] = np.select(filters, stim_type)
     # travel_distance_all_trials=[]
     # travel_of_interest_in_the_experiment=[]
     # opto_of_interest_in_the_experiment=[]
@@ -197,8 +273,8 @@ def main(thisDir, json_file):
     end_frame = end_time * frame_rate
     vz = df.loc[:, ["delta rotation vector lab z"]].values
     if analysis_methods.get("analyse_stimulus_by_time") == True:
-        stim_to_analyse = stim_df.loc[:, "stim_onset"]
-        stim_name_list = np.array(stim_df["stim_type"])
+        stim_to_analyse = stim_info.loc[:, "stim_onset"]
+        stim_name_list = np.array(stim_info["stim_type"])
         grey_onset = (
             stim_to_analyse
             + np.ones(len(stim_to_analyse), dtype=int) * analysis_window[0] * frame_rate
@@ -401,14 +477,7 @@ def main(thisDir, json_file):
             # ax.set_xticklabels(['100','75','50','25','0','25','50','75','100'],size=16)
             # ax3.set_xlabel("Coherence level (%)", fontsize=18)
             # ax3.set_ylabel("Optomotor Index", fontsize=18)
-            ax4.scatter(follow_count_coherence, follow_count, c=colormap[0], marker="o")
-            ax4.set_ylim(0, 15)
-            ax4.set(
-                yticks=[0, 15],
-                ylabel="Follow response (count)",
-                xticks=[100, 50, 0, -50, -100],
-                xlabel="Coherence level (%)",
-            )
+
             # ax4.set_ylim(0, 15)
             # ax4.set_yticks([0, 15])
             # ax.set_xticks([1,2,3,4,5,6,7,8,9])
@@ -427,10 +496,10 @@ def main(thisDir, json_file):
     else:
         for stim_types in range(0, len(stim_type)):
             this_stim = stim_type[stim_types]
-            stim_to_analyse = stim_df.loc[
-                np.where((stim_df.loc[:, "stim_type"] == this_stim)), "stim_onset"
+            stim_to_analyse = stim_info.loc[
+                np.where((stim_info.loc[:, "stim_type"] == this_stim)), "stim_onset"
             ]
-            stim_name_list = stim_df.loc[stim_to_analyse.index, "stim_type"].values
+            stim_name_list = stim_info.loc[stim_to_analyse.index, "stim_type"].values
             grey_onset = (
                 stim_to_analyse
                 + np.ones(len(stim_to_analyse), dtype=int)
