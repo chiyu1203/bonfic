@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib import cm
 
+
 # custom_cmap = [
 #     [1, 0, 0, 1],
 #     [0.8, 0, 0.2, 0.1],
@@ -29,8 +30,6 @@ from matplotlib import cm
 #     [0.2, 0, 0.8, 0.1],
 #     [0, 0, 1, 1],
 # ]
-
-
 class MplColorHelper:
     def __init__(self, cmap_name, start_val, stop_val):
         self.cmap_name = cmap_name
@@ -61,7 +60,6 @@ def main(thisDir, json_file):
     running_speed_threshold = 50
     turning_threshold = 0.33
     window_length = analysis_window[1] - analysis_window[0]
-    # stim_type=["clock_coh100","clock_coh75","clock_coh50","clock_coh25","clock_coh0","anticlock_coh100","anticlock_coh75","anticlock_coh50","anticlock_coh25"]
     stim_type = [
         -100,
         -75,
@@ -141,6 +139,7 @@ def main(thisDir, json_file):
                 )
             stimulus_timestamp.append(float(timestamp.replace(")", "")))
         stim_variable = np.array(stim_variable).reshape((len(stim_info), -1))
+        stim_info["stim_type"] = np.select(filters, stim_type)
 
     elif analysis_methods.get("experiment_name") == "sweeploom":
         for row in range(0, len(stim_info)):
@@ -164,6 +163,7 @@ def main(thisDir, json_file):
         stim_variable = np.delete(stim_variable, -1, axis=0)
         stim_info = pd.DataFrame(stim_variable)
         if exp_date in ["221015", "221016"]:
+            ### use this criteria for experiments during exp_date=['221015','221016']
             filters = [
                 (stim_info.iloc[:, 0] == 1)
                 & (stim_info.iloc[:, 2] > stim_info.iloc[:, 3]),
@@ -194,8 +194,7 @@ def main(thisDir, json_file):
                 (stim_info.iloc[:, 6] == 2)
                 & (stim_info.iloc[:, 2] == stim_info.iloc[:, 3]),
             ]
-        ### use this criteria for experiments during exp_date=['221015','221016']
-
+        stim_info["stim_type"] = np.select(filters, stim_type)
     elif analysis_methods.get("experiment_name") == "dots":
         col_num = [2, 4, 5, 7, 11, 13, 15, 17]
         col_name = [
@@ -223,18 +222,23 @@ def main(thisDir, json_file):
         stim_info["timestamp"] = pd.to_numeric(stim_info["timestamp"])
         stim_info["timestamp"] = stim_info["timestamp"].astype("float32")
         stim_info.drop(columns=stim_info.columns[0:22], inplace=True)
-        ##define the parameters of stimulus
-        filters = [
-            (stim_info["VelX"] > 1) & (stim_info["Coherence"] == 100),
-            (stim_info["VelX"] > 1) & (stim_info["Coherence"] == 75),
-            (stim_info["VelX"] > 1) & (stim_info["Coherence"] == 50),
-            (stim_info["VelX"] > 1) & (stim_info["Coherence"] == 25),
-            (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 0),
-            (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 25),
-            (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 50),
-            (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 75),
-            (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 100),
-        ]
+        ##define the category of stimulus, this is used when the category is not numeric such as loom sweep-loom
+        # filters = [
+        #     (stim_info["VelX"] > 1) & (stim_info["Coherence"] == 100),
+        #     (stim_info["VelX"] > 1) & (stim_info["Coherence"] == 75),
+        #     (stim_info["VelX"] > 1) & (stim_info["Coherence"] == 50),
+        #     (stim_info["VelX"] > 1) & (stim_info["Coherence"] == 25),
+        #     (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 0),
+        #     (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 25),
+        #     (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 50),
+        #     (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 75),
+        #     (stim_info["VelX"] < 1) & (stim_info["Coherence"] == 100),
+        # ]
+        velxcoherence = (
+            stim_info["VelX"] * stim_info["Coherence"] / abs(stim_info["VelX"])
+        )
+        stim_info["stim_type"] = -1 * velxcoherence.astype(int)
+
     else:
         warnings.warn("stimulus paradigm can not be recognised")
         return
@@ -251,7 +255,9 @@ def main(thisDir, json_file):
         stim_onset1 = np.where(np.roll(timestamp_diff, 1, axis=1) != timestamp_diff)[1][
             1::2
         ]
-        warnings.warn("still need to debug this place")
+        warnings.warn(
+            "still need to debug this place for situation where there is no log file"
+        )
         return
 
     stimulus_timestamp_b = np.tile(stimulus_timestamp, (len(data_timestamp), 1))
@@ -259,7 +265,6 @@ def main(thisDir, json_file):
     timestamp_diff = data_timestamp_b > np.transpose(stimulus_timestamp_b)
     stim_onset = np.where(np.roll(timestamp_diff, 1, axis=1) != timestamp_diff)[1][1::2]
     stim_info["stim_onset"] = stim_onset
-    stim_info["stim_type"] = np.select(filters, stim_type)
     travel_distance_during_stim_all = []
     travel_distance_prior_stim_all = []
     optomotor_response_during_stim_all = []
