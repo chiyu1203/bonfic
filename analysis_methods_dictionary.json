@@ -1,22 +1,37 @@
 {
-    "experiment_name": "dots",
-    "overwrite_curated_dataset": true,
-    "graph_colour_code": [
-        "r",
-        "y",
-        "m",
-        "c",
-        "k",
-        "b",
-        "g",
-        "r"
-    ],
-    "debug_mode": false,
-    "filtering_method": "sg_filter",
-    "plotting_tbt_overview": false,
-    "plotting_trajectory": false,
-    "plotting_event_related_trajectory": false,
-    "plotting_optomotor_response": true,
-    "load_experiment_condition_from_database": true,
-    "select_animals_by_condition": true
+ "experiment_name": "dots",
+ "overwrite_curated_dataset": true,
+ "graph_colour_code": [
+  "r",
+  "y",
+  "m",
+  "c",
+  "k",
+  "b",
+  "g",
+  "r"
+ ],
+ "debug_mode": true,
+ "filtering_method": "sg_filter",
+ "plotting_tbt_overview": true,
+ "plotting_trajectory": false,
+ "plotting_event_related_trajectory": false,
+ "plotting_optomotor_response": true,
+ "load_experiment_condition_from_database": true,
+ "select_animals_by_condition": true,
+ "analysis_by_stimulus_type": true,
+ "frame_rate": 144,
+ "stim_duration": 25,
+ "interval_duration": 5,
+ "stim_type": [
+  -100,
+  -75,
+  -50,
+  -25,
+  0,
+  25,
+  50,
+  75,
+  100
+ ]
 }

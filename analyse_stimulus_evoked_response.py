@@ -7,6 +7,7 @@ velocity vector across time in a trial plus optomotor response
 analyis methods needs to tell us what to analye. For example optomotor response, acceleration epochs, deceleration epochs, transition between stationary to walk and walk to stationary
 """
 import json
+import re
 import time
 import os, fnmatch
 import pandas as pd
@@ -41,6 +42,80 @@ class MplColorHelper:
         return self.scalarMap.to_rgba(val)
 
 
+def generate_stimulus_evoked_response(stim_to_analyse,vz,travel_distance_fbf,analysis_window,frame_rate,stim_duration):
+    print(f"plotting data from {analysis_window[0]} to {analysis_window[1]}")
+    init_time = abs(analysis_window[0])
+    init_frame = init_time * frame_rate
+    end_time = init_time + stim_duration
+    end_frame = end_time * frame_rate
+    index_points = generate_index_points(stim_to_analyse, analysis_window, frame_rate)
+    velocity_z = vz[index_points]
+    stim_travel_distance = travel_distance_fbf[index_points]
+    velocity = stim_travel_distance * frame_rate
+    cum_z_vector = np.cumsum(velocity_z, axis=1)
+    cum_travel_distance = np.cumsum(stim_travel_distance, axis=1)
+    travel_distance_prior_stim = cum_travel_distance[:, init_frame, 0]
+    travel_distance_during_stim = (
+        cum_travel_distance[:, end_frame, 0] - travel_distance_prior_stim
+    )
+    opto_all_trials = np.ones(velocity_z.shape[0])
+    ## when quantifying optomotor response, we focus on only stimulus onset so using init_frame:end_frame
+    for i in range(0, velocity_z.shape[0]):
+        opto_all_trials[i] = optomotor_response_idx(
+            velocity_z[i, init_frame:end_frame, 0]
+        )
+    return travel_distance_prior_stim, travel_distance_during_stim, opto_all_trials
+def classify_trial_type(summary_list,turning_threshold,running_speed_threshold): 
+    summary_list = {
+        "opto_index": opto_all_trials,
+        "travel_distance": travel_distance_during_stim,
+        "optoxcoherence": opto_all_trials * stim_name_list,
+        "stim_index": stim_to_analyse.index,
+        "coherence_level": stim_name_list,
+    }
+    summary_df = pd.DataFrame(summary_list)
+    # summary_df.loc[summary_df["coherence_level"]==100]
+    # summary_df.set_index(["stim_index", "coherence_level"], inplace=True)
+    ## classify optomotor response
+    turning_trials = summary_df.loc[abs(summary_df["opto_index"]) > turning_threshold]
+    running_trials = summary_df.loc[
+        summary_df["travel_distance"] > running_speed_threshold
+    ]
+    turning_walk_trials = summary_df.loc[
+        (summary_df["travel_distance"] > running_speed_threshold)
+        & (abs(summary_df["opto_index"]) > turning_threshold)
+    ]
+    straight_walk_trials = summary_df.loc[
+        (summary_df["travel_distance"] > running_speed_threshold)
+        & (abs(summary_df["opto_index"]) < turning_threshold)
+    ]
+    follow_trials = turning_walk_trials.loc[turning_walk_trials["optoxcoherence"] < 0]
+    against_trials = turning_walk_trials.loc[turning_walk_trials["optoxcoherence"] > 0]
+    spontaneous_trials = turning_walk_trials.loc[
+        turning_walk_trials["optoxcoherence"] == 0
+    ]
+    tmp = follow_trials.groupby("coherence_level").count()
+    follow_count_coherence = tmp.index.values
+    follow_count = tmp.values[:, 0]
+
+    return turning_trials, running_trials, turning_walk_trials, straight_walk_trials, follow_trials, against_trials,spontaneous_trials, follow_count
+
+
+def generate_index_points(stim_to_analyse, analysis_window, frame_rate):
+    window_length = analysis_window[1] - analysis_window[0]
+    interval_onset = (
+        stim_to_analyse
+        + np.ones(len(stim_to_analyse), dtype=int) * analysis_window[0] * frame_rate
+    )
+    analysie_window_tile = np.tile(
+        np.arange(window_length * frame_rate), (len(interval_onset), 1)
+    )
+    index_points = (
+        np.array(interval_onset).reshape(len(interval_onset), 1) + analysie_window_tile
+    )
+    return index_points
+
+
 def optomotor_response_idx(ev_dat):
     opt_idx = (
         np.nansum(abs(ev_dat[ev_dat > 0])) - np.nansum(abs(ev_dat[ev_dat < 0]))
@@ -49,35 +124,43 @@ def optomotor_response_idx(ev_dat):
 
 
 def main(thisDir, json_file):
+    ##Figuring out path and directory
+    if isinstance(json_file, dict):
+        analysis_methods = json_file
+    else:
+        with open(json_file, "r") as f:
+            print(f"load analysis methods from file {json_file}")
+            analysis_methods = json.loads(f.read())
+    frame_rate = analysis_methods.get("frame_rate")
+    stim_duration = analysis_methods.get("stim_duration")
+    interval_duration = analysis_methods.get("interval_duration")
+    stim_type = analysis_methods.get("stim_type")
+    # stim_type = [
+    #     -100,
+    #     -75,
+    #     -50,
+    #     -25,
+    #     0,
+    #     25,
+    #     50,
+    #     75,
+    #     100,
+    # ]  # plue value representing clockwise, counterclockwise is minus, then the rest is coherence leve
+    tick_positions = np.linspace(0, 1, len(stim_type))
+    tick_labels = [str(value) for value in stim_type]
     csv_pattern = "trial_*.csv"
     tracking_csv_pattern = "tracking_*.csv"
     database_pattern = "*.pickle"
-    frame_rate = 144
-    stim_duration = 25
-    grey_duration = 5
-    # analysis_window=frame_rate*(stim_duration+grey_duration)
-    analysis_window = [grey_duration * -1, stim_duration]
-    running_speed_threshold = 50
-    turning_threshold = 0.33
-    window_length = analysis_window[1] - analysis_window[0]
-    stim_type = [
-        -100,
-        -75,
-        -50,
-        -25,
-        0,
-        25,
-        50,
-        75,
-        100,
-    ]  # plue value representing clockwise, counterclockwise is minus, then the rest is coherence leve
     colormap_name = "coolwarm"
     COL = MplColorHelper(colormap_name, 0, 8)
     sm = cm.ScalarMappable(cmap=colormap_name)
-    tick_positions = np.linspace(0, 1, 9)
-    tick_labels = [str(value) for value in stim_type]
-    with open(json_file, "r") as f:
-        analysis_methods = json.loads(f.read())
+
+    running_speed_threshold = 50
+    turning_threshold = 0.33
+    analysis_window = [
+        interval_duration * -1,
+        stim_duration + interval_duration,
+    ]  ##analyse duration includes interval before and after stimulus
     file = os.listdir(thisDir)
     file_name = fnmatch.filter(file, database_pattern)
     database = os.path.join(thisDir, file_name[0])
@@ -94,6 +177,10 @@ def main(thisDir, json_file):
         x_all = df.loc[:, ["intergrated x position"]]
         y_all = df.loc[:, ["intergrated y position"]]
     ## here write an additional function to classify stationary, moving and total travel distance
+    vz = df.loc[:, ["delta rotation vector lab z"]].values
+    travel_distance_fbf = np.sqrt(
+        np.add(np.square(np.diff(x_all, axis=0)), np.square(np.diff(y_all, axis=0)))
+    )
     if analysis_methods.get("plotting_trajectory") == True:
         plt.plot(x_all, y_all, c=np.arange(len(y_all)), marker=".", alpha=0.5)
         plt.show()
@@ -121,6 +208,7 @@ def main(thisDir, json_file):
     csv_file_directory = os.path.join(thisDir, csv_file[0])
     stim_info = pd.read_csv(csv_file_directory)
     stim_info = stim_info.reset_index()
+    raw_column_number = stim_info.shape[1]
     stim_variable = []
     stimulus_timestamp = []
     if analysis_methods.get("experiment_name") == "gratings":
@@ -221,7 +309,9 @@ def main(thisDir, json_file):
         stim_info["timestamp"] = stim_info[["Timestamp", "Value"]].agg(".".join, axis=1)
         stim_info["timestamp"] = pd.to_numeric(stim_info["timestamp"])
         stim_info["timestamp"] = stim_info["timestamp"].astype("float32")
-        stim_info.drop(columns=stim_info.columns[0:22], inplace=True)
+        stim_info.drop(
+            columns=stim_info.columns[0 : raw_column_number + 1], inplace=True
+        )
         ##define the category of stimulus, this is used when the category is not numeric such as loom sweep-loom
         # filters = [
         #     (stim_info["VelX"] > 1) & (stim_info["Coherence"] == 100),
@@ -269,47 +359,53 @@ def main(thisDir, json_file):
     travel_distance_prior_stim_all = []
     optomotor_response_during_stim_all = []
     velocity_list = []
+    if (
+        analysis_methods.get("analysis_by_stimulus_type") == True
+    ):  ## this is usually use when stimulus length is different
+        for thisStim in stim_type:
+            stim_to_analyse = stim_info.loc[
+                np.where((stim_info.loc[:, "stim_type"] == thisStim)), "stim_onset"
+            ]
+            stim_name_list = stim_info.loc[stim_to_analyse.index, "stim_type"].values
+            if analysis_methods.get("experiment_name") == "sweeploom":
+                if re.search(
+                    "_f_", thisStim
+                ):  ##create this condition so that stim_duration became dynamics
+                    stim_duration = 3
+                    presence_duration = 1
+                    sweep_duration = 1
+                elif re.search("_s_", thisStim):
+                    stim_duration = 4
+                    presence_duration = 1
+                    sweep_duration = 2
+                else:
+                    print("something wrong with the stim list")
+    else:
+        stim_to_analyse = stim_info.loc[:, "stim_onset"]
+        stim_name_list = np.array(stim_info["stim_type"])
+
+    print(f"plotting data from {analysis_window[0]} to {analysis_window[1]}")
     init_time = abs(analysis_window[0])
     init_frame = init_time * frame_rate
-    end_time = abs(analysis_window[0]) + stim_duration
+    end_time = init_time + stim_duration
     end_frame = end_time * frame_rate
-    vz = df.loc[:, ["delta rotation vector lab z"]].values
-    stim_to_analyse = stim_info.loc[:, "stim_onset"]
-    stim_name_list = np.array(stim_info["stim_type"])
-    grey_onset = (
-        stim_to_analyse
-        + np.ones(len(stim_to_analyse), dtype=int) * analysis_window[0] * frame_rate
-    )
-    analysie_window_tile = np.tile(
-        np.arange(window_length * frame_rate), (len(grey_onset), 1)
-    )
-    index_points = (
-        np.array(grey_onset).reshape(len(grey_onset), 1) + analysie_window_tile
-    )
+    index_points = generate_index_points(stim_to_analyse, analysis_window, frame_rate)
     velocity_z = vz[index_points]
-    opto_all_trials = np.ones(velocity_z.shape[0])
-    for i in range(0, velocity_z.shape[0]):
-        opto_all_trials[i] = optomotor_response_idx(velocity_z[i, init_frame:, 0])
-
-    x = x_all[index_points]
-    y = y_all[index_points]
-    x_dif = np.diff(x, axis=1)
-    y_dif = np.diff(y, axis=1)
-
-    travel_distance_fbf = np.sqrt(np.add(np.square(x_dif), np.square(y_dif)))
-    velocity = travel_distance_fbf * frame_rate
+    stim_travel_distance = travel_distance_fbf[index_points]
+    velocity = stim_travel_distance * frame_rate
     # trial_num.append(velocity.shape[0])
-    velocity_list.append(velocity[:, :, 0])
-    cum_z_vector = np.cumsum(velocity_z[:, init_frame:, 0], axis=1)
-
-    cum_travel_distance = np.cumsum(
-        np.sqrt(np.add(np.square(x_dif), np.square(y_dif))), axis=1
-    )
+    cum_z_vector = np.cumsum(velocity_z, axis=1)
+    cum_travel_distance = np.cumsum(stim_travel_distance, axis=1)
     travel_distance_prior_stim = cum_travel_distance[:, init_frame, 0]
     travel_distance_during_stim = (
-        cum_travel_distance[:, -1, 0] - travel_distance_prior_stim
+        cum_travel_distance[:, end_frame, 0] - travel_distance_prior_stim
     )
-
+    opto_all_trials = np.ones(velocity_z.shape[0])
+    ## when quantifying optomotor response, we focus on only stimulus onset so using init_frame:end_frame
+    for i in range(0, velocity_z.shape[0]):
+        opto_all_trials[i] = optomotor_response_idx(
+            velocity_z[i, init_frame:end_frame, 0]
+        )
     summary_list = {
         "opto_index": opto_all_trials,
         "travel_distance": travel_distance_during_stim,
@@ -341,7 +437,7 @@ def main(thisDir, json_file):
     tmp = follow_trials.groupby("coherence_level").count()
     follow_count_coherence = tmp.index.values
     follow_count = tmp.values[:, 0]
-
+    velocity_list.append(velocity[:, :, 0])
     travel_distance_during_stim_all.append(travel_distance_during_stim)
     travel_distance_prior_stim_all.append(travel_distance_prior_stim)
     optomotor_response_during_stim_all.append(opto_all_trials)
@@ -359,7 +455,6 @@ def main(thisDir, json_file):
         ##concatenate velocity list for heatmap
         velocity_list = np.vstack(velocity_list)
         ##arrange xticks at onset and offset of the stimulus for heatmap
-        heatmap_xticks = [init_frame, end_frame]
         # trial_num_across_stim=np.cumsum(trial_num)
         fig1, (ax, ax1, ax2) = plt.subplots(
             nrows=1, ncols=3, figsize=(18, 7), tight_layout=True
@@ -381,21 +476,28 @@ def main(thisDir, json_file):
         ax2.set_ylabel("Trial#")
         ## add vertical lines to indicate stimulus onset and offset
         ax2.axvline(
-            x=heatmap_xticks[0],
+            x=init_frame,
             color="white",
-            linestyle="-",
+            linestyle="--",
             label="Stimulus Starts",
         )
-        ax2.set_xticks([heatmap_xticks[0]])
+        ax2.axvline(
+            x=end_frame,
+            color="white",
+            linestyle="--",
+            label="Stimulus Ends",
+        )
+        ax2.set_xticks([init_frame])
         ax2.set_xticklabels(["0"])
         ax2.set_xlabel("Time (s)")
         ## add title
         ax2.set_title("stimulus evoked velocity preview")
         plot_name = "optomotor_overview.png"
-        fig1.savefig(os.path.join(thisDir, plot_name))
+        if analysis_methods.get("debug_mode") == False:
+            fig1.savefig(os.path.join(thisDir, plot_name))
 
     if analysis_methods.get("plotting_optomotor_response") == True:
-        colormap = np.array(["k", "y", "m", "c", "r", "b", "g", "k"])
+        # colormap = np.array(["k", "y", "m", "c", "r", "b", "g", "k"])
         fig2, (ax3, ax4) = plt.subplots(
             nrows=1, ncols=2, figsize=(18, 7), tight_layout=True
         )
@@ -412,7 +514,7 @@ def main(thisDir, json_file):
                 this_coherence,
                 mean_response,
                 yerr=sem_response,
-                c=colormap[0],
+                c="k",
                 fmt="o",
                 elinewidth=2,
                 capsize=3,
@@ -427,25 +529,38 @@ def main(thisDir, json_file):
         # ax3.set_yticks([-1, 0, 1])
         ax3.set(
             yticks=[-1, 0, 1],
-            ylabel="Optomotor Index",
+            ylabel="Optomotor Index during stimulus",
             xticks=[100, 50, 0, -50, -100],
             xlabel="Coherence level (%)",
+        )
+        ax4.axvline(
+            x=init_frame,
+            color="black",
+            linestyle="--",
+            label="Stimulus Starts",
+        )
+        ax4.axvline(
+            x=end_frame,
+            color="black",
+            linestyle="--",
+            label="Stimulus Ends",
         )
         ax4.set_ylim(-100, 100)
         ax4.set(
             yticks=[-100, 0, 100],
             ylabel="Cumulative Rotation Vector (rad/frame)",
-            xticks=[0, this_z.shape[1]],
-            xticklabels=["0", "25"],
+            xticks=[0, init_frame, end_frame],
+            xticklabels=["-5", "0", "25"],
             xlabel="Time (s)",
         )
         cbar = plt.colorbar(sm, ax=ax4, orientation="vertical", ticks=tick_positions)
         cbar.set_ticklabels(tick_labels)
 
         plot_name = "optomotor_analysis.svg"
-        fig2.savefig(os.path.join(thisDir, plot_name))
+        if analysis_methods.get("debug_mode") == False:
+            fig2.savefig(os.path.join(thisDir, plot_name))
 
-    plt.show()
+        # plt.show()
     return summary_df, velocity_list, travel_distance_during_stim_all, cum_z_vector
 
 
