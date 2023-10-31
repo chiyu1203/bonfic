@@ -42,14 +42,88 @@ class MplColorHelper:
         return self.scalarMap.to_rgba(val)
 
 
+def a_guest(x):
+    # Initialize an array of zeros with the same shape as x
+    b = np.zeros_like(x, dtype=bool)
+
+    # Find the index of the maximum value in each row of x
+    i = np.argmax(x, axis=1)
+
+    # Set the value at the index of the maximum value to True for each row of x
+    b[np.arange(i.size), i] = np.logical_or.reduce(x, axis=1)
+
+    return b
+
+
+def deceleration_detection(v_array=[], *args):
+    # Set initial values for variables
+    init_frame = args[0]
+    frame_rate = args[1]
+    presence_duration = args[2]
+    fir_half = int(init_frame + 0.5 * frame_rate)
+
+    # Calculate mean and standard deviation of initial velocity values
+    V0 = v_array[:, init_frame:fir_half]
+    meanV0 = np.mean(V0, axis=1)
+    stdV0 = np.std(V0, axis=1, ddof=1)
+
+    # Calculate deceleration threshold
+    deceleration_threshold = meanV0 - 2 * stdV0
+
+    # Calculate velocity of interest and create a threshold matrix
+    velocity_of_interest = v_array[
+        :, fir_half : fir_half + presence_duration * frame_rate
+    ]
+    dece_big = np.reshape(
+        np.repeat(deceleration_threshold, presence_duration * frame_rate, axis=0),
+        (len(deceleration_threshold), presence_duration * frame_rate),
+    )
+
+    # Check for deceleration onset and return the onset time
+    dec = np.less(dece_big, velocity_of_interest)
+
+    # In theory, chatGPT's method has no problem but it needs some additional work to sort out all True and all False condition
+    # last_true_indices = dec.shape[1] - np.argmax(dec[:, ::-1], axis=1) - 1
+    # Create a new array with only the first "True" value from each row
+    # result_array = np.zeros(dec.shape[0], dtype=bool)
+    # result_array[last_true_indices != dec.shape[1]-1] = dec[np.arange(dec.shape[0]), last_true_indices[last_true_indices != dec.shape[1]-1]]
+
+    rev = np.fliplr(dec)
+    rev_t_seq_onset = np.where(a_guest(rev) == True)
+    return rev_t_seq_onset
+
+
+def recovery_detection(dev_trial, dev_timing_from_analysis_window):
+    velocity_threshold = 5
+    ##apply these velocity traces with velocity threshold
+    stationary_state_check = dev_trial < velocity_threshold
+    ##align the decerlation time with this velocity tracing
+    dev_timing_from_analysis_window = dev_timing_from_analysis_window.astype(int)
+    index_list = np.ones((len(dev_timing_from_analysis_window),), dtype=float)
+    walking_length = 72
+    stationary_length = 10
+    p = stationary_length * "t" + walking_length * "f"
+    for i in range(len(dev_timing_from_analysis_window)):
+        this_dev_onset = dev_timing_from_analysis_window[i]
+        bool_string = "".join(
+            "t" if b else "f" for b in stationary_state_check[i, this_dev_onset:]
+        )
+        indices_temp = bool_string.find(p)
+        if indices_temp < 0:
+            indices = float("nan")
+        else:
+            indices = indices_temp + this_dev_onset
+        index_list[i] = indices
+    return index_list
+
+
 def generate_stimulus_evoked_response(
     stim_to_analyse, vz, travel_distance_fbf, analysis_window, frame_rate, stim_duration
 ):
     print(f"plotting data from {analysis_window[0]} to {analysis_window[1]}")
     init_time = abs(analysis_window[0])
     init_frame = init_time * frame_rate
-    end_time = init_time + stim_duration
-    end_frame = end_time * frame_rate
+    end_frame = analysis_window[1] * frame_rate
     index_points = generate_index_points(stim_to_analyse, analysis_window, frame_rate)
     velocity_z = vz[index_points]
     stim_travel_distance = travel_distance_fbf[index_points]
@@ -73,9 +147,16 @@ def generate_stimulus_evoked_response(
 
 
 def classify_trial_type(summary_df, turning_threshold, running_speed_threshold):
-    # summary_df.loc[summary_df["coherence_level"]==100]
-    # summary_df.set_index(["stim_index", "coherence_level"], inplace=True)
-    ## classify optomotor response
+    if summary_df.stim_type.dtype == "object":
+        print(
+            "classify the behaviour into turning, running, straightwalk, turning_walk"
+        )
+    else:
+        print(
+            "classify the behaviour into turning, running, straightwalk, turning_walk + follow and against trials"
+        )
+        summary_df["optoxstim"] = summary_df["opto_index"] * summary_df["stim_type"]
+
     turning_trials = summary_df.loc[abs(summary_df["opto_index"]) > turning_threshold]
     running_trials = summary_df.loc[
         summary_df["travel_distance"] > running_speed_threshold
@@ -88,14 +169,15 @@ def classify_trial_type(summary_df, turning_threshold, running_speed_threshold):
         (summary_df["travel_distance"] > running_speed_threshold)
         & (abs(summary_df["opto_index"]) < turning_threshold)
     ]
-    follow_trials = turning_walk_trials.loc[turning_walk_trials["optoxcoherence"] < 0]
-    against_trials = turning_walk_trials.loc[turning_walk_trials["optoxcoherence"] > 0]
-    spontaneous_trials = turning_walk_trials.loc[
-        turning_walk_trials["optoxcoherence"] == 0
-    ]
-    tmp = follow_trials.groupby("coherence_level").count()
-    follow_count_coherence = tmp.index.values
-    follow_count = tmp.values[:, 0]
+    if "optoxstim" in summary_df:
+        follow_trials = turning_walk_trials.loc[turning_walk_trials["optoxstim"] < 0]
+        against_trials = turning_walk_trials.loc[turning_walk_trials["optoxstim"] > 0]
+        spontaneous_trials = turning_walk_trials.loc[
+            turning_walk_trials["optoxstim"] == 0
+        ]
+        tmp = follow_trials.groupby("stim_type").count()
+        follow_count_coherence = tmp.index.values
+        follow_count = tmp.values[:, 0]
 
 
 def generate_index_points(stim_to_analyse, analysis_window, frame_rate):
@@ -154,15 +236,22 @@ def main(thisDir, json_file):
 
     running_speed_threshold = 50
     turning_threshold = 0.33
-    analysis_window = [
-        interval_duration * -1,
-        stim_duration + interval_duration,
-    ]  ##analyse duration includes interval before and after stimulus
+    if analysis_methods.get("experiment_name") == "sweeploom":
+        analysis_window = [-1, 8]
+        stim_duration = 4
+        presence_duration = 1
+        sweep_duration = 2
+        velocity_threshold = 5
+    elif analysis_methods.get("experiment_name") == "dots":
+        analysis_window = [
+            interval_duration * -1,
+            stim_duration + interval_duration,
+        ]  ##analyse duration includes interval before and after stimulus
     file = os.listdir(thisDir)
     file_name = fnmatch.filter(file, database_pattern)
     database = os.path.join(thisDir, file_name[0])
     df = pd.read_pickle(database)
-    exp_date = thisDir.split("/")[5]
+    exp_date = thisDir.split("/")[4]
     if analysis_methods.get("filtering_method") == "sg_filter":
         x_all = savgol_filter(df.loc[:, ["intergrated x position"]], 71, 3, axis=0)
         y_all = savgol_filter(df.loc[:, ["intergrated y position"]], 71, 3, axis=0)
@@ -227,11 +316,23 @@ def main(thisDir, json_file):
         stim_info["stim_type"] = np.select(filters, stim_type)
 
     elif analysis_methods.get("experiment_name") == "sweeploom":
+        stim_type = [
+            "c2b_f_sloom",
+            "c2b_s_sloom",
+            "c2f_f_sloom",
+            "c2f_s_sloom",
+            "c2c_f_loom",
+            "c2c_s_loom",
+        ]
         for row in range(0, len(stim_info)):
             stim_variable.append(int(stim_info.iloc[row, 2].split("=", 1)[1]))
             stim_variable.append(int(stim_info.iloc[row, 3].split("=", 1)[1]))
             stim_variable.append(int(stim_info.iloc[row, 4].split("=", 1)[1]))
             stim_variable.append(int(stim_info.iloc[row, 5].split("=", 1)[1]))
+            stim_variable.append(int(stim_info.iloc[row, 6].split("=", 1)[1]))
+            if exp_date in ["221102", "221103"]:
+                stim_variable.append(int(stim_info.iloc[row, 7].split("=", 1)[1]))
+                stim_variable.append(int(stim_info.iloc[row, 8].split("=", 1)[1]))
             # stim_variable.append(int(re.split(r'=|}',stim_info.iloc[row,5])[1]))
             if isinstance(stim_info.loc[row, "Value"], float):
                 timestamp = stim_info.loc[row, "Timestamp"]
@@ -241,12 +342,24 @@ def main(thisDir, json_file):
                     + "."
                     + stim_info.loc[row, "Value"]
                 )
-            stimulus_timestamp.append(float(timestamp.replace(")", "")))
+            stim_variable.append(float(timestamp.replace(")", "")))
         stim_variable = np.array(stim_variable).reshape((len(stim_info), -1))
+        column_names = [
+            "size_start",
+            "size_end",
+            "location1_start",
+            "location1_end",
+            "location2_start",
+            "location2_end",
+            "time",
+            "timestamp",
+        ]
+        stim_info = pd.DataFrame(stim_variable, columns=column_names)
+        # stim_info.rename(columns={7: "timestamp"})
         # some bugs in the bonsai workflow. Needs to remove the first timestamp and the last row of stim variable here
-        stimulus_timestamp.pop(0)
-        stim_variable = np.delete(stim_variable, -1, axis=0)
-        stim_info = pd.DataFrame(stim_variable)
+        # if closed_loop_experiment == True:
+        #     stimulus_timestamp.pop(0)
+        #     stim_variable=np.delete(stim_variable, -1, axis=0)
         if exp_date in ["221015", "221016"]:
             ### use this criteria for experiments during exp_date=['221015','221016']
             filters = [
@@ -280,6 +393,7 @@ def main(thisDir, json_file):
                 & (stim_info.iloc[:, 2] == stim_info.iloc[:, 3]),
             ]
         stim_info["stim_type"] = np.select(filters, stim_type)
+
     elif analysis_methods.get("experiment_name") == "dots":
         col_num = [2, 4, 5, 7, 11, 13, 15, 17]
         col_name = [
@@ -343,6 +457,7 @@ def main(thisDir, json_file):
     # travel_distance_during_stim_all = []
     # travel_distance_prior_stim_all = []
     # optomotor_response_during_stim_all = []
+    cum_travel_list = []
     summary_df_list = []
     velocity_list = []
     z_list = []
@@ -390,12 +505,12 @@ def main(thisDir, json_file):
                 "opto_index": opto_all_trials,
                 "travel_distance_prior": travel_distance_prior_stim,
                 "travel_distance": travel_distance_during_stim,
-                "optoxcoherence": opto_all_trials * stim_name_list,
                 "stim_index": stim_to_analyse.index,
-                "coherence_level": stim_name_list,
+                "stim_type": stim_name_list,
             }
             summary_df = pd.DataFrame(summary_list)
             classify_trial_type(summary_df, turning_threshold, running_speed_threshold)
+            cum_travel_list.append(cum_travel_distance[:, :, 0])
             summary_df_list.append(summary_df)
             velocity_list.append(velocity[:, :, 0])
             z_list.append(cum_z_vector[:, :, 0])
@@ -428,16 +543,15 @@ def main(thisDir, json_file):
             "opto_index": opto_all_trials,
             "travel_distance_prior": travel_distance_prior_stim,
             "travel_distance": travel_distance_during_stim,
-            "optoxcoherence": opto_all_trials * stim_name_list,
             "stim_index": stim_to_analyse.index,
-            "coherence_level": stim_name_list,
+            "stim_type": stim_name_list,
         }
         summary_df = pd.DataFrame(summary_list)
         classify_trial_type(summary_df, turning_threshold, running_speed_threshold)
-
         # travel_distance_during_stim_all.append(travel_distance_during_stim)
         # travel_distance_prior_stim_all.append(travel_distance_prior_stim)
         # optomotor_response_during_stim_all.append(opto_all_trials)
+        cum_travel_list.append(cum_travel_distance[:, :, 0])
         summary_df_list.append(summary_df)
         velocity_list.append(velocity[:, :, 0])
         z_list.append(cum_z_vector[:, :, 0])
@@ -449,6 +563,7 @@ def main(thisDir, json_file):
     # travel_distance_during_stim = np.concatenate(travel_distance_during_stim_all)
     ##concatenate velocity list for heatmap
     summary_df = pd.concat(summary_df_list)
+    cum_travel_distance = np.vstack(cum_travel_list)
     velocity_arr = np.vstack(velocity_list)
     cum_z_vector = np.vstack(z_list)
 
@@ -496,6 +611,7 @@ def main(thisDir, json_file):
         plot_name = "optomotor_overview.png"
         if analysis_methods.get("debug_mode") == False:
             fig1.savefig(os.path.join(thisDir, plot_name))
+        plt.show()
 
     if analysis_methods.get("plotting_optomotor_response") == True:
         # colormap = np.array(["k", "y", "m", "c", "r", "b", "g", "k"])
@@ -505,7 +621,7 @@ def main(thisDir, json_file):
         for i in range(len(stim_type)):
             this_coherence = stim_type[i]
             this_response = summary_df.loc[
-                summary_df["coherence_level"] == this_coherence, "opto_index"
+                summary_df["stim_type"] == this_coherence, "opto_index"
             ].values
             mean_response = np.mean(this_response, axis=0)
             sem_response = np.std(this_response, axis=0, ddof=1) / np.sqrt(
@@ -520,7 +636,7 @@ def main(thisDir, json_file):
                 elinewidth=2,
                 capsize=3,
             )
-            this_z = cum_z_vector[summary_df["coherence_level"] == this_coherence, :]
+            this_z = cum_z_vector[summary_df["stim_type"] == this_coherence, :]
             time_points = np.arange(this_z.shape[1])
             time_points_b = np.tile(time_points, (this_z.shape[0], 1))
             # ax4.scatter(time_points_b, this_z, s=1, color=custom_cmap[i])
@@ -560,14 +676,66 @@ def main(thisDir, json_file):
         plot_name = "optomotor_analysis.png"
         if analysis_methods.get("debug_mode") == False:
             fig2.savefig(os.path.join(thisDir, plot_name))
-
         plt.show()
+
+    if analysis_methods.get("plotting_deceleration_accerleration") == True:
+        travel_distance_after_stim_presence = cum_travel_distance[
+            :, init_frame + presence_duration * frame_rate
+        ]
+        travel_distance_1sec_prior_stim = (
+            cum_travel_distance[:, init_frame] - cum_travel_distance[:, 0]
+        )
+        running_trial = travel_distance_1sec_prior_stim > velocity_threshold
+        running_velocity = velocity_arr[running_trial, :]
+        running_travel_distance_after_stim_presence = (
+            travel_distance_after_stim_presence[running_trial]
+        )
+        travel_distance_1sec_post_stim = (
+            cum_travel_distance[running_trial, init_frame + 1 * frame_rate]
+            - cum_travel_distance[running_trial, init_frame]
+        )
+        run_type1 = running_velocity[
+            travel_distance_1sec_post_stim > velocity_threshold, :
+        ]
+        running_travel_distance_after_stim_presence_type1 = (
+            running_travel_distance_after_stim_presence[
+                travel_distance_1sec_post_stim > velocity_threshold
+            ]
+        )
+        trial_to_analyse = run_type1
+        detected_bool = deceleration_detection(
+            trial_to_analyse, init_frame, frame_rate, presence_duration
+        )
+        dec_trial_id = detected_bool[0]
+        # this reverse the frame number back so the output is the frame number no. at the detection window
+        de_test = frame_rate * presence_duration - detected_bool[1]
+        ##remove trials that the true value is outside this 1-sec window
+        dev_timing = de_test[de_test != frame_rate * presence_duration]
+        dev_trial_id = dec_trial_id[de_test != frame_rate * presence_duration]
+        dev_timing_from_analysis_window = (
+            dev_timing
+            + init_frame
+            + (0.5 * presence_duration + abs(analysis_window[0])) * frame_rate
+        )
+        # dev_timing_from_stim_presence = (
+        #     dev_timing / frame_rate + 0.5 * presence_duration + init_time
+        # )
+        # dev_timing_y = 10 * np.ones_like(dev_timing_from_stim_presence)
+        ##When analysing recover epochs, focus on the trials has similar deceleration dynamics
+        dev_trial = trial_to_analyse[dev_trial_id, :]
+        ##apply these velocity traces with velocity threshold
+        index_list = recovery_detection(dev_trial, dev_timing_from_analysis_window)
+        rec_array = (
+            index_list - dev_timing_from_analysis_window
+        )  # this normalise the recovery duration from the first deceleration
+
     return summary_df, velocity_arr, cum_z_vector
 
 
 if __name__ == "__main__":
     # thisDir='C:/Users/neuroLaptop/Documents/L23038/230824/dots'# a test example on neurolocust laptop
-    thisDir = "Z:/DATA/experiment_trackball_Optomotor/L22147/221106/dots"  # a test example on the server
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/L22147/221106/dots"  # a test example on the server
+    thisDir = "Z:/DATA/experiment_trackball_Optomotor/L22131/221102/sweeploom"
     json_file = "analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)

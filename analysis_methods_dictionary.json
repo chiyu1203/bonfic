@@ -1,5 +1,5 @@
 {
- "experiment_name": "dots",
+ "experiment_name": "sweeploom",
  "overwrite_curated_dataset": true,
  "graph_colour_code": [
   "r",
@@ -16,7 +16,8 @@
  "plotting_tbt_overview": true,
  "plotting_trajectory": false,
  "plotting_event_related_trajectory": false,
- "plotting_optomotor_response": true,
+ "plotting_deceleration_accerleration": true,
+ "plotting_optomotor_response": false,
  "load_experiment_condition_from_database": true,
  "select_animals_by_condition": true,
  "analysis_by_stimulus_type": false,
