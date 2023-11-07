@@ -19,15 +19,12 @@ analysis_methods = {
     "stim_duration": 4,
     "interval_duration": 5,
     "stim_type": [
-        -100,
-        -75,
-        -50,
-        -25,
-        0,
-        25,
-        50,
-        75,
-        100,
+        "c2b_f_sloom",
+        "c2b_s_sloom",
+        "c2f_f_sloom",
+        "c2f_s_sloom",
+        "c2c_f_loom",
+        "c2c_s_loom",
     ],
 }  # plus value representing clockwise, counterclockwise is minus, then the rest is coherence levels
 json_string = json.dumps(analysis_methods, indent=1)

@@ -18,6 +18,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib import cm
+from align_data_with_ttl import find_file
 
 
 # custom_cmap = [
@@ -213,7 +214,7 @@ def main(thisDir, json_file):
     frame_rate = analysis_methods.get("frame_rate")
     stim_duration = analysis_methods.get("stim_duration")
     interval_duration = analysis_methods.get("interval_duration")
-    stim_type = analysis_methods.get("stim_type")
+    # stim_type = analysis_methods.get("stim_type")
     # stim_type = [
     #     -100,
     #     -75,
@@ -225,11 +226,17 @@ def main(thisDir, json_file):
     #     75,
     #     100,
     # ]  # plue value representing clockwise, counterclockwise is minus, then the rest is coherence leve
-    tick_positions = np.linspace(0, 1, len(stim_type))
-    tick_labels = [str(value) for value in stim_type]
-    csv_pattern = "trial_*.csv"
+    pd_pattern = "PD*.csv"
+    this_PD = find_file(thisDir, pd_pattern)
+    trial_pattern = "trial*.csv"
+    csv_file_directory = find_file(thisDir, trial_pattern)
     tracking_csv_pattern = "tracking_*.csv"
+    tracking_csv_file_directory = find_file(thisDir, tracking_csv_pattern)
     database_pattern = "*.pickle"
+    database = find_file(thisDir, database_pattern)
+    # csv_pattern = "trial_*.csv"
+    # tracking_csv_pattern = "tracking_*.csv"
+    # database_pattern = "*.pickle"
     colormap_name = "coolwarm"
     COL = MplColorHelper(colormap_name, 0, 8)
     sm = cm.ScalarMappable(cmap=colormap_name)
@@ -242,14 +249,17 @@ def main(thisDir, json_file):
         presence_duration = 1
         sweep_duration = 2
         velocity_threshold = 5
-    elif analysis_methods.get("experiment_name") == "dots":
+    elif (
+        analysis_methods.get("experiment_name") == "dots"
+        or analysis_methods.get("experiment_name") == "densities"
+    ):
         analysis_window = [
             interval_duration * -1,
             stim_duration + interval_duration,
         ]  ##analyse duration includes interval before and after stimulus
-    file = os.listdir(thisDir)
-    file_name = fnmatch.filter(file, database_pattern)
-    database = os.path.join(thisDir, file_name[0])
+    # file = os.listdir(thisDir)
+    # file_name = fnmatch.filter(file, database_pattern)
+    # database = os.path.join(thisDir, file_name[0])
     df = pd.read_pickle(database)
     exp_date = thisDir.split("/")[4]
     if analysis_methods.get("filtering_method") == "sg_filter":
@@ -273,25 +283,30 @@ def main(thisDir, json_file):
 
     ##here to start analying stimulus-evoked response.
     ##Firstly, load stimulus information
-    tracking_csv_file = fnmatch.filter(file, tracking_csv_pattern)
-    tracking_csv_file_directory = os.path.join(thisDir, tracking_csv_file[0])
-    tracking_info = pd.read_csv(
-        tracking_csv_file_directory, delimiter="(", engine="python"
-    )
-    tracking_info = tracking_info.reset_index()
-    tracking_info[["timestamp", "value"]] = tracking_info.iloc[:, 1].str.split(
-        ", ", expand=True
-    )
-    tracking_info["value"] = tracking_info["value"].str.replace(r"[()]", "", regex=True)
-    tracking_info["value"] = tracking_info["value"].str.replace(r"[,]", ".", regex=True)
-    tracking_info["timestamp"] = tracking_info["timestamp"].str.replace(
-        r"[,]", ".", regex=True
-    )
-    tracking_info["timestamp"] = pd.to_numeric(tracking_info["timestamp"])
-    tracking_info["timestamp"] = tracking_info["timestamp"].astype("float32")
-    tracking_info["value"] = pd.to_numeric(tracking_info["value"])
-    csv_file = fnmatch.filter(file, csv_pattern)
-    csv_file_directory = os.path.join(thisDir, csv_file[0])
+    # tracking_csv_file = fnmatch.filter(file, tracking_csv_pattern)
+    # tracking_csv_file_directory = os.path.join(thisDir, tracking_csv_file[0])
+    if tracking_csv_file_directory != None:
+        tracking_info = pd.read_csv(
+            tracking_csv_file_directory, delimiter="(", engine="python"
+        )
+        tracking_info = tracking_info.reset_index()
+        tracking_info[["timestamp", "value"]] = tracking_info.iloc[:, 1].str.split(
+            ", ", expand=True
+        )
+        tracking_info["value"] = tracking_info["value"].str.replace(
+            r"[()]", "", regex=True
+        )
+        tracking_info["value"] = tracking_info["value"].str.replace(
+            r"[,]", ".", regex=True
+        )
+        tracking_info["timestamp"] = tracking_info["timestamp"].str.replace(
+            r"[,]", ".", regex=True
+        )
+        tracking_info["timestamp"] = pd.to_numeric(tracking_info["timestamp"])
+        tracking_info["timestamp"] = tracking_info["timestamp"].astype("float32")
+        tracking_info["value"] = pd.to_numeric(tracking_info["value"])
+    # csv_file = fnmatch.filter(file, csv_pattern)
+    # csv_file_directory = os.path.join(thisDir, csv_file[0])
     stim_info = pd.read_csv(csv_file_directory)
     stim_info = stim_info.reset_index()
     raw_column_number = stim_info.shape[1]
@@ -316,14 +331,15 @@ def main(thisDir, json_file):
         stim_info["stim_type"] = np.select(filters, stim_type)
 
     elif analysis_methods.get("experiment_name") == "sweeploom":
-        stim_type = [
-            "c2b_f_sloom",
-            "c2b_s_sloom",
-            "c2f_f_sloom",
-            "c2f_s_sloom",
-            "c2c_f_loom",
-            "c2c_s_loom",
-        ]
+        stim_type = analysis_methods.get("stim_type")
+        # stim_type = [
+        #     "c2b_f_sloom",
+        #     "c2b_s_sloom",
+        #     "c2f_f_sloom",
+        #     "c2f_s_sloom",
+        #     "c2c_f_loom",
+        #     "c2c_s_loom",
+        # ]
         for row in range(0, len(stim_info)):
             stim_variable.append(int(stim_info.iloc[row, 2].split("=", 1)[1]))
             stim_variable.append(int(stim_info.iloc[row, 3].split("=", 1)[1]))
@@ -355,11 +371,6 @@ def main(thisDir, json_file):
             "timestamp",
         ]
         stim_info = pd.DataFrame(stim_variable, columns=column_names)
-        # stim_info.rename(columns={7: "timestamp"})
-        # some bugs in the bonsai workflow. Needs to remove the first timestamp and the last row of stim variable here
-        # if closed_loop_experiment == True:
-        #     stimulus_timestamp.pop(0)
-        #     stim_variable=np.delete(stim_variable, -1, axis=0)
         if exp_date in ["221015", "221016"]:
             ### use this criteria for experiments during exp_date=['221015','221016']
             filters = [
@@ -394,7 +405,10 @@ def main(thisDir, json_file):
             ]
         stim_info["stim_type"] = np.select(filters, stim_type)
 
-    elif analysis_methods.get("experiment_name") == "dots":
+    elif (
+        analysis_methods.get("experiment_name") == "dots"
+        or analysis_methods.get("experiment_name") == "densities"
+    ):
         col_num = [2, 4, 5, 7, 11, 13, 15, 17]
         col_name = [
             "ID",
@@ -423,10 +437,16 @@ def main(thisDir, json_file):
         stim_info.drop(
             columns=stim_info.columns[0 : raw_column_number + 1], inplace=True
         )
-        velxcoherence = (
-            stim_info["VelX"] * stim_info["Coherence"] / abs(stim_info["VelX"])
-        )
-        stim_info["stim_type"] = -1 * velxcoherence.astype(int)
+        if analysis_methods.get("experiment_name") == "densities":
+            stim_variable_direction = (
+                stim_info["VelX"] * stim_info["numDots"] / abs(stim_info["VelX"])
+            )
+        elif analysis_methods.get("experiment_name") == "dots":
+            velxcoherence = (
+                stim_info["VelX"] * stim_info["Coherence"] / abs(stim_info["VelX"])
+            )
+        stim_info["stim_type"] = -1 * stim_variable_direction.astype(int)
+        stim_type = np.sort(stim_info.stim_type.unique()).tolist()
 
     else:
         warnings.warn("stimulus paradigm can not be recognised")
@@ -454,13 +474,12 @@ def main(thisDir, json_file):
     timestamp_diff = data_timestamp_b > np.transpose(stimulus_timestamp_b)
     stim_onset = np.where(np.roll(timestamp_diff, 1, axis=1) != timestamp_diff)[1][1::2]
     stim_info["stim_onset"] = stim_onset
-    # travel_distance_during_stim_all = []
-    # travel_distance_prior_stim_all = []
-    # optomotor_response_during_stim_all = []
     cum_travel_list = []
     summary_df_list = []
     velocity_list = []
     z_list = []
+    tick_positions = np.linspace(0, 1, len(stim_type))
+    tick_labels = [str(value) for value in stim_type]
     if (
         analysis_methods.get("analysis_by_stimulus_type") == True
     ):  ## this is usually use when stimulus length is different
@@ -514,9 +533,6 @@ def main(thisDir, json_file):
             summary_df_list.append(summary_df)
             velocity_list.append(velocity[:, :, 0])
             z_list.append(cum_z_vector[:, :, 0])
-            # travel_distance_during_stim_all.append(travel_distance_during_stim)
-            # travel_distance_prior_stim_all.append(travel_distance_prior_stim)
-            # optomotor_response_during_stim_all.append(opto_all_trials)
     else:
         stim_to_analyse = stim_info.loc[:, "stim_onset"]
         stim_name_list = np.array(stim_info["stim_type"])
@@ -548,19 +564,12 @@ def main(thisDir, json_file):
         }
         summary_df = pd.DataFrame(summary_list)
         classify_trial_type(summary_df, turning_threshold, running_speed_threshold)
-        # travel_distance_during_stim_all.append(travel_distance_during_stim)
-        # travel_distance_prior_stim_all.append(travel_distance_prior_stim)
-        # optomotor_response_during_stim_all.append(opto_all_trials)
         cum_travel_list.append(cum_travel_distance[:, :, 0])
         summary_df_list.append(summary_df)
         velocity_list.append(velocity[:, :, 0])
         z_list.append(cum_z_vector[:, :, 0])
-    # travel_distance_tbt=np.concatenate(travel_distance_prior_stim_all)
     ##concatenate travel distance for histogram
     print("ready to plot graph with some data and decompose those lists")
-    # optomotor_response_during_stim = np.concatenate(optomotor_response_during_stim_all)
-    # travel_distance_prior_stim = np.concatenate(travel_distance_prior_stim_all)
-    # travel_distance_during_stim = np.concatenate(travel_distance_during_stim_all)
     ##concatenate velocity list for heatmap
     summary_df = pd.concat(summary_df_list)
     cum_travel_distance = np.vstack(cum_travel_list)
@@ -735,7 +744,9 @@ def main(thisDir, json_file):
 if __name__ == "__main__":
     # thisDir='C:/Users/neuroLaptop/Documents/L23038/230824/dots'# a test example on neurolocust laptop
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/L22147/221106/dots"  # a test example on the server
-    thisDir = "Z:/DATA/experiment_trackball_Optomotor/L22131/221102/sweeploom"
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/L22131/221102/sweeploom"
+    thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22036/220819/densities"
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23001/230215/densities"
     json_file = "analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
