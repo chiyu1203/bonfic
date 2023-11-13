@@ -122,6 +122,9 @@ def generate_stimulus_evoked_response(
     stim_to_analyse, vz, travel_distance_fbf, analysis_window, frame_rate, stim_duration
 ):
     print(f"plotting data from {analysis_window[0]} to {analysis_window[1]}")
+    sec_thres_min = 5
+    sec_thres_max = 30
+    sec_steps = 5
     init_time = abs(analysis_window[0])
     init_frame = init_time * frame_rate
     end_frame = analysis_window[1] * frame_rate
@@ -131,12 +134,14 @@ def generate_stimulus_evoked_response(
     velocity = stim_travel_distance * frame_rate
     cum_z_vector = np.cumsum(velocity_z, axis=1)
     cum_travel_distance = np.cumsum(stim_travel_distance, axis=1)
-    opto_all_trials = np.ones(velocity_z.shape[0])
+    opto_all_trials = np.ones((velocity_z.shape[0], 5))
     ## when quantifying optomotor response, we focus on only stimulus onset so using init_frame:end_frame
-    for i in range(0, velocity_z.shape[0]):
-        opto_all_trials[i] = optomotor_response_idx(
-            velocity_z[i, init_frame:end_frame, 0]
-        )
+    for j, analysis_length in enumerate(range(sec_thres_min, sec_thres_max, sec_steps)):
+        this_end = (init_time + analysis_length) * frame_rate
+        for i in range(0, velocity_z.shape[0]):
+            opto_all_trials[i, j] = optomotor_response_idx(
+                velocity_z[i, init_frame:this_end, 0]
+            )
     return (
         cum_travel_distance,
         opto_all_trials,
@@ -214,6 +219,7 @@ def main(thisDir, json_file):
     frame_rate = analysis_methods.get("frame_rate")
     stim_duration = analysis_methods.get("stim_duration")
     interval_duration = analysis_methods.get("interval_duration")
+    visual_paradigm_name = analysis_methods.get("experiment_name")
     # stim_type = analysis_methods.get("stim_type")
     # stim_type = [
     #     -100,
@@ -243,16 +249,13 @@ def main(thisDir, json_file):
 
     running_speed_threshold = 50
     turning_threshold = 0.33
-    if analysis_methods.get("experiment_name") == "sweeploom":
+    if visual_paradigm_name == "sweeploom":
         analysis_window = [-1, 8]
         stim_duration = 4
         presence_duration = 1
         sweep_duration = 2
         velocity_threshold = 5
-    elif (
-        analysis_methods.get("experiment_name") == "dots"
-        or analysis_methods.get("experiment_name") == "densities"
-    ):
+    elif visual_paradigm_name == "dots" or visual_paradigm_name.endswith("densities"):
         analysis_window = [
             interval_duration * -1,
             stim_duration + interval_duration,
@@ -261,7 +264,7 @@ def main(thisDir, json_file):
     # file_name = fnmatch.filter(file, database_pattern)
     # database = os.path.join(thisDir, file_name[0])
     df = pd.read_pickle(database)
-    exp_date = thisDir.split("/")[4]
+    exp_date = thisDir.split("/")[5]
     if analysis_methods.get("filtering_method") == "sg_filter":
         x_all = savgol_filter(df.loc[:, ["intergrated x position"]], 71, 3, axis=0)
         y_all = savgol_filter(df.loc[:, ["intergrated y position"]], 71, 3, axis=0)
@@ -277,6 +280,7 @@ def main(thisDir, json_file):
     travel_distance_fbf = np.sqrt(
         np.add(np.square(np.diff(x_all, axis=0)), np.square(np.diff(y_all, axis=0)))
     )
+    travel_distance_whole_session = np.sum(travel_distance_fbf)
     if analysis_methods.get("plotting_trajectory") == True:
         plt.plot(x_all, y_all, c=np.arange(len(y_all)), marker=".", alpha=0.5)
         plt.show()
@@ -312,7 +316,7 @@ def main(thisDir, json_file):
     raw_column_number = stim_info.shape[1]
     stim_variable = []
     stimulus_timestamp = []
-    if analysis_methods.get("experiment_name") == "gratings":
+    if visual_paradigm_name == "gratings":
         for row in range(0, len(stim_info)):
             # delete the bracket in current speed and save it as integer in new list
             stim_variable.append(int(stim_info.loc[row, "Frame"].replace("(", "")))
@@ -330,7 +334,7 @@ def main(thisDir, json_file):
         stim_variable = np.array(stim_variable).reshape((len(stim_info), -1))
         stim_info["stim_type"] = np.select(filters, stim_type)
 
-    elif analysis_methods.get("experiment_name") == "sweeploom":
+    elif visual_paradigm_name == "sweeploom":
         stim_type = analysis_methods.get("stim_type")
         # stim_type = [
         #     "c2b_f_sloom",
@@ -405,10 +409,7 @@ def main(thisDir, json_file):
             ]
         stim_info["stim_type"] = np.select(filters, stim_type)
 
-    elif (
-        analysis_methods.get("experiment_name") == "dots"
-        or analysis_methods.get("experiment_name") == "densities"
-    ):
+    elif visual_paradigm_name == "dots" or visual_paradigm_name.endswith("densities"):
         col_num = [2, 4, 5, 7, 11, 13, 15, 17]
         col_name = [
             "ID",
@@ -437,12 +438,12 @@ def main(thisDir, json_file):
         stim_info.drop(
             columns=stim_info.columns[0 : raw_column_number + 1], inplace=True
         )
-        if analysis_methods.get("experiment_name") == "densities":
+        if visual_paradigm_name.endswith("densities"):
             stim_variable_direction = (
                 stim_info["VelX"] * stim_info["numDots"] / abs(stim_info["VelX"])
             )
-        elif analysis_methods.get("experiment_name") == "dots":
-            velxcoherence = (
+        elif visual_paradigm_name == "dots":
+            stim_variable_direction = (
                 stim_info["VelX"] * stim_info["Coherence"] / abs(stim_info["VelX"])
             )
         stim_info["stim_type"] = -1 * stim_variable_direction.astype(int)
@@ -488,7 +489,7 @@ def main(thisDir, json_file):
                 np.where((stim_info.loc[:, "stim_type"] == thisStim)), "stim_onset"
             ]
             stim_name_list = stim_info.loc[stim_to_analyse.index, "stim_type"].values
-            if analysis_methods.get("experiment_name") == "sweeploom":
+            if visual_paradigm_name == "sweeploom":
                 if re.search(
                     "_f_", thisStim
                 ):  ##create this condition so that stim_duration became dynamics
@@ -555,8 +556,9 @@ def main(thisDir, json_file):
         travel_distance_during_stim = (
             cum_travel_distance[:, end_frame, 0] - travel_distance_prior_stim
         )
+        optomotor_range = 4
         summary_list = {
-            "opto_index": opto_all_trials,
+            "opto_index": opto_all_trials[:, optomotor_range],
             "travel_distance_prior": travel_distance_prior_stim,
             "travel_distance": travel_distance_during_stim,
             "stim_index": stim_to_analyse.index,
@@ -652,13 +654,12 @@ def main(thisDir, json_file):
             ax4.scatter(time_points_b, this_z, s=1, color=COL.get_rgb(i))
 
         ax3.set_ylim(-1, 1)
-        # ax3.set_yticks([-1, 0, 1])
         ax3.set(
+            xlabel=visual_paradigm_name,
             yticks=[-1, 0, 1],
             ylabel="Optomotor Index during stimulus",
-            xticks=[100, 50, 0, -50, -100],
-            xlabel="Coherence level (%)",
         )
+        # xticks=[np.max(stim_type), 0, np.min(stim_type)],
         ax4.axvline(
             x=init_frame,
             color="black",
@@ -671,18 +672,18 @@ def main(thisDir, json_file):
             linestyle="--",
             label="Stimulus Ends",
         )
-        ax4.set_ylim(-100, 100)
+        ax4.set_ylim(-14400, 14400)
         ax4.set(
-            yticks=[-100, 0, 100],
-            ylabel="Cumulative Rotation Vector (rad/frame)",
+            yticks=[-14400, 0, 14400],
+            ylabel="Cumulative Rotation Velocity(sec)",
             xticks=[0, init_frame, end_frame],
-            xticklabels=["-5", "0", "25"],
+            xticklabels=[str(analysis_window[0]), "0", str(stim_duration)],
             xlabel="Time (s)",
         )
         cbar = plt.colorbar(sm, ax=ax4, orientation="vertical", ticks=tick_positions)
         cbar.set_ticklabels(tick_labels)
 
-        plot_name = "optomotor_analysis.png"
+        plot_name = f"optomotor_analysis_until{(optomotor_range+1)*5}s.png"
         if analysis_methods.get("debug_mode") == False:
             fig2.savefig(os.path.join(thisDir, plot_name))
         plt.show()
@@ -738,14 +739,17 @@ def main(thisDir, json_file):
             index_list - dev_timing_from_analysis_window
         )  # this normalise the recovery duration from the first deceleration
 
-    return summary_df, velocity_arr, cum_z_vector
+    return summary_df, velocity_arr, cum_z_vector, travel_distance_whole_session
 
 
 if __name__ == "__main__":
     # thisDir='C:/Users/neuroLaptop/Documents/L23038/230824/dots'# a test example on neurolocust laptop
-    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/L22147/221106/dots"  # a test example on the server
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22147/221106/dots"  # a test example on the server
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/L22131/221102/sweeploom"
-    thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22036/220819/densities"
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22036/220819/densities"
+    thisDir = (
+        "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23002/230221/long_densities"
+    )
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23001/230215/densities"
     json_file = "analysis_methods_dictionary.json"
     tic = time.perf_counter()

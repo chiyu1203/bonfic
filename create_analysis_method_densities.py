@@ -2,7 +2,7 @@ import json
 
 file_name = "analysis_methods_dictionary.json"
 analysis_methods = {
-    "experiment_name": "densities",
+    "experiment_name": "long_densities",
     "overwrite_curated_dataset": True,
     "graph_colour_code": ["r", "y", "m", "c", "k", "b", "g", "r"],
     "debug_mode": False,

@@ -112,7 +112,7 @@ def create_curated_dataset(thisDir, json_file):
     raw_data.iloc[:, 7] = raw_data.iloc[:, 7] * track_ball_radius
     raw_data.iloc[:, 8] = raw_data.iloc[:, 8] * track_ball_radius * frame_rate
     ## adjust the unit of the z vector based on the target frame rate of fictrac
-    raw_data.iloc[:, 2] = raw_data.iloc[:, 2]
+    raw_data.iloc[:, 2] = raw_data.iloc[:, 2] * frame_rate
 
     ### save the curated_database
     if analysis_methods.get("debug_mode") == False:

@@ -1,5 +1,5 @@
 {
- "experiment_name": "sweeploom",
+ "experiment_name": "long_densities",
  "overwrite_curated_dataset": true,
  "graph_colour_code": [
   "r",
@@ -16,8 +16,8 @@
  "plotting_tbt_overview": true,
  "plotting_trajectory": false,
  "plotting_event_related_trajectory": false,
- "plotting_deceleration_accerleration": true,
- "plotting_optomotor_response": false,
+ "plotting_deceleration_accerleration": false,
+ "plotting_optomotor_response": true,
  "load_experiment_condition_from_database": true,
  "select_animals_by_condition": true,
  "analysis_by_stimulus_type": false,
@@ -25,14 +25,13 @@
  "stim_duration": 25,
  "interval_duration": 5,
  "stim_type": [
-  -100,
-  -75,
-  -50,
-  -25,
-  0,
-  25,
-  50,
-  75,
-  100
+  -4096,
+  -1024,
+  -256,
+  -64,
+  64,
+  256,
+  1024,
+  4096
  ]
 }
