@@ -135,6 +135,7 @@ def generate_stimulus_evoked_response(
     cum_z_vector = np.cumsum(velocity_z, axis=1)
     cum_travel_distance = np.cumsum(stim_travel_distance, axis=1)
     opto_all_trials = np.ones((velocity_z.shape[0], 5))
+    opto_all_isi = np.ones((velocity_z.shape[0], 1))
     ## when quantifying optomotor response, we focus on only stimulus onset so using init_frame:end_frame
     for j, analysis_length in enumerate(range(sec_thres_min, sec_thres_max, sec_steps)):
         this_end = (init_time + analysis_length) * frame_rate
@@ -142,9 +143,14 @@ def generate_stimulus_evoked_response(
             opto_all_trials[i, j] = optomotor_response_idx(
                 velocity_z[i, init_frame:this_end, 0]
             )
+            if j == 0:
+                opto_all_isi[i, j] = optomotor_response_idx(
+                    velocity_z[i, :init_frame, 0]
+                )
     return (
         cum_travel_distance,
         opto_all_trials,
+        opto_all_isi,
         cum_z_vector,
         init_frame,
         end_frame,
@@ -255,7 +261,9 @@ def main(thisDir, json_file):
         presence_duration = 1
         sweep_duration = 2
         velocity_threshold = 5
-    elif visual_paradigm_name == "dots" or visual_paradigm_name.endswith("densities"):
+    elif visual_paradigm_name == "coherence" or visual_paradigm_name.endswith(
+        "densities"
+    ):
         analysis_window = [
             interval_duration * -1,
             stim_duration + interval_duration,
@@ -409,7 +417,9 @@ def main(thisDir, json_file):
             ]
         stim_info["stim_type"] = np.select(filters, stim_type)
 
-    elif visual_paradigm_name == "dots" or visual_paradigm_name.endswith("densities"):
+    elif visual_paradigm_name == "coherence" or visual_paradigm_name.endswith(
+        "densities"
+    ):
         col_num = [2, 4, 5, 7, 11, 13, 15, 17]
         col_name = [
             "ID",
@@ -442,7 +452,7 @@ def main(thisDir, json_file):
             stim_variable_direction = (
                 stim_info["VelX"] * stim_info["numDots"] / abs(stim_info["VelX"])
             )
-        elif visual_paradigm_name == "dots":
+        elif visual_paradigm_name == "coherence":
             stim_variable_direction = (
                 stim_info["VelX"] * stim_info["Coherence"] / abs(stim_info["VelX"])
             )
@@ -505,6 +515,7 @@ def main(thisDir, json_file):
             (
                 cum_travel_distance,
                 opto_all_trials,
+                opto_all_isi,
                 cum_z_vector,
                 init_frame,
                 end_frame,
@@ -522,8 +533,9 @@ def main(thisDir, json_file):
                 cum_travel_distance[:, end_frame, 0] - travel_distance_prior_stim
             )
             summary_list = {
+                "opto_index_isi": opto_all_isi[:, 0],
                 "opto_index": opto_all_trials,
-                "travel_distance_prior": travel_distance_prior_stim,
+                "travel_distance_isi": travel_distance_prior_stim,
                 "travel_distance": travel_distance_during_stim,
                 "stim_index": stim_to_analyse.index,
                 "stim_type": stim_name_list,
@@ -540,6 +552,7 @@ def main(thisDir, json_file):
         (
             cum_travel_distance,
             opto_all_trials,
+            opto_all_isi,
             cum_z_vector,
             init_frame,
             end_frame,
@@ -558,8 +571,9 @@ def main(thisDir, json_file):
         )
         optomotor_range = 4
         summary_list = {
+            "opto_index_isi": opto_all_isi[:, 0],
             "opto_index": opto_all_trials[:, optomotor_range],
-            "travel_distance_prior": travel_distance_prior_stim,
+            "travel_distance_isi": travel_distance_prior_stim,
             "travel_distance": travel_distance_during_stim,
             "stim_index": stim_to_analyse.index,
             "stim_type": stim_name_list,
@@ -743,14 +757,10 @@ def main(thisDir, json_file):
 
 
 if __name__ == "__main__":
-    # thisDir='C:/Users/neuroLaptop/Documents/L23038/230824/dots'# a test example on neurolocust laptop
-    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22147/221106/dots"  # a test example on the server
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/L22131/221102/sweeploom"
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22036/220819/densities"
-    thisDir = (
-        "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23002/230221/long_densities"
-    )
-    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23001/230215/densities"
+    # thisDir = ("Z:/DATA/experiment_trackball_Optomotor/VCCball/L23002/230221/long_densities")
+    thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23001/230215/densities"
     json_file = "analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
