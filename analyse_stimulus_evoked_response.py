@@ -456,6 +456,7 @@ def main(thisDir, json_file):
             stim_variable_direction = (
                 stim_info["VelX"] * stim_info["Coherence"] / abs(stim_info["VelX"])
             )
+        # positive value means dots moves from right to left in a window, allocentric orientation in a panoramic setup: counterclock wise
         stim_info["stim_type"] = -1 * stim_variable_direction.astype(int)
         stim_type = np.sort(stim_info.stim_type.unique()).tolist()
 

@@ -20,13 +20,13 @@ def generate_timestamp_csv(file_path):
     float_pattern = r"BaslerSource::grab \[DBG\] Frame captured \d+x\d+x\d+ @ \d+\.\d+ \((\d+\.\d+)\)"
 
     # Detect the file's encoding
-    with open(file_path, "rb") as rawdata:
-        result = chardet.detect(rawdata.read(10000))
+    # with open(file_path, "rb") as rawdata:
+    #     result = chardet.detect(rawdata.read(10000))
 
-    detected_encoding = result["encoding"]
+    # detected_encoding = result["encoding"]
 
-    # Open and read the log file
-    with open(file_path, "r", encoding=detected_encoding) as log_file:
+    # Open and read the log file (used above command and found out that encoding is ISO-8859-5 in this file)
+    with open(file_path, "r", encoding="ISO-8859-5") as log_file:
         log_content = log_file.read()
 
     # Use regular expressions to extract frame numbers and float values
@@ -155,8 +155,8 @@ def create_curated_dataset(thisDir, json_file):
 
 
 if __name__ == "__main__":
-    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/L22146/221106/dots"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23002\231121\coherence"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23006\231123\coherence"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23003\231122\coherence"
     json_file = "analysis_methods_dictionary.json"
     tic = time.perf_counter()
     create_curated_dataset(thisDir, json_file)
