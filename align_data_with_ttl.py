@@ -12,7 +12,8 @@ def find_transitions(arr):
     for i in range(1, len(arr)):
         if arr[i - 1] == False and arr[i] == True:
             transitions.append(i)
-    return transitions
+
+    return np.array(transitions)
 
 
 # Example usage
@@ -39,17 +40,21 @@ def find_file(thisDir, pattern):
         return vid_list
 
 
-def detect_transition(this_led, on_threshold, off_threshold):
+def detect_transition(arr, on_threshold, off_threshold):
     sample_rate = 100
-    arr = np.genfromtxt(this_led, delimiter=",", dtype=int)
+    trial_num = 112
+    # pre_stim_interval = 180
     # max_value=np.max(arr[:100])
-    # np.min(arr[:100])
+    # np.min(arr[:18000])
     pass_threshold = arr > on_threshold
     transition = edge_detector(pass_threshold)
     b2w = find_transitions(pass_threshold)
+    # set an arbitary threshold to remove first few noise value
+    b2w = b2w[b2w > sample_rate * 60]
     pass_threshold = off_threshold > arr
     w2b = find_transitions(pass_threshold)
-    return b2w, w2b
+    w2b = w2b[w2b > sample_rate * 60]
+    return b2w[: trial_num + 1], w2b[:trial_num]
     # =arr[transition]>0
     # bright = arr[arr > on_threshold]
     # ttl_diff = np.diff(bright)
@@ -78,8 +83,8 @@ def get_led_value(this_video, analysis_methods):
             # exit(1)
 
         # Define the coordinates of the top-left and bottom-right corners of the ROI
-        x, y = 36, 20  # Top-left corner36,20,20,24
-        width, height = 20, 24  # Width and height of the ROI
+        x, y = 286, 12  # Top-left corner36,20,20,24 286,12,27,33
+        width, height = 27, 33  # Width and height of the ROI
 
         # Extract the ROI from the grayscale frame
         roi = frame[y : y + height, x : x + width]
@@ -125,42 +130,75 @@ def analyse_led_signal(thisDir, json_file):
     trial_pattern = "trial*.csv"
     this_trial_info = find_file(thisDir, trial_pattern)
 
-    video_pattern = "video*.avi"
+    video_pattern = "*.avi"
     this_video = find_file(thisDir, video_pattern)
-    grey_value = []
-    # Load videos
-    led_pattern = "video*.csv"
-    this_led = find_file(thisDir, led_pattern)
-    if len(this_led) > 0:
-        if isinstance(this_video, list):
-            for i in range(len(this_video)):
-                grey_list = get_led_value(this_video[i], analysis_methods)
-                grey_value.append(grey_list)
-        elif isinstance(this_video, str):
-            grey_list = get_led_value(this_video, analysis_methods)
-            grey_value.append(grey_list)
-        else:
-            warnings.warn("unable to find a video")
-    else:
-        print(f"using led file {this_led}, extracted from bonsai or elsewhere")
+    # file_name, file_extension = os.path.splitext(file_path)
+    # output_file_name = file_name + "_timestamp.csv"
 
-    on_thresholds = [25000, 80000]
-    off_thresholds = [1000, 1000]
-    if isinstance(this_led, list):
+    # Load videos
+
+    led_pattern = "fictrac*.csv"
+    led_files = find_file(thisDir, led_pattern)
+    fictrac_vidLog_pattern = "fictrac-vidLogFrames*.txt"
+    fictrac_vidLog = find_file(thisDir, fictrac_vidLog_pattern)
+    led_value = []
+    if len(led_files) == 0:
+        on_thresholds = [25000, 80000]
+        off_thresholds = [1000, 1000]
         for i in range(len(this_video)):
-            # on_threshold = 25000
-            on_threshold = on_thresholds[i]
-            off_threshold = off_thresholds[i]
-            b2w, w2b = detect_transition(this_led[i], on_threshold, off_threshold)
-    elif isinstance(this_led, str):
-        b2w, w2b = detect_transition(this_led, on_thresholds[0], off_thresholds[0])
+            grey_list = get_led_value(this_video[i], analysis_methods)
+            led_value.append(grey_list)
+    elif isinstance(led_files, list):
+        on_thresholds = [25000, 80000]
+        off_thresholds = [1000, 1000]
+        print(f"using led file {led_files}, extracted from bonsai or elsewhere")
+        for i in range(len(led_files)):
+            arr = np.genfromtxt(led_files[i], delimiter=",", dtype=int)
+            led_value.append(arr)
     else:
-        warnings.warn("unable to find a video")
+        on_thresholds = [20000]
+        off_thresholds = [10000]
+        print(f"using led file {led_files}, extracted from bonsai or elsewhere")
+        arr = np.genfromtxt(led_files, delimiter=",", dtype=int)
+        led_value.append(arr)
+    # led_value = []
+    # if len(led_files) > 0:
+    #     if isinstance(this_video, list):
+    #         for i in range(len(this_video)):
+    #             grey_list = get_led_value(this_video[i], analysis_methods)
+    #             led_value.append(grey_list)
+    #     elif isinstance(this_video, str):
+    #         grey_list = get_led_value(this_video, analysis_methods)
+    #         led_value.append(grey_list)
+    #     else:
+    #         warnings.warn("unable to find a video")
+    # else:
+    #     print(f"using led file {led_files}, extracted from bonsai or elsewhere")
+    for i in range(len(led_value)):
+        b2w, w2b = detect_transition(led_value[i], on_thresholds[i], off_thresholds[i])
+    if fictrac_vidLog:
+        arr = np.genfromtxt(fictrac_vidLog, delimiter=",", dtype=int)
+        ##use these two arr[w2b], arr[b2w] to infer where the original fictrac file should be.
+
+        print(arr)
+
+    # if isinstance(led_files, list):
+    #     for i in range(len(this_video)):
+    #         # on_threshold = 25000
+    #         on_threshold = on_thresholds[i]
+    #         off_threshold = off_thresholds[i]
+    #         b2w, w2b = detect_transition(led_files[i], on_threshold, off_threshold)
+    # elif isinstance(led_files, str):
+    #     b2w, w2b = detect_transition(led_files, on_thresholds[0], off_thresholds[0])
+    # else:
+    #     warnings.warn("unable to find a video")
 
 
 if __name__ == "__main__":
     # thisDir = "C:/Users/neuroLaptop/Documents/Open Ephys/2023-06-06_21-51-30/"
-    thisDir = r"Z:\Users\chiyu\sync_test"
+    # thisDir = r"Z:\Users\chiyu\sync_test"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session2"
     json_file = "analysis_methods_dictionary.json"
     ##Time the function
     tic = time.perf_counter()

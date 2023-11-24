@@ -155,7 +155,7 @@ def create_curated_dataset(thisDir, json_file):
 
 
 if __name__ == "__main__":
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23006\231123\coherence"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23003\231122\coherence"
     json_file = "analysis_methods_dictionary.json"
     tic = time.perf_counter()

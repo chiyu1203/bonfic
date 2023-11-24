@@ -226,18 +226,6 @@ def main(thisDir, json_file):
     stim_duration = analysis_methods.get("stim_duration")
     interval_duration = analysis_methods.get("interval_duration")
     visual_paradigm_name = analysis_methods.get("experiment_name")
-    # stim_type = analysis_methods.get("stim_type")
-    # stim_type = [
-    #     -100,
-    #     -75,
-    #     -50,
-    #     -25,
-    #     0,
-    #     25,
-    #     50,
-    #     75,
-    #     100,
-    # ]  # plue value representing clockwise, counterclockwise is minus, then the rest is coherence leve
     pd_pattern = "PD*.csv"
     this_PD = find_file(thisDir, pd_pattern)
     trial_pattern = "trial*.csv"
@@ -762,7 +750,7 @@ if __name__ == "__main__":
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22036/220819/densities"
     # thisDir = ("Z:/DATA/experiment_trackball_Optomotor/VCCball/L23002/230221/long_densities")
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23001/230215/densities"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
     json_file = "analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
