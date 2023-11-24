@@ -161,37 +161,17 @@ def analyse_led_signal(thisDir, json_file):
         print(f"using led file {led_files}, extracted from bonsai or elsewhere")
         arr = np.genfromtxt(led_files, delimiter=",", dtype=int)
         led_value.append(arr)
-    # led_value = []
-    # if len(led_files) > 0:
-    #     if isinstance(this_video, list):
-    #         for i in range(len(this_video)):
-    #             grey_list = get_led_value(this_video[i], analysis_methods)
-    #             led_value.append(grey_list)
-    #     elif isinstance(this_video, str):
-    #         grey_list = get_led_value(this_video, analysis_methods)
-    #         led_value.append(grey_list)
-    #     else:
-    #         warnings.warn("unable to find a video")
-    # else:
-    #     print(f"using led file {led_files}, extracted from bonsai or elsewhere")
     for i in range(len(led_value)):
         b2w, w2b = detect_transition(led_value[i], on_thresholds[i], off_thresholds[i])
+    ## this probably means the same as dict fictrac_posthoc_analysis, if fictrac_vidLog exists, then probably do not posthoc analysis
     if fictrac_vidLog:
         arr = np.genfromtxt(fictrac_vidLog, delimiter=",", dtype=int)
-        ##use these two arr[w2b], arr[b2w] to infer where the original fictrac file should be.
-
-        print(arr)
-
-    # if isinstance(led_files, list):
-    #     for i in range(len(this_video)):
-    #         # on_threshold = 25000
-    #         on_threshold = on_thresholds[i]
-    #         off_threshold = off_thresholds[i]
-    #         b2w, w2b = detect_transition(led_files[i], on_threshold, off_threshold)
-    # elif isinstance(led_files, str):
-    #     b2w, w2b = detect_transition(led_files, on_thresholds[0], off_thresholds[0])
-    # else:
-    #     warnings.warn("unable to find a video")
+        stim_onset_frame = arr[w2b]
+        isi_onset_frame = arr[b2w]
+    else:
+        stim_onset_frame = w2b
+        isi_onset_frame = b2w
+    return stim_onset_frame, isi_onset_frame
 
 
 if __name__ == "__main__":

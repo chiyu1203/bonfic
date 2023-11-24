@@ -65,29 +65,26 @@ def create_curated_dataset(thisDir, json_file):
     dat_pattern = "*.dat"
     track_ball_radius = analysis_methods.get("trackball_radius")
     frame_rate = analysis_methods.get("frame_rate")
+    fictrac_posthoc_analysis = analysis_methods.get("fictrac_posthoc_analysis")
     # list up the files in the dir
     pd_pattern = "PD*.csv"
     dat_file = find_file(thisDir, dat_pattern)
-    # file = os.listdir(thisDir)
-    # look for files that matches the pattern
-    # find_file()
-    # dat_file = fnmatch.filter(file, dat_pattern)
-    # dat_file_directory = os.path.join(thisDir, dat_file[0])
 
     ## load dat file
     for this_dat_file in dat_file:
         file_name = Path(this_dat_file).stem
         experiment_timestamp = file_name.split("-")
         raw_data = pd.read_table(this_dat_file, sep="\s+")
-        ## fictrac title is here 'frame counter', 'delta rotation vector cam x', 'delta rotation vector cam y', \
-        ##'delta rotation vector cam z', 'delta rotation error score', 'delta rotation vector lab x', \
-        ##'delta rotation vector lab y', 'delta rotation vector lab z', 'absolute rotation vector cam x',\
-        ##'absolute rotation vector cam y', 'absolute rotation vector cam z', \
-        ##'absolute rotation vector lab x', 'absolute rotation vector lab y', \
-        ##'absolute rotation vector lab z', 'intergrated x position','intergrated y position', \
-        ##'intergrated animal heading', 'animal movement direction', 'animal movement speed', \
-        ##'intergrated forward motion','intergrated side motion', 'timestamp', 'sequence counter','delta timestamp', 'alt. timestamp']
-
+        """
+        fictrac title is here 'frame counter', 'delta rotation vector cam x', 'delta rotation vector cam y', \
+        'delta rotation vector cam z', 'delta rotation error score', 'delta rotation vector lab x', \
+        'delta rotation vector lab y', 'delta rotation vector lab z', 'absolute rotation vector cam x',\
+        'absolute rotation vector cam y', 'absolute rotation vector cam z', \
+        'absolute rotation vector lab x', 'absolute rotation vector lab y', \
+        'absolute rotation vector lab z', 'intergrated x position','intergrated y position', \
+        'intergrated animal heading', 'animal movement direction', 'animal movement speed', \
+        'intergrated forward motion','intergrated side motion', 'timestamp', 'sequence counter','delta timestamp', 'alt. timestamp']
+        """
         ## drop some column
         raw_data.drop(
             raw_data.columns[[0, 1, 2, 3, 4, 8, 9, 10, 16, 17, 19, 20, 21, 22, 23]],
@@ -108,7 +105,10 @@ def create_curated_dataset(thisDir, json_file):
         ]
         ## cleaning , and change the data from object to float
         raw_data.iloc[:, :] = raw_data.iloc[:, :].replace({",": ""}, regex=True)
-        if raw_data["timestamp"][0] == raw_data["timestamp"][1]:
+        if (
+            raw_data["timestamp"][0] == raw_data["timestamp"][1]
+            and fictrac_posthoc_analysis == False
+        ):
             print(
                 "this error timestamp value comes from a bug in new fictrac, extract timestamp from log file"
             )
@@ -130,6 +130,12 @@ def create_curated_dataset(thisDir, json_file):
             else:
                 print("log file size matches with dat file")
             raw_data["timestamp"] = timestamp_arr
+        elif fictrac_posthoc_analysis == True:
+            print(
+                "Use posthoc analysis to get dat file hence the timestamp from this file the time posthoc analysis was done. Hence, not useful to align tracking with stimulus anymore"
+            )
+        else:
+            print("no error timestamp value comes from fictrac dat file")
         for ind in range(0, raw_data.shape[1]):
             raw_data.iloc[:, ind] = pd.to_numeric(raw_data.iloc[:, ind]).astype(
                 "float32"

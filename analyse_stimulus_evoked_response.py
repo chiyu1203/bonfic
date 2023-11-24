@@ -18,7 +18,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib import cm
-from align_data_with_ttl import find_file
+from align_data_with_ttl import find_file, analyse_led_signal
 
 
 # custom_cmap = [
@@ -226,6 +226,8 @@ def main(thisDir, json_file):
     stim_duration = analysis_methods.get("stim_duration")
     interval_duration = analysis_methods.get("interval_duration")
     visual_paradigm_name = analysis_methods.get("experiment_name")
+    fictrac_posthoc_analysis = analysis_methods.get("fictrac_posthoc_analysis")
+    isi_onset_log = analysis_methods.get("isi_onset_log")
     pd_pattern = "PD*.csv"
     this_PD = find_file(thisDir, pd_pattern)
     trial_pattern = "trial*.csv"
@@ -454,8 +456,16 @@ def main(thisDir, json_file):
 
     # compare the timestamp between event file and dat file
     stimulus_timestamp = stim_info["timestamp"].to_numpy()
-    if df.loc[:, "timestamp"][0] > 0:
+    if fictrac_posthoc_analysis:
+        stim_onset, isi_onset = analyse_led_signal(thisDir, json_file)
+    elif df["timestamp"][0] != df["timestamp"][1]:
         data_timestamp = df.loc[:, "timestamp"]
+        stimulus_timestamp_b = np.tile(stimulus_timestamp, (len(data_timestamp), 1))
+        data_timestamp_b = np.tile(data_timestamp, (len(stimulus_timestamp), 1))
+        timestamp_diff = data_timestamp_b > np.transpose(stimulus_timestamp_b)
+        stim_onset = np.where(np.roll(timestamp_diff, 1, axis=1) != timestamp_diff)[1][
+            1::2
+        ]
     else:
         data_timestamp = tracking_info["timestamp"]
         stimulus_timestamp_b = np.tile(stimulus_timestamp, (len(data_timestamp), 1))
@@ -468,11 +478,7 @@ def main(thisDir, json_file):
             "still need to debug this place for situation where there is no log file"
         )
         return
-
-    stimulus_timestamp_b = np.tile(stimulus_timestamp, (len(data_timestamp), 1))
-    data_timestamp_b = np.tile(data_timestamp, (len(stimulus_timestamp), 1))
-    timestamp_diff = data_timestamp_b > np.transpose(stimulus_timestamp_b)
-    stim_onset = np.where(np.roll(timestamp_diff, 1, axis=1) != timestamp_diff)[1][1::2]
+    ##probably need to add some function here to deal with the situation when isi_onset_log is True
     stim_info["stim_onset"] = stim_onset
     cum_travel_list = []
     summary_df_list = []
