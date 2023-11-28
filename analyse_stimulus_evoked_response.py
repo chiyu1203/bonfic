@@ -458,7 +458,7 @@ def main(thisDir, json_file):
     stimulus_timestamp = stim_info["timestamp"].to_numpy()
     if fictrac_posthoc_analysis:
         stim_onset, isi_onset = analyse_led_signal(thisDir, json_file)
-    elif df["timestamp"][0] != df["timestamp"][1]:
+    elif df["timestamp"][1] != df["timestamp"][2]:
         data_timestamp = df.loc[:, "timestamp"]
         stimulus_timestamp_b = np.tile(stimulus_timestamp, (len(data_timestamp), 1))
         data_timestamp_b = np.tile(data_timestamp, (len(stimulus_timestamp), 1))
@@ -755,8 +755,9 @@ if __name__ == "__main__":
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/L22131/221102/sweeploom"
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22036/220819/densities"
     # thisDir = ("Z:/DATA/experiment_trackball_Optomotor/VCCball/L23002/230221/long_densities")
-    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23001/230215/densities"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
+    thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23004/230218/densities"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
+    # thisDir = r"Z:/DATA/experiment_trackball_Optomotor/VCCball/L23009/230309/densities"
     json_file = "analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
