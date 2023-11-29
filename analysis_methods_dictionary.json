@@ -1,5 +1,5 @@
 {
- "experiment_name": "long_densities",
+ "experiment_name": "coherence",
  "overwrite_curated_dataset": true,
  "graph_colour_code": [
   "r",
@@ -13,8 +13,8 @@
  ],
  "debug_mode": false,
  "fictrac_posthoc_analysis": false,
- "use_led_to_align_stimulus_timing": false,
- "isi_onset_log": false,
+ "use_led_to_align_stimulus_timing": true,
+ "isi_onset_log": true,
  "filtering_method": "sg_filter",
  "plotting_tbt_overview": true,
  "plotting_trajectory": false,
@@ -24,18 +24,18 @@
  "load_experiment_condition_from_database": true,
  "select_animals_by_condition": true,
  "analysis_by_stimulus_type": false,
- "trackball_radius": 40,
- "frame_rate": 144,
- "stim_duration": 25,
- "interval_duration": 5,
+ "trackball_radius": 100,
+ "frame_rate": 100,
+ "stim_duration": 20,
+ "interval_duration": 10,
+ "prestim_duration": 180,
  "stim_type": [
-  -4096,
-  -1024,
-  -256,
-  -64,
-  64,
-  256,
-  1024,
-  4096
+  -100,
+  -66,
+  -33,
+  0,
+  33,
+  66,
+  100
  ]
 }

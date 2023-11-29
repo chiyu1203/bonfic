@@ -5,6 +5,7 @@ import cv2
 import warnings
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 
 def find_transitions(arr):
@@ -32,7 +33,8 @@ def find_file(thisDir, pattern):
         print(f"no {pattern} found in {thisDir}. Let's leave this programme")
         return None
     elif len(file_check) == 1:
-        return os.path.join(thisDir, file_check[0])
+        # return os.path.join(thisDir, file_check[0])
+        return Path(thisDir) / file_check[0]
     else:
         vid_list = []
         for i in range(len(file_check)):

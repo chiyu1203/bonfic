@@ -245,24 +245,9 @@ def main(thisDir, json_file):
 
     running_speed_threshold = 50
     turning_threshold = 0.33
-    if visual_paradigm_name == "sweeploom":
-        analysis_window = [-1, 8]
-        stim_duration = 4
-        presence_duration = 1
-        sweep_duration = 2
-        velocity_threshold = 5
-    elif visual_paradigm_name == "coherence" or visual_paradigm_name.endswith(
-        "densities"
-    ):
-        analysis_window = [
-            interval_duration * -1,
-            stim_duration + interval_duration,
-        ]  ##analyse duration includes interval before and after stimulus
-    # file = os.listdir(thisDir)
-    # file_name = fnmatch.filter(file, database_pattern)
-    # database = os.path.join(thisDir, file_name[0])
     df = pd.read_pickle(database)
-    exp_date = thisDir.split("/")[5]
+    [exp_date, exp_hour] = csv_file_directory.stem.split("events")[1].split("T")
+    exp_place = csv_file_directory.parts[3]
     if analysis_methods.get("filtering_method") == "sg_filter":
         x_all = savgol_filter(df.loc[:, ["intergrated x position"]], 71, 3, axis=0)
         y_all = savgol_filter(df.loc[:, ["intergrated y position"]], 71, 3, axis=0)
@@ -373,7 +358,7 @@ def main(thisDir, json_file):
             "timestamp",
         ]
         stim_info = pd.DataFrame(stim_variable, columns=column_names)
-        if exp_date in ["221015", "221016"]:
+        if exp_date in ["2022-10-15", "2022-10-16"]:
             ### use this criteria for experiments during exp_date=['221015','221016']
             filters = [
                 (stim_info.iloc[:, 0] == 1)
@@ -424,17 +409,20 @@ def main(thisDir, json_file):
         for i, j in zip(col_num, col_name):
             stim_info[["tmp", j]] = stim_info.iloc[:, i].str.split("=", expand=True)
             stim_info[j] = pd.to_numeric(stim_info[j])
-        stim_info["Value"] = stim_info["Value"].str.replace(r"[()]", "", regex=True)
-        if stim_info["Timestamp"].dtypes == "object":
-            stim_info["Timestamp"] = stim_info["Timestamp"].str.replace(
-                r"[()]", "", regex=True
-            )
-        stim_info["Value"] = stim_info["Value"].fillna(0)
-        stim_info["Timestamp"] = stim_info["Timestamp"].astype(str)
-        stim_info["Value"] = stim_info["Value"].astype(str)
-        stim_info["timestamp"] = stim_info[["Timestamp", "Value"]].agg(".".join, axis=1)
-        stim_info["timestamp"] = pd.to_numeric(stim_info["timestamp"])
-        stim_info["timestamp"] = stim_info["timestamp"].astype("float32")
+        if exp_place == "Zball":
+            stim_info["ts"] = stim_info["Value"].str.replace(r"[()]", "", regex=True)
+        elif exp_place == "VCCball":
+            stim_info["Value"] = stim_info["Value"].str.replace(r"[()]", "", regex=True)
+            if stim_info["Timestamp"].dtypes == "object":
+                stim_info["Timestamp"] = stim_info["Timestamp"].str.replace(
+                    r"[()]", "", regex=True
+                )
+            stim_info["Value"] = stim_info["Value"].fillna(0)
+            stim_info["Timestamp"] = stim_info["Timestamp"].astype(str)
+            stim_info["Value"] = stim_info["Value"].astype(str)
+            stim_info["ts"] = stim_info[["Timestamp", "Value"]].agg(".".join, axis=1)
+        stim_info["ts"] = pd.to_numeric(stim_info["ts"])
+        stim_info["ts"] = stim_info["ts"].astype("float32")
         stim_info.drop(
             columns=stim_info.columns[0 : raw_column_number + 1], inplace=True
         )
@@ -455,7 +443,7 @@ def main(thisDir, json_file):
         return
 
     # compare the timestamp between event file and dat file
-    stimulus_timestamp = stim_info["timestamp"].to_numpy()
+    stimulus_timestamp = stim_info["ts"].to_numpy()
     if fictrac_posthoc_analysis:
         stim_onset, isi_onset = analyse_led_signal(thisDir, json_file)
     elif df["timestamp"][1] != df["timestamp"][2]:
@@ -480,6 +468,27 @@ def main(thisDir, json_file):
         return
     ##probably need to add some function here to deal with the situation when isi_onset_log is True
     stim_info["stim_onset"] = stim_onset
+
+    if visual_paradigm_name == "sweeploom":
+        analysis_window = [-1, 8]
+        stim_duration = 4
+        presence_duration = 1
+        sweep_duration = 2
+        velocity_threshold = 5
+    elif visual_paradigm_name == "coherence" or visual_paradigm_name.endswith(
+        "densities"
+    ):
+        analysis_window = [interval_duration * -1, stim_duration + interval_duration]
+    else:
+        print(
+            "visual paradigm name does not match with avaliable options. Please check"
+        )
+        return
+
+    cum_travel_isi = []
+    summary_list_isi = []
+    velocity_isi = []
+    z_isi = []
     cum_travel_list = []
     summary_df_list = []
     velocity_list = []
@@ -542,8 +551,11 @@ def main(thisDir, json_file):
             velocity_list.append(velocity[:, :, 0])
             z_list.append(cum_z_vector[:, :, 0])
     else:
-        stim_to_analyse = stim_info.loc[:, "stim_onset"]
-        stim_name_list = np.array(stim_info["stim_type"])
+        if isi_onset_log:
+            stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
+        else:
+            stim_to_analyse = stim_info.loc[:, "stim_onset"]
+        stim_name_list = np.array(stim_info["stim_type"][stim_to_analyse.index])
         (
             cum_travel_distance,
             opto_all_trials,
@@ -564,7 +576,7 @@ def main(thisDir, json_file):
         travel_distance_during_stim = (
             cum_travel_distance[:, end_frame, 0] - travel_distance_prior_stim
         )
-        optomotor_range = 4
+        optomotor_range = 3
         summary_list = {
             "opto_index_isi": opto_all_isi[:, 0],
             "opto_index": opto_all_trials[:, optomotor_range],
@@ -579,6 +591,49 @@ def main(thisDir, json_file):
         summary_df_list.append(summary_df)
         velocity_list.append(velocity[:, :, 0])
         z_list.append(cum_z_vector[:, :, 0])
+        if isi_onset_log:
+            stim_to_analyse = stim_info.loc[::2, "stim_onset"]
+            analysis_window_isi = [
+                interval_duration * -1,
+                interval_duration + interval_duration,
+            ]
+            stim_name_list = np.array(stim_info["stim_type"][stim_to_analyse.index])
+            (
+                cum_travel_distance,
+                opto_all_trials,
+                opto_all_isi,
+                cum_z_vector,
+                init_frame_isi,
+                end_frame_isi,
+                velocity,
+            ) = generate_stimulus_evoked_response(
+                stim_to_analyse,
+                vz,
+                travel_distance_fbf,
+                analysis_window_isi,
+                frame_rate,
+                interval_duration,
+            )
+            travel_distance_prior_stim = cum_travel_distance[:, init_frame_isi, 0]
+            travel_distance_during_stim = (
+                cum_travel_distance[:, end_frame_isi, 0] - travel_distance_prior_stim
+            )
+            optomotor_range = 1
+            summary_isi = {
+                "opto_index_last5": opto_all_isi[:, 0],
+                "opto_index_isi": opto_all_trials[:, optomotor_range],
+                "travel_distance_last5": travel_distance_prior_stim,
+                "travel_distance_isi": travel_distance_during_stim,
+                "stim_index": stim_to_analyse.index,
+                "stim_type": stim_name_list,
+            }
+            summary_df_isi = pd.DataFrame(summary_isi)
+            # classify_trial_type(summary_df, turning_threshold, running_speed_threshold)
+            cum_travel_isi.append(cum_travel_distance[:, :, 0])
+            summary_list_isi.append(summary_df_isi)
+            velocity_isi.append(velocity[:, :, 0])
+            z_isi.append(cum_z_vector[:, :, 0])
+
     ##concatenate travel distance for histogram
     print("ready to plot graph with some data and decompose those lists")
     ##concatenate velocity list for heatmap
@@ -755,8 +810,11 @@ if __name__ == "__main__":
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/L22131/221102/sweeploom"
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22036/220819/densities"
     # thisDir = ("Z:/DATA/experiment_trackball_Optomotor/VCCball/L23002/230221/long_densities")
-    thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23004/230218/densities"
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23004/230218/densities"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
+    thisDir = (
+        "Z:/DATA/experiment_trackball_Optomotor/Zball/GN23001/231121/coherence/session2"
+    )
     # thisDir = r"Z:/DATA/experiment_trackball_Optomotor/VCCball/L23009/230309/densities"
     json_file = "analysis_methods_dictionary.json"
     tic = time.perf_counter()
