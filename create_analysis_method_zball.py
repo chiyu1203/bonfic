@@ -6,7 +6,7 @@ analysis_methods = {
     "overwrite_curated_dataset": True,
     "graph_colour_code": ["r", "y", "m", "c", "k", "b", "g", "r"],
     "debug_mode": False,
-    "fictrac_posthoc_analysis": False,
+    "fictrac_posthoc_analysis": True,
     "use_led_to_align_stimulus_timing": True,
     "isi_onset_log": True,
     "filtering_method": "sg_filter",
