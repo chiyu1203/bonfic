@@ -38,7 +38,7 @@ def find_file(thisDir, pattern):
     else:
         vid_list = []
         for i in range(len(file_check)):
-            vid_list.append(os.path.join(thisDir, file_check[i]))
+            vid_list.append(Path(thisDir) / file_check[i])
         return vid_list
 
 
@@ -144,25 +144,36 @@ def analyse_led_signal(thisDir, json_file):
     fictrac_vidLog_pattern = "fictrac-vidLogFrames*.txt"
     fictrac_vidLog = find_file(thisDir, fictrac_vidLog_pattern)
     led_value = []
+    '''
     if len(led_files) == 0:
         on_thresholds = [25000, 80000]
         off_thresholds = [1000, 1000]
         for i in range(len(this_video)):
             grey_list = get_led_value(this_video[i], analysis_methods)
             led_value.append(grey_list)
-    elif isinstance(led_files, list):
+    '''
+    if isinstance(led_files, list):
         on_thresholds = [25000, 80000]
         off_thresholds = [1000, 1000]
         print(f"using led file {led_files}, extracted from bonsai or elsewhere")
         for i in range(len(led_files)):
             arr = np.genfromtxt(led_files[i], delimiter=",", dtype=int)
             led_value.append(arr)
-    else:
-        on_thresholds = [20000]
-        off_thresholds = [10000]
+    elif len(led_files.stem)>0:
+        on_thresholds = [18000]
+        off_thresholds = [5000]
         print(f"using led file {led_files}, extracted from bonsai or elsewhere")
         arr = np.genfromtxt(led_files, delimiter=",", dtype=int)
         led_value.append(arr)
+    else:
+        print(f"LED file not found. Use openCV to analyse the LED signals")
+        on_thresholds = [25000, 80000]
+        off_thresholds = [1000, 1000]
+        for i in range(len(this_video)):
+            grey_list = get_led_value(this_video[i], analysis_methods)
+            led_value.append(grey_list)
+
+    ## use led value to detect the transition.
     for i in range(len(led_value)):
         b2w, w2b = detect_transition(led_value[i], on_thresholds[i], off_thresholds[i])
     ## this probably means the same as dict fictrac_posthoc_analysis, if fictrac_vidLog exists, then probably do not posthoc analysis
@@ -172,7 +183,7 @@ def analyse_led_signal(thisDir, json_file):
         isi_onset_frame = arr[b2w]
     else:
         stim_onset_frame = w2b
-        isi_onset_frame = b2w
+        isi_onset_frame = b2w[:len(w2b)]
     return stim_onset_frame, isi_onset_frame
 
 
