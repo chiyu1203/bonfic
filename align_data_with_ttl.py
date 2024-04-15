@@ -144,14 +144,14 @@ def analyse_led_signal(thisDir, json_file):
     fictrac_vidLog_pattern = "fictrac-vidLogFrames*.txt"
     fictrac_vidLog = find_file(thisDir, fictrac_vidLog_pattern)
     led_value = []
-    '''
+    """
     if len(led_files) == 0:
         on_thresholds = [25000, 80000]
         off_thresholds = [1000, 1000]
         for i in range(len(this_video)):
             grey_list = get_led_value(this_video[i], analysis_methods)
             led_value.append(grey_list)
-    '''
+    """
     if isinstance(led_files, list):
         on_thresholds = [25000, 80000]
         off_thresholds = [1000, 1000]
@@ -159,9 +159,9 @@ def analyse_led_signal(thisDir, json_file):
         for i in range(len(led_files)):
             arr = np.genfromtxt(led_files[i], delimiter=",", dtype=int)
             led_value.append(arr)
-    elif len(led_files.stem)>0:
-        on_thresholds = [18000]
-        off_thresholds = [5000]
+    elif len(led_files.stem) > 0:
+        on_thresholds = [17000]
+        off_thresholds = [6000]
         print(f"using led file {led_files}, extracted from bonsai or elsewhere")
         arr = np.genfromtxt(led_files, delimiter=",", dtype=int)
         led_value.append(arr)
@@ -183,7 +183,7 @@ def analyse_led_signal(thisDir, json_file):
         isi_onset_frame = arr[b2w]
     else:
         stim_onset_frame = w2b
-        isi_onset_frame = b2w[:len(w2b)]
+        isi_onset_frame = b2w[: len(w2b)]
     return stim_onset_frame, isi_onset_frame
 
 

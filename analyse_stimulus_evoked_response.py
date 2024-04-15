@@ -249,7 +249,7 @@ def main(thisDir, json_file):
     df = pd.read_pickle(database)
     [exp_date, exp_hour] = csv_file_directory.stem.split("events")[1].split("T")
     exp_place = csv_file_directory.parts[3]
-    exp_place ="Zball"
+    # exp_place = "Zball"
     if analysis_methods.get("filtering_method") == "sg_filter":
         x_all = savgol_filter(df.loc[:, ["intergrated x position"]], 71, 3, axis=0)
         y_all = savgol_filter(df.loc[:, ["intergrated y position"]], 71, 3, axis=0)
@@ -448,9 +448,9 @@ def main(thisDir, json_file):
     stimulus_timestamp = stim_info["ts"].to_numpy()
     if fictrac_posthoc_analysis:
         stim_onset, isi_onset = analyse_led_signal(thisDir, json_file)
-        transition_onset=np.ones((len(stim_onset)+len(isi_onset),), dtype=int)
-        transition_onset[1::2]=stim_onset
-        transition_onset[::2]=isi_onset
+        transition_onset = np.ones((len(stim_onset) + len(isi_onset),), dtype=int)
+        transition_onset[1::2] = stim_onset
+        transition_onset[::2] = isi_onset
         stim_info["stim_onset"] = transition_onset
     elif df["timestamp"][1] != df["timestamp"][2]:
         data_timestamp = df.loc[:, "timestamp"]
@@ -474,7 +474,6 @@ def main(thisDir, json_file):
         )
         return
     ##probably need to add some function here to deal with the situation when isi_onset_log is True
-
 
     if visual_paradigm_name == "sweeploom":
         analysis_window = [-1, 8]
@@ -692,7 +691,7 @@ def main(thisDir, json_file):
         ax2.set_title("stimulus evoked velocity preview")
         plot_name = "optomotor_overview.png"
         if analysis_methods.get("debug_mode") == False:
-            fig1.savefig(Path(thisDir) / plot_name) 
+            fig1.savefig(Path(thisDir) / plot_name)
         plt.show()
 
     if analysis_methods.get("plotting_optomotor_response") == True:
@@ -810,6 +809,15 @@ def main(thisDir, json_file):
             index_list - dev_timing_from_analysis_window
         )  # this normalise the recovery duration from the first deceleration
 
+'''
+need to write something here to save summary_df,velocity_arr, cum_z_vector, but what is the efficent way to manage these data
+If everything is in summary_df then that's easy but now it looks like I have other two big tables velocity_arr and cum_z_vector.
+or should I export the original location and then do the calculation after aligning behaviour data with ephys data
+My gut feeling is that we still have a place for hdf-based curated database, which we can throw all the information there
+In this case, the original database_curated.pickle should be renamed as tracking_curated.pickle.
+'''
+
+
     return summary_df, velocity_arr, cum_z_vector, travel_distance_whole_session
 
 
@@ -819,13 +827,9 @@ if __name__ == "__main__":
     # thisDir = ("Z:/DATA/experiment_trackball_Optomotor/VCCball/L23002/230221/long_densities")
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23004/230218/densities"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
-    '''
-    thisDir = (
-        "Z:/DATA/experiment_trackball_Optomotor/Zball/GN23001/231121/coherence/session2"
-    )
-    '''
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23012\231126\coherence\session1"
     # thisDir = r"Z:/DATA/experiment_trackball_Optomotor/VCCball/L23009/230309/densities"
-    thisDir = "/Users/cylee/Downloads/bonfic_led"
+    # thisDir = "/Users/cylee/Downloads/bonfic_led"
     json_file = "analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
