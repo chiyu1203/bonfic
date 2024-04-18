@@ -6,6 +6,7 @@ event evoked response: need to output the trial id (both within the same stimulu
 velocity vector across time in a trial plus optomotor response
 analyis methods needs to tell us what to analye. For example optomotor response, acceleration epochs, deceleration epochs, transition between stationary to walk and walk to stationary
 """
+
 import json
 import re
 import time
@@ -235,7 +236,7 @@ def main(thisDir, json_file):
     csv_file_directory = find_file(thisDir, trial_pattern)
     tracking_csv_pattern = "tracking_*.csv"
     tracking_csv_file_directory = find_file(thisDir, tracking_csv_pattern)
-    database_pattern = "*.pickle"
+    database_pattern = "database*.pickle"
     database = find_file(thisDir, database_pattern)
     # csv_pattern = "trial_*.csv"
     # tracking_csv_pattern = "tracking_*.csv"
@@ -641,6 +642,7 @@ def main(thisDir, json_file):
             z_isi.append(cum_z_vector[:, :, 0])
 
     ##concatenate travel distance for histogram
+
     print("ready to plot graph with some data and decompose those lists")
     ##concatenate velocity list for heatmap
     summary_df = pd.concat(summary_df_list)
@@ -809,16 +811,28 @@ def main(thisDir, json_file):
             index_list - dev_timing_from_analysis_window
         )  # this normalise the recovery duration from the first deceleration
 
-'''
+    if analysis_methods.get("debug_mode") == True:
+        print("Nothing is saved in the debug mode. Move to the next animal")
+    else:
+        summary_file_name = Path(thisDir) / "behavioural_summary.pickle"
+        summary_df.to_pickle(summary_file_name)
+        velocity_file_name = Path(thisDir) / "trial_velocity.npy"
+        with open(velocity_file_name, "wb") as f:
+            np.save(f, velocity_arr)
+        Zvector_file_name = Path(thisDir) / "z_vector.npy"
+        with open(Zvector_file_name, "wb") as f:
+            np.save(f, cum_z_vector)
+
+    return summary_df, velocity_arr, cum_z_vector, travel_distance_whole_session
+
+
+"""
 need to write something here to save summary_df,velocity_arr, cum_z_vector, but what is the efficent way to manage these data
 If everything is in summary_df then that's easy but now it looks like I have other two big tables velocity_arr and cum_z_vector.
 or should I export the original location and then do the calculation after aligning behaviour data with ephys data
 My gut feeling is that we still have a place for hdf-based curated database, which we can throw all the information there
 In this case, the original database_curated.pickle should be renamed as tracking_curated.pickle.
-'''
-
-
-    return summary_df, velocity_arr, cum_z_vector, travel_distance_whole_session
+"""
 
 
 if __name__ == "__main__":
