@@ -160,6 +160,27 @@ def generate_stimulus_evoked_response(
     )
 
 
+def classify_walk(arr, speed_threshold=10, consecutive_length=5):
+    binary_array = arr > speed_threshold
+
+    # Create a kernel of length 5 filled with ones
+    kernel = np.ones(consecutive_length)
+
+    # Use convolution to find the sum of 5 consecutive elements
+    conv = np.convolve(binary_array, kernel, mode="valid")
+
+    # Find the indices where the convolution result is 5 or more
+    start_indices = np.where(conv >= consecutive_length)[0]
+
+    # Adjust the indices to ensure that they point to the start of 5 or more consecutive elements
+    start_indices = [
+        idx
+        for idx in start_indices
+        if np.all(binary_array[idx : idx + consecutive_length])
+    ]
+    return np.asarray(start_indices)
+
+
 def classify_trial_type(summary_df, turning_threshold, running_speed_threshold):
     if summary_df.stim_type.dtype == "object":
         print(
@@ -266,6 +287,31 @@ def main(thisDir, json_file):
     travel_distance_fbf = np.sqrt(
         np.add(np.square(np.diff(x_all, axis=0)), np.square(np.diff(y_all, axis=0)))
     )
+    velocity_fbf = travel_distance_fbf * frame_rate
+    putative_walk = classify_walk(velocity_fbf[:, 0], 5, frame_rate * 1)
+    dif_putative_walk = np.diff(putative_walk, axis=0)
+    gap_len = np.where(dif_putative_walk > frame_rate * 1)
+    walk_events_end = putative_walk[gap_len]
+    walk_events_start = np.concatenate(
+        (
+            [walk_events_end[0] - gap_len[0][0] - 1],
+            walk_events_end[1:] - gap_len[0][1:] + gap_len[0][:-1],
+        )
+    )
+    # walk_events_start = []
+    # for i in range(len(walk_events_end)):
+    #     if i == 0:
+    #         walk_events_start.append(walk_events_end[i] - gap_len[0][i] - 1)
+    #         continue
+    #     else:
+    #         walk_events_start.append(
+    #             walk_events_end[i] - gap_len[0][i] + gap_len[0][i - 1]
+    #         )
+
+    pcm = plt.pcolormesh(np.transpose(velocity_fbf), cmap="magma", vmin=0, vmax=100)
+    for i in walk_events_start:
+        plt.axvline(x=i, color="w")
+    plt.show()
     travel_distance_whole_session = np.sum(travel_distance_fbf)
     if analysis_methods.get("plotting_trajectory") == True:
         plt.plot(x_all, y_all, c=np.arange(len(y_all)), marker=".", alpha=0.5)
@@ -841,7 +887,8 @@ if __name__ == "__main__":
     # thisDir = ("Z:/DATA/experiment_trackball_Optomotor/VCCball/L23002/230221/long_densities")
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23004/230218/densities"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23012\231126\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23012\231126\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23018\240422\coherence\session2"
     # thisDir = r"Z:/DATA/experiment_trackball_Optomotor/VCCball/L23009/230309/densities"
     # thisDir = "/Users/cylee/Downloads/bonfic_led"
     json_file = "analysis_methods_dictionary.json"

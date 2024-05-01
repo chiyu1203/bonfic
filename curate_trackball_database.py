@@ -5,7 +5,8 @@ import json
 import time
 import pandas as pd
 import numpy as np
-import chardet
+
+# import chardet
 import sys
 from pathlib import Path
 
@@ -186,8 +187,8 @@ def create_curated_dataset(thisDir, json_file):
 
 
 if __name__ == "__main__":
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23009\231125\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23003\231122\coherence"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23014\231126\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23018\240422\coherence\session2"
     json_file = "analysis_methods_dictionary.json"
     tic = time.perf_counter()
     create_curated_dataset(thisDir, json_file)

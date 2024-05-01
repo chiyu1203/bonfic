@@ -139,7 +139,7 @@ def analyse_led_signal(thisDir, json_file):
 
     # Load videos
 
-    led_pattern = "fictrac*.csv"
+    led_pattern = "*LED.csv"
     led_files = find_file(thisDir, led_pattern)
     fictrac_vidLog_pattern = "fictrac-vidLogFrames*.txt"
     fictrac_vidLog = find_file(thisDir, fictrac_vidLog_pattern)
@@ -160,8 +160,10 @@ def analyse_led_signal(thisDir, json_file):
             arr = np.genfromtxt(led_files[i], delimiter=",", dtype=int)
             led_value.append(arr)
     elif len(led_files.stem) > 0:
-        on_thresholds = [17000]
-        off_thresholds = [6000]
+        # on_thresholds = [17000]
+        # off_thresholds = [6000]
+        on_thresholds = [20000]
+        off_thresholds = [18000]
         print(f"using led file {led_files}, extracted from bonsai or elsewhere")
         arr = np.genfromtxt(led_files, delimiter=",", dtype=int)
         led_value.append(arr)
