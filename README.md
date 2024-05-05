@@ -24,15 +24,11 @@ Keeping animals in Z building is possible but please be aware that the animals h
 
 Tethering animals: teathering animal itself is not that hard but electrophysiology, we want to fix animals by head, which is not trivial (as locust's head is small and round). 
 
-So far, we used Pavan's needle to tether animals and try to glue their head and thorax together so from time to time, animals do escape from the tethering, which is really scary for electrophysiology. 
+We 3D print a customised headbar and use two kind of UHU glue for tethering. First use sand paper to get rid of wax on animal's head and thorax. 
 
-Imagine locusts got rid of the tether and headfix and break your 6000-euro probes :(
+Then use a sharp thing to place the red UHU glue and stick it on the animal.
 
-We use two kind of UHU glue for tethering. First use sand paper to get rid of wax on animal's head and thorax. 
-
-Then dip the tip of the customised needles with red UHU glue and stick it on the animal.
-
-Then apply blue UHU glue around the needles and the animal. Shine the animal with UV light for 30 seconds from multiple angle.
+Then apply blue UHU glue on the holes of the headbar and use shape thing to make sure the glue cover all edges. Shine the animal with UV light for 30 seconds from multiple angle.
 
 (There is a small ball you can use while tething the animal before the stage is avaiable, just put the ball under a tethered animal, the animal shall climb it due to its instinct. 
 
@@ -40,15 +36,15 @@ But dont start tethering animals too early because even if you use the ball to k
 
 ### Lighting: 
 
-switch on extension located at the bottom of the rig. This will turn on both IR light by the side of the camera and a light above the animal. 
+switch on extension located at the bottom of the rig. This will turn on both IR lights and OpenEphys DAQ (and maybe a light above the animal). 
 
-It seems that these light will create some noise so I need to test them and perhaps replacing them with othe noise-free lighting.
+These light create some noise so they are wrapped with tin foil and connect to ground bus.
 
 There are two ways to run the experiment, using online fictrac or offline fictrac. Online fictrac is essential for closed-loop experiment. 
 
 However, due to some potential incompatability issue between AMD CPU and OpenCL, we drop a lot of frames when doing online fictrac analysis and saving frames into video 
 
-(On average, 40% of the frame are dropped at 100Hz. This means those videos can hardly be backtrack).
+(On average, 40% of the frame are dropped at 100Hz. This means those videos can hardly be backtrack), so highly recommend to use bonsai to save videos when online fictrac is not necessary.
 
 
 ## Running the experiment (online fictrac):
@@ -111,18 +107,21 @@ Prepare the animal
 
 Add optical glue to the animal and wait for the glue to dry out
 
-Start the workflow
+Start the bonsai workflow (for behavioural only: **rdk_3coherence_1hr_posthoc**; for ephys: **loom and gratings manual trigger**) 
 
-Start Ephys recording (Optional)
+Open Ephys GUI (For ephys: make sure to downgrade the USB driver)
 
 Move the animal from the tethering stage to the ephys rig
 
-Closed the front cloth
+Find a good location with the test workflow and stick the reference electrode with the tape with the headbar (For ephys: make sure to downgrade the USB driver)
 
-(if just let camera run as default) press **R** to start saving the incoming frames into video
-(if using arduino trigger basler camera) press **C** to start the camera trigger
+Closed the front cloth, and turn off room light; (For ephys: turn off micromanipulator and open **rdk_3coherence_1hr_posthoc**)
 
 Press **S** to start stimulus
+
+press **C** to start the camera trigger (if using arduino trigger basler camera). Then press **R** to start saving the incoming frames into video.
+
+Starting Ephys recording,  
 
 At the end of the experiment:
 
