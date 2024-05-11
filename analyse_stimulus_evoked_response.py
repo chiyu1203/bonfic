@@ -21,6 +21,11 @@ import matplotlib as mpl
 from matplotlib import cm
 from pathlib import Path
 from align_data_with_ttl import find_file, analyse_led_signal
+import sys
+
+sys.path.insert(0, "C:/Users/neuroPC/Documents/GitHub/utilities")
+from useful_tools import select_animals_gpt
+from data_cleaning import sorting_trial_info
 
 
 # custom_cmap = [
@@ -444,49 +449,9 @@ def main(thisDir, json_file):
     elif visual_paradigm_name == "coherence" or visual_paradigm_name.endswith(
         "densities"
     ):
-        col_num = [2, 4, 5, 7, 11, 13, 15, 17]
-        col_name = [
-            "ID",
-            "Size",
-            "Colour",
-            "numDots",
-            "Contrast",
-            "VelX",
-            "VelY",
-            "Coherence",
-        ]
-        for i, j in zip(col_num, col_name):
-            stim_info[["tmp", j]] = stim_info.iloc[:, i].str.split("=", expand=True)
-            stim_info[j] = pd.to_numeric(stim_info[j])
-        if exp_place == "Zball":
-            stim_info["ts"] = stim_info["Value"].str.replace(r"[()]", "", regex=True)
-        elif exp_place == "VCCball":
-            stim_info["Value"] = stim_info["Value"].str.replace(r"[()]", "", regex=True)
-            if stim_info["Timestamp"].dtypes == "object":
-                stim_info["Timestamp"] = stim_info["Timestamp"].str.replace(
-                    r"[()]", "", regex=True
-                )
-            stim_info["Value"] = stim_info["Value"].fillna(0)
-            stim_info["Timestamp"] = stim_info["Timestamp"].astype(str)
-            stim_info["Value"] = stim_info["Value"].astype(str)
-            stim_info["ts"] = stim_info[["Timestamp", "Value"]].agg(".".join, axis=1)
-        stim_info["ts"] = pd.to_numeric(stim_info["ts"])
-        stim_info["ts"] = stim_info["ts"].astype("float32")
-        stim_info.drop(
-            columns=stim_info.columns[0 : raw_column_number + 1], inplace=True
+        sorting_trial_info(
+            stim_info, visual_paradigm_name="coherence", exp_place="Zball"
         )
-        if visual_paradigm_name.endswith("densities"):
-            stim_variable_direction = (
-                stim_info["VelX"] * stim_info["numDots"] / abs(stim_info["VelX"])
-            )
-        elif visual_paradigm_name == "coherence":
-            stim_variable_direction = (
-                stim_info["VelX"] * stim_info["Coherence"] / abs(stim_info["VelX"])
-            )
-        # positive value means dots moves from right to left in a window, allocentric orientation in a panoramic setup: counterclock wise
-        stim_info["stim_type"] = -1 * stim_variable_direction.astype(int)
-        stim_type = np.sort(stim_info.stim_type.unique()).tolist()
-
     else:
         warnings.warn("stimulus paradigm can not be recognised")
         return
