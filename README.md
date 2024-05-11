@@ -101,33 +101,45 @@ Close the workflow (re-open the workflow if you want to continue with the next t
 ---------------------------------------------------------------------------------------------------------------------------------
 The following command is used when you need to do posthoc analysis for led detection and fictrac, which means we only need to deliver stimuli and film the animal
 
-Open Bonsai workflow (for example **rdk_3coherence_1hr_posthoc**)
+Open Bonsai workflows (for example **rdk_3coherence_1hr_posthoc** and exploration workflow: **loom and gratings manual trigger**)
 
 Prepare the animal
 
 Add optical glue to the animal and wait for the glue to dry out
 
+For ephys: inserting reference pin into the locust brain
+
 Start the bonsai workflow (for behavioural only: **rdk_3coherence_1hr_posthoc**; for ephys: **loom and gratings manual trigger**) 
 
-Open Ephys GUI (For ephys: make sure to downgrade the USB driver)
+Open Ephys GUI (For ephys: make sure to downgrade the USB driver first)
 
 Move the animal from the tethering stage to the ephys rig
 
-Find a good location with the test workflow and stick the reference electrode with the tape with the headbar (For ephys: make sure to downgrade the USB driver)
+Ephys only: Dip the electrode with dyes and wait for 5 mins so that the dyes can be stained on the electrode
 
-Closed the front cloth, and turn off room light; (For ephys: turn off micromanipulator and open **rdk_3coherence_1hr_posthoc**)
+Move the probe into the rig and stick the reference pins together. Attaching the remaining part of reference wire with tape to the headbar so that the animal can not touch it
+
+Go deeper every 50um and deliver visual stimuli to find a good location with the exploration workflow
+
+Closed the front cloth, and turn off room light (For ephys: turn off micromanipulator, remove binoculars and open **rdk_3coherence_1hr_posthoc**)
+
+Start the workflow of the **rdk_3coherence_1hr_posthoc**
 
 Press **S** to start stimulus
 
-press **C** to start the camera trigger (if using arduino trigger basler camera). Then press **R** to start saving the incoming frames into video.
+press **C** to start the camera trigger (if using arduino trigger basler camera) then press **R** to start saving the incoming frames into video.
 
-Starting Ephys recording,  
+Starting Ephys recording
+
+Plug in the barcode thing.
 
 At the end of the experiment:
 
 Stop Ephys recording (Optional)
 
-Stop workflow by pressing Stop on Bonsai GUI
+Pressing D to stop arduino first
+
+Pressing Stop button to leave Bonsai GUI
 
 ## Posthoc analysis:
 
