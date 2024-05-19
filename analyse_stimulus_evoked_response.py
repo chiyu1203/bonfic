@@ -575,45 +575,43 @@ def main(thisDir, json_file):
     else:
         if isi_onset_log:
             stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
+            stim_name_list = np.array(stim_info["stim_type"][stim_to_analyse.index])
+            (
+                cum_travel_distance,
+                opto_all_trials,
+                opto_all_isi,
+                cum_z_vector,
+                init_frame,
+                end_frame,
+                velocity,
+            ) = generate_stimulus_evoked_response(
+                stim_to_analyse,
+                vz,
+                travel_distance_fbf,
+                analysis_window,
+                frame_rate,
+                stim_duration,
+            )
+            travel_distance_prior_stim = cum_travel_distance[:, init_frame, 0]
+            travel_distance_during_stim = (
+                cum_travel_distance[:, end_frame, 0] - travel_distance_prior_stim
+            )
+            optomotor_range = 3
+            summary_list = {
+                "opto_index_isi": opto_all_isi[:, 0],
+                "opto_index": opto_all_trials[:, optomotor_range],
+                "travel_distance_isi": travel_distance_prior_stim,
+                "travel_distance": travel_distance_during_stim,
+                "stim_index": stim_to_analyse.index,
+                "stim_type": stim_name_list,
+            }
+            summary_df = pd.DataFrame(summary_list)
+            classify_trial_type(summary_df, turning_threshold, running_speed_threshold)
+            cum_travel_list.append(cum_travel_distance[:, :, 0])
+            summary_df_list.append(summary_df)
+            velocity_list.append(velocity[:, :, 0])
+            z_list.append(cum_z_vector[:, :, 0])
         else:
-            stim_to_analyse = stim_info.loc[:, "stim_onset"]
-        stim_name_list = np.array(stim_info["stim_type"][stim_to_analyse.index])
-        (
-            cum_travel_distance,
-            opto_all_trials,
-            opto_all_isi,
-            cum_z_vector,
-            init_frame,
-            end_frame,
-            velocity,
-        ) = generate_stimulus_evoked_response(
-            stim_to_analyse,
-            vz,
-            travel_distance_fbf,
-            analysis_window,
-            frame_rate,
-            stim_duration,
-        )
-        travel_distance_prior_stim = cum_travel_distance[:, init_frame, 0]
-        travel_distance_during_stim = (
-            cum_travel_distance[:, end_frame, 0] - travel_distance_prior_stim
-        )
-        optomotor_range = 3
-        summary_list = {
-            "opto_index_isi": opto_all_isi[:, 0],
-            "opto_index": opto_all_trials[:, optomotor_range],
-            "travel_distance_isi": travel_distance_prior_stim,
-            "travel_distance": travel_distance_during_stim,
-            "stim_index": stim_to_analyse.index,
-            "stim_type": stim_name_list,
-        }
-        summary_df = pd.DataFrame(summary_list)
-        classify_trial_type(summary_df, turning_threshold, running_speed_threshold)
-        cum_travel_list.append(cum_travel_distance[:, :, 0])
-        summary_df_list.append(summary_df)
-        velocity_list.append(velocity[:, :, 0])
-        z_list.append(cum_z_vector[:, :, 0])
-        if isi_onset_log:
             stim_to_analyse = stim_info.loc[::2, "stim_onset"]
             analysis_window_isi = [
                 interval_duration * -1,
@@ -660,10 +658,16 @@ def main(thisDir, json_file):
 
     print("ready to plot graph with some data and decompose those lists")
     ##concatenate velocity list for heatmap
-    summary_df = pd.concat(summary_df_list)
-    cum_travel_distance = np.vstack(cum_travel_list)
-    velocity_arr = np.vstack(velocity_list)
-    cum_z_vector = np.vstack(z_list)
+    if isi_onset_log:
+        summary_df = pd.concat(summary_df_list)
+        cum_travel_distance = np.vstack(cum_travel_list)
+        velocity_arr = np.vstack(velocity_list)
+        cum_z_vector = np.vstack(z_list)
+    else:
+        summary_df = pd.concat(cum_travel_isi)
+        cum_travel_distance = np.vstack(summary_list_isi)
+        velocity_arr = np.vstack(velocity_isi)
+        cum_z_vector = np.vstack(z_isi)
 
     if analysis_methods.get("plotting_tbt_overview") == True:
         ##arrange xticks at onset and offset of the stimulus for heatmap
@@ -721,6 +725,8 @@ def main(thisDir, json_file):
             this_response = summary_df.loc[
                 summary_df["stim_type"] == this_coherence, "opto_index"
             ].values
+            if len(this_response) == 0:
+                continue
             mean_response = np.mean(this_response, axis=0)
             sem_response = np.std(this_response, axis=0, ddof=1) / np.sqrt(
                 this_response.shape[0]
@@ -857,7 +863,7 @@ if __name__ == "__main__":
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23004/230218/densities"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23012\231126\coherence\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23018\240422\coherence\session2"
+    thisDir = r"Z:/DATA/experiment_trackball_Optomotor/Zball/GN23019/240507/coherence/session1"
     # thisDir = (
     #     "Z:/DATA/experiment_trackball_Optomotor/Zball/GN23019/240507/coherence/session1"
     # )
