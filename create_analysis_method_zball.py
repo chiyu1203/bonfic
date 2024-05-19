@@ -11,7 +11,7 @@ analysis_methods = {
     "isi_onset_log": True,
     "filtering_method": "sg_filter",
     "plotting_tbt_overview": True,
-    "plotting_trajectory": False,
+    "plotting_trajectory": True,
     "plotting_event_related_trajectory": False,
     "plotting_deceleration_accerleration": False,
     "plotting_optomotor_response": True,

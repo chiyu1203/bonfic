@@ -292,7 +292,10 @@ def main(thisDir, json_file):
     travel_distance_fbf = np.sqrt(
         np.add(np.square(np.diff(x_all, axis=0)), np.square(np.diff(y_all, axis=0)))
     )
+    """
+
     velocity_fbf = travel_distance_fbf * frame_rate
+
     putative_walk = classify_walk(velocity_fbf[:, 0], 5, frame_rate * 1)
     dif_putative_walk = np.diff(putative_walk, axis=0)
     gap_len = np.where(dif_putative_walk > frame_rate * 1)
@@ -317,10 +320,11 @@ def main(thisDir, json_file):
     for i in walk_events_start:
         plt.axvline(x=i, color="w")
     plt.show()
+    """
     travel_distance_whole_session = np.sum(travel_distance_fbf)
     if analysis_methods.get("plotting_trajectory") == True:
-        plt.plot(x_all, y_all, c=np.arange(len(y_all)), marker=".", alpha=0.5)
-        plt.show()
+        plt.scatter(x_all, y_all, c=np.arange(len(y_all)), marker=".", alpha=0.5)
+        # plt.show()
 
     ##here to start analying stimulus-evoked response.
     ##Firstly, load stimulus information
@@ -349,7 +353,7 @@ def main(thisDir, json_file):
     # csv_file = fnmatch.filter(file, csv_pattern)
     # csv_file_directory = os.path.join(thisDir, csv_file[0])
     stim_info = pd.read_csv(csv_file_directory)
-    stim_info = stim_info.reset_index()
+    # stim_info = stim_info.reset_index()
     raw_column_number = stim_info.shape[1]
     stim_variable = []
     stimulus_timestamp = []
@@ -449,7 +453,7 @@ def main(thisDir, json_file):
     elif visual_paradigm_name == "coherence" or visual_paradigm_name.endswith(
         "densities"
     ):
-        sorting_trial_info(
+        stim_info, stim_type = sorting_trial_info(
             stim_info, visual_paradigm_name="coherence", exp_place="Zball"
         )
     else:
@@ -852,8 +856,11 @@ if __name__ == "__main__":
     # thisDir = ("Z:/DATA/experiment_trackball_Optomotor/VCCball/L23002/230221/long_densities")
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23004/230218/densities"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23012\231126\coherence\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23018\240422\coherence\session2"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23012\231126\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23018\240422\coherence\session2"
+    # thisDir = (
+    #     "Z:/DATA/experiment_trackball_Optomotor/Zball/GN23019/240507/coherence/session1"
+    # )
     # thisDir = r"Z:/DATA/experiment_trackball_Optomotor/VCCball/L23009/230309/densities"
     # thisDir = "/Users/cylee/Downloads/bonfic_led"
     json_file = "analysis_methods_dictionary.json"

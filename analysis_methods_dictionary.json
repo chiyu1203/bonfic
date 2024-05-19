@@ -17,7 +17,7 @@
  "isi_onset_log": true,
  "filtering_method": "sg_filter",
  "plotting_tbt_overview": true,
- "plotting_trajectory": false,
+ "plotting_trajectory": true,
  "plotting_event_related_trajectory": false,
  "plotting_deceleration_accerleration": false,
  "plotting_optomotor_response": true,
