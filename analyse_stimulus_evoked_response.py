@@ -856,8 +856,8 @@ if __name__ == "__main__":
     # thisDir = ("Z:/DATA/experiment_trackball_Optomotor/VCCball/L23002/230221/long_densities")
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23004/230218/densities"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23012\231126\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23018\240422\coherence\session2"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23012\231126\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23018\240422\coherence\session2"
     # thisDir = (
     #     "Z:/DATA/experiment_trackball_Optomotor/Zball/GN23019/240507/coherence/session1"
     # )

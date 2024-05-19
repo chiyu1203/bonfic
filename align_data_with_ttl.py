@@ -160,12 +160,17 @@ def analyse_led_signal(thisDir, json_file):
             arr = np.genfromtxt(led_files[i], delimiter=",", dtype=int)
             led_value.append(arr)
     elif len(led_files.stem) > 0:
-        # on_thresholds = [17000]
-        # off_thresholds = [6000]
-        on_thresholds = [20000]
-        off_thresholds = [18000]
         print(f"using led file {led_files}, extracted from bonsai or elsewhere")
         arr = np.genfromtxt(led_files, delimiter=",", dtype=int)
+        sort_arr = arr[np.argsort(arr)]
+        lower_mean = np.mean(sort_arr[:10000])
+        lower_std = np.std(sort_arr[:10000])
+        higher_mean = np.mean(sort_arr[-10000:])
+        higher_std = np.std(sort_arr[-10000:])
+        # on_thresholds = [17000]
+        # off_thresholds = [6000]
+        on_thresholds = [int(higher_mean - higher_std * 100)]
+        off_thresholds = [int(lower_mean + lower_std * 100)]
         led_value.append(arr)
     else:
         print(f"LED file not found. Use openCV to analyse the LED signals")
