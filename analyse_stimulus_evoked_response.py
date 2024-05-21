@@ -16,13 +16,13 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib import cm
 from pathlib import Path
-from align_data_with_ttl import find_file, analyse_led_signal
+from align_data_with_ttl import analyse_led_signal
 
 ##need to add this additional cell because useful tools are in another folder. Need to integrate these two folders one day
 current_working_directory = Path.cwd()
 parent_dir = current_working_directory.resolve().parents[0]
 sys.path.insert(0, str(parent_dir) + "\\utilities")
-from useful_tools import select_animals_gpt
+from useful_tools import select_animals_gpt,find_file
 from data_cleaning import sorting_trial_info
 
 
@@ -241,6 +241,7 @@ def optomotor_response_idx(ev_dat):
 
 
 def main(thisDir, json_file):
+    thisDir=Path(thisDir)
     ##Figuring out path and directory
     if isinstance(json_file, dict):
         analysis_methods = json_file
@@ -572,44 +573,6 @@ def main(thisDir, json_file):
             z_list.append(cum_z_vector[:, :, 0])
     else:
         if align_with_isi_onset:
-            stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
-            stim_name_list = np.array(stim_info["stim_type"][stim_to_analyse.index])
-            (
-                cum_travel_distance,
-                opto_all_trials,
-                opto_all_isi,
-                cum_z_vector,
-                init_frame,
-                end_frame,
-                velocity,
-            ) = generate_stimulus_evoked_response(
-                stim_to_analyse,
-                vz,
-                travel_distance_fbf,
-                analysis_window,
-                monitor_fps,
-                stim_duration,
-            )
-            travel_distance_prior_stim = cum_travel_distance[:, init_frame, 0]
-            travel_distance_during_stim = (
-                cum_travel_distance[:, end_frame, 0] - travel_distance_prior_stim
-            )
-            optomotor_range = 3
-            summary_list = {
-                "opto_index_isi": opto_all_isi[:, 0],
-                "opto_index": opto_all_trials[:, optomotor_range],
-                "travel_distance_isi": travel_distance_prior_stim,
-                "travel_distance": travel_distance_during_stim,
-                "stim_index": stim_to_analyse.index,
-                "stim_type": stim_name_list,
-            }
-            summary_df = pd.DataFrame(summary_list)
-            classify_trial_type(summary_df, turning_threshold, running_speed_threshold)
-            cum_travel_list.append(cum_travel_distance[:, :, 0])
-            summary_df_list.append(summary_df)
-            velocity_list.append(velocity[:, :, 0])
-            z_list.append(cum_z_vector[:, :, 0])
-        else:
             stim_to_analyse = stim_info.loc[::2, "stim_onset"]
             analysis_window_isi = [
                 interval_duration * -1,
@@ -651,21 +614,59 @@ def main(thisDir, json_file):
             summary_list_isi.append(summary_df_isi)
             velocity_isi.append(velocity[:, :, 0])
             z_isi.append(cum_z_vector[:, :, 0])
+        else:
+            stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
+            stim_name_list = np.array(stim_info["stim_type"][stim_to_analyse.index])
+            (
+                cum_travel_distance,
+                opto_all_trials,
+                opto_all_isi,
+                cum_z_vector,
+                init_frame,
+                end_frame,
+                velocity,
+            ) = generate_stimulus_evoked_response(
+                stim_to_analyse,
+                vz,
+                travel_distance_fbf,
+                analysis_window,
+                monitor_fps,
+                stim_duration,
+            )
+            travel_distance_prior_stim = cum_travel_distance[:, init_frame, 0]
+            travel_distance_during_stim = (
+                cum_travel_distance[:, end_frame, 0] - travel_distance_prior_stim
+            )
+            optomotor_range = 3
+            summary_list = {
+                "opto_index_isi": opto_all_isi[:, 0],
+                "opto_index": opto_all_trials[:, optomotor_range],
+                "travel_distance_isi": travel_distance_prior_stim,
+                "travel_distance": travel_distance_during_stim,
+                "stim_index": stim_to_analyse.index,
+                "stim_type": stim_name_list,
+            }
+            summary_df = pd.DataFrame(summary_list)
+            classify_trial_type(summary_df, turning_threshold, running_speed_threshold)
+            cum_travel_list.append(cum_travel_distance[:, :, 0])
+            summary_df_list.append(summary_df)
+            velocity_list.append(velocity[:, :, 0])
+            z_list.append(cum_z_vector[:, :, 0])
 
     ##concatenate travel distance for histogram
 
     print("ready to plot graph with some data and decompose those lists")
     ##concatenate velocity list for heatmap
     if align_with_isi_onset:
-        summary_df = pd.concat(summary_df_list)
-        cum_travel_distance = np.vstack(cum_travel_list)
-        velocity_arr = np.vstack(velocity_list)
-        cum_z_vector = np.vstack(z_list)
-    else:
         summary_df = pd.concat(cum_travel_isi)
         cum_travel_distance = np.vstack(summary_list_isi)
         velocity_arr = np.vstack(velocity_isi)
         cum_z_vector = np.vstack(z_isi)
+    else:
+        summary_df = pd.concat(summary_df_list)
+        cum_travel_distance = np.vstack(cum_travel_list)
+        velocity_arr = np.vstack(velocity_list)
+        cum_z_vector = np.vstack(z_list)
 
     if analysis_methods.get("plotting_tbt_overview") == True:
         ##arrange xticks at onset and offset of the stimulus for heatmap
@@ -861,8 +862,8 @@ if __name__ == "__main__":
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23004/230218/densities"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23012\231126\coherence\session1"
-    #thisDir = r"Z:/DATA/experiment_trackball_Optomotor/Zball/GN23019/240507/coherence/session1"
-    thisDir = r"Z:/DATA/experiment_trackball_Optomotor/Zball/GN23001/231121/coherence/session1"
+    thisDir = r"Z:/DATA/experiment_trackball_Optomotor/Zball/GN23019/240507/coherence/session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
     # thisDir = (
     #     "Z:/DATA/experiment_trackball_Optomotor/Zball/GN23019/240507/coherence/session1"
     # )

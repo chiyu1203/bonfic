@@ -1,12 +1,13 @@
-import os, fnmatch
-import time
-import json
-import cv2
-import warnings
+import os, fnmatch,sys, time, json, cv2, warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+
+current_working_directory = Path.cwd()
+parent_dir = current_working_directory.resolve().parents[0]
+sys.path.insert(0, str(parent_dir) + "\\utilities")
+from useful_tools import find_file,find_file_multiple_patterns
 
 def find_transitions(arr):
     transitions = []
@@ -25,22 +26,6 @@ print("Transition indices:", transition_indices)
 
 def edge_detector(inp):
     return np.arange(len(inp) - 1)[~inp[:-1] & inp[1:]]
-
-
-def find_file(thisDir, pattern):
-    file_check = fnmatch.filter(os.listdir(thisDir), pattern)
-    if len(file_check) == 0:
-        print(f"no {pattern} found in {thisDir}. Let's leave this programme")
-        return None
-    elif len(file_check) == 1:
-        # return os.path.join(thisDir, file_check[0])
-        return Path(thisDir) / file_check[0]
-    else:
-        vid_list = []
-        for i in range(len(file_check)):
-            vid_list.append(Path(thisDir) / file_check[i])
-        return vid_list
-
 
 def detect_transition(arr, on_threshold, off_threshold):
     sample_rate = 100
@@ -138,14 +123,15 @@ def analyse_led_signal(thisDir, json_file):
     # output_file_name = file_name + "_timestamp.csv"
 
     # Load videos
-    led_pattern = "*sync_pulse.csv"
-    led_files = find_file(thisDir, led_pattern)
+    led_pattern = ["*sync_pulse.csv","*LED.csv"]
+    led_files = find_file_multiple_patterns(thisDir, led_pattern)
     if led_files is None:
-        led_pattern = "*LED.csv"
-        led_files = find_file(thisDir, led_pattern)
+        return print("led file is not found")
     fictrac_vidLog_pattern = "fictrac-vidLogFrames*.txt"
     fictrac_vidLog = find_file(thisDir, fictrac_vidLog_pattern)
     led_value = []
+    on_thresholds=[]
+    off_thresholds=[]
     """
     if len(led_files) == 0:
         on_thresholds = [25000, 80000]
@@ -155,11 +141,16 @@ def analyse_led_signal(thisDir, json_file):
             led_value.append(grey_list)
     """
     if isinstance(led_files, list):
-        on_thresholds = [25000, 80000]
-        off_thresholds = [1000, 1000]
         print(f"multiple led files {led_files} were found. They came from bonsai")
         for i in range(len(led_files)):
             arr = np.genfromtxt(led_files[i], delimiter=",", dtype=int)
+            sort_arr = arr[np.argsort(arr)]
+            lower_mean = np.mean(sort_arr[:10000])
+            lower_std = np.std(sort_arr[:10000])
+            higher_mean = np.mean(sort_arr[-10000:])
+            higher_std = np.std(sort_arr[-10000:])
+            on_thresholds.append(int(higher_mean - higher_std * 100))
+            off_thresholds.append(int(lower_mean + lower_std * 100))
             led_value.append(arr)
     elif len(led_files.stem) > 0:
         print(f"using led file {led_files}, extracted from bonsai or elsewhere")
@@ -171,8 +162,8 @@ def analyse_led_signal(thisDir, json_file):
         higher_std = np.std(sort_arr[-10000:])
         # on_thresholds = [17000]
         # off_thresholds = [6000]
-        on_thresholds = [int(higher_mean - higher_std * 100)]
-        off_thresholds = [int(lower_mean + lower_std * 100)]
+        on_thresholds.append(int(higher_mean - higher_std * 100))
+        off_thresholds.append(int(lower_mean + lower_std * 100))
         led_value.append(arr)
     else:
         print(f"LED file not found. Use openCV to analyse the LED signals")

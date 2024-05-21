@@ -8,7 +8,7 @@ analysis_methods = {
     "debug_mode": False,
     "fictrac_posthoc_analysis": True,
     "use_led_to_align_stimulus_timing": True,
-    "align_with_isi_onset": True,
+    "align_with_isi_onset": False,
     "filtering_method": "sg_filter",
     "plotting_tbt_overview": True,
     "plotting_trajectory": True,
