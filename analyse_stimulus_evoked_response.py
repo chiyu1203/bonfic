@@ -7,13 +7,9 @@ velocity vector across time in a trial plus optomotor response
 analyis methods needs to tell us what to analye. For example optomotor response, acceleration epochs, deceleration epochs, transition between stationary to walk and walk to stationary
 """
 
-import json
-import re
-import time
-import os, fnmatch
+import json, sys, re, time, os, fnmatch, warnings
 import pandas as pd
 import numpy as np
-import warnings
 from scipy.signal import savgol_filter
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
@@ -21,9 +17,11 @@ import matplotlib as mpl
 from matplotlib import cm
 from pathlib import Path
 from align_data_with_ttl import find_file, analyse_led_signal
-import sys
 
-sys.path.insert(0, "C:/Users/neuroPC/Documents/GitHub/utilities")
+##need to add this additional cell because useful tools are in another folder. Need to integrate these two folders one day
+current_working_directory = Path.cwd()
+parent_dir = current_working_directory.resolve().parents[0]
+sys.path.insert(0, str(parent_dir) + "\\utilities")
 from useful_tools import select_animals_gpt
 from data_cleaning import sorting_trial_info
 
@@ -66,9 +64,9 @@ def a_guest(x):
 def deceleration_detection(v_array=[], *args):
     # Set initial values for variables
     init_frame = args[0]
-    frame_rate = args[1]
+    monitor_fps = args[1]
     presence_duration = args[2]
-    fir_half = int(init_frame + 0.5 * frame_rate)
+    fir_half = int(init_frame + 0.5 * monitor_fps)
 
     # Calculate mean and standard deviation of initial velocity values
     V0 = v_array[:, init_frame:fir_half]
@@ -80,11 +78,11 @@ def deceleration_detection(v_array=[], *args):
 
     # Calculate velocity of interest and create a threshold matrix
     velocity_of_interest = v_array[
-        :, fir_half : fir_half + presence_duration * frame_rate
+        :, fir_half : fir_half + presence_duration * monitor_fps
     ]
     dece_big = np.reshape(
-        np.repeat(deceleration_threshold, presence_duration * frame_rate, axis=0),
-        (len(deceleration_threshold), presence_duration * frame_rate),
+        np.repeat(deceleration_threshold, presence_duration * monitor_fps, axis=0),
+        (len(deceleration_threshold), presence_duration * monitor_fps),
     )
 
     # Check for deceleration onset and return the onset time
@@ -126,26 +124,26 @@ def recovery_detection(dev_trial, dev_timing_from_analysis_window):
 
 
 def generate_stimulus_evoked_response(
-    stim_to_analyse, vz, travel_distance_fbf, analysis_window, frame_rate, stim_duration
+    stim_to_analyse, vz, travel_distance_fbf, analysis_window, monitor_fps, stim_duration
 ):
     print(f"plotting data from {analysis_window[0]} to {analysis_window[1]}")
     sec_thres_min = 5
     sec_thres_max = 30
     sec_steps = 5
     init_time = abs(analysis_window[0])
-    init_frame = init_time * frame_rate
-    end_frame = analysis_window[1] * frame_rate
-    index_points = generate_index_points(stim_to_analyse, analysis_window, frame_rate)
+    init_frame = init_time * monitor_fps
+    end_frame = analysis_window[1] * monitor_fps
+    index_points = generate_index_points(stim_to_analyse, analysis_window, monitor_fps)
     velocity_z = vz[index_points]
     stim_travel_distance = travel_distance_fbf[index_points]
-    velocity = stim_travel_distance * frame_rate
+    velocity = stim_travel_distance * monitor_fps
     cum_z_vector = np.cumsum(velocity_z, axis=1)
     cum_travel_distance = np.cumsum(stim_travel_distance, axis=1)
     opto_all_trials = np.ones((velocity_z.shape[0], 5))
     opto_all_isi = np.ones((velocity_z.shape[0], 1))
     ## when quantifying optomotor response, we focus on only stimulus onset so using init_frame:end_frame
     for j, analysis_length in enumerate(range(sec_thres_min, sec_thres_max, sec_steps)):
-        this_end = (init_time + analysis_length) * frame_rate
+        this_end = (init_time + analysis_length) * monitor_fps
         for i in range(0, velocity_z.shape[0]):
             opto_all_trials[i, j] = optomotor_response_idx(
                 velocity_z[i, init_frame:this_end, 0]
@@ -220,14 +218,14 @@ def classify_trial_type(summary_df, turning_threshold, running_speed_threshold):
         follow_count = tmp.values[:, 0]
 
 
-def generate_index_points(stim_to_analyse, analysis_window, frame_rate):
+def generate_index_points(stim_to_analyse, analysis_window, monitor_fps):
     window_length = analysis_window[1] - analysis_window[0]
     interval_onset = (
         stim_to_analyse
-        + np.ones(len(stim_to_analyse), dtype=int) * analysis_window[0] * frame_rate
+        + np.ones(len(stim_to_analyse), dtype=int) * analysis_window[0] * monitor_fps
     )
     analysie_window_tile = np.tile(
-        np.arange(window_length * frame_rate), (len(interval_onset), 1)
+        np.arange(window_length * monitor_fps), (len(interval_onset), 1)
     )
     index_points = (
         np.array(interval_onset).reshape(len(interval_onset), 1) + analysie_window_tile
@@ -250,12 +248,12 @@ def main(thisDir, json_file):
         with open(json_file, "r") as f:
             print(f"load analysis methods from file {json_file}")
             analysis_methods = json.loads(f.read())
-    frame_rate = analysis_methods.get("frame_rate")
+    monitor_fps = analysis_methods.get("monitor_fps")
     stim_duration = analysis_methods.get("stim_duration")
     interval_duration = analysis_methods.get("interval_duration")
     visual_paradigm_name = analysis_methods.get("experiment_name")
     fictrac_posthoc_analysis = analysis_methods.get("fictrac_posthoc_analysis")
-    isi_onset_log = analysis_methods.get("isi_onset_log")
+    align_with_isi_onset = analysis_methods.get("align_with_isi_onset")
     pd_pattern = "PD*.csv"
     this_PD = find_file(thisDir, pd_pattern)
     trial_pattern = "trial*.csv"
@@ -294,11 +292,11 @@ def main(thisDir, json_file):
     )
     """
 
-    velocity_fbf = travel_distance_fbf * frame_rate
+    velocity_fbf = travel_distance_fbf * monitor_fps
 
-    putative_walk = classify_walk(velocity_fbf[:, 0], 5, frame_rate * 1)
+    putative_walk = classify_walk(velocity_fbf[:, 0], 5, monitor_fps * 1)
     dif_putative_walk = np.diff(putative_walk, axis=0)
-    gap_len = np.where(dif_putative_walk > frame_rate * 1)
+    gap_len = np.where(dif_putative_walk > monitor_fps * 1)
     walk_events_end = putative_walk[gap_len]
     walk_events_start = np.concatenate(
         (
@@ -551,7 +549,7 @@ def main(thisDir, json_file):
                 vz,
                 travel_distance_fbf,
                 analysis_window,
-                frame_rate,
+                monitor_fps,
                 stim_duration,
             )
             travel_distance_prior_stim = cum_travel_distance[:, init_frame, 0]
@@ -573,7 +571,7 @@ def main(thisDir, json_file):
             velocity_list.append(velocity[:, :, 0])
             z_list.append(cum_z_vector[:, :, 0])
     else:
-        if isi_onset_log:
+        if align_with_isi_onset:
             stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
             stim_name_list = np.array(stim_info["stim_type"][stim_to_analyse.index])
             (
@@ -589,7 +587,7 @@ def main(thisDir, json_file):
                 vz,
                 travel_distance_fbf,
                 analysis_window,
-                frame_rate,
+                monitor_fps,
                 stim_duration,
             )
             travel_distance_prior_stim = cum_travel_distance[:, init_frame, 0]
@@ -631,7 +629,7 @@ def main(thisDir, json_file):
                 vz,
                 travel_distance_fbf,
                 analysis_window_isi,
-                frame_rate,
+                monitor_fps,
                 interval_duration,
             )
             travel_distance_prior_stim = cum_travel_distance[:, init_frame_isi, 0]
@@ -658,7 +656,7 @@ def main(thisDir, json_file):
 
     print("ready to plot graph with some data and decompose those lists")
     ##concatenate velocity list for heatmap
-    if isi_onset_log:
+    if align_with_isi_onset:
         summary_df = pd.concat(summary_df_list)
         cum_travel_distance = np.vstack(cum_travel_list)
         velocity_arr = np.vstack(velocity_list)
@@ -783,7 +781,7 @@ def main(thisDir, json_file):
 
     if analysis_methods.get("plotting_deceleration_accerleration") == True:
         travel_distance_after_stim_presence = cum_travel_distance[
-            :, init_frame + presence_duration * frame_rate
+            :, init_frame + presence_duration * monitor_fps
         ]
         travel_distance_1sec_prior_stim = (
             cum_travel_distance[:, init_frame] - cum_travel_distance[:, 0]
@@ -794,7 +792,7 @@ def main(thisDir, json_file):
             travel_distance_after_stim_presence[running_trial]
         )
         travel_distance_1sec_post_stim = (
-            cum_travel_distance[running_trial, init_frame + 1 * frame_rate]
+            cum_travel_distance[running_trial, init_frame + 1 * monitor_fps]
             - cum_travel_distance[running_trial, init_frame]
         )
         run_type1 = running_velocity[
@@ -807,21 +805,21 @@ def main(thisDir, json_file):
         )
         trial_to_analyse = run_type1
         detected_bool = deceleration_detection(
-            trial_to_analyse, init_frame, frame_rate, presence_duration
+            trial_to_analyse, init_frame, monitor_fps, presence_duration
         )
         dec_trial_id = detected_bool[0]
         # this reverse the frame number back so the output is the frame number no. at the detection window
-        de_test = frame_rate * presence_duration - detected_bool[1]
+        de_test = monitor_fps * presence_duration - detected_bool[1]
         ##remove trials that the true value is outside this 1-sec window
-        dev_timing = de_test[de_test != frame_rate * presence_duration]
-        dev_trial_id = dec_trial_id[de_test != frame_rate * presence_duration]
+        dev_timing = de_test[de_test != monitor_fps * presence_duration]
+        dev_trial_id = dec_trial_id[de_test != monitor_fps * presence_duration]
         dev_timing_from_analysis_window = (
             dev_timing
             + init_frame
-            + (0.5 * presence_duration + abs(analysis_window[0])) * frame_rate
+            + (0.5 * presence_duration + abs(analysis_window[0])) * monitor_fps
         )
         # dev_timing_from_stim_presence = (
-        #     dev_timing / frame_rate + 0.5 * presence_duration + init_time
+        #     dev_timing / monitor_fps + 0.5 * presence_duration + init_time
         # )
         # dev_timing_y = 10 * np.ones_like(dev_timing_from_stim_presence)
         ##When analysing recover epochs, focus on the trials has similar deceleration dynamics
@@ -863,7 +861,8 @@ if __name__ == "__main__":
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23004/230218/densities"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23012\231126\coherence\session1"
-    thisDir = r"Z:/DATA/experiment_trackball_Optomotor/Zball/GN23019/240507/coherence/session1"
+    #thisDir = r"Z:/DATA/experiment_trackball_Optomotor/Zball/GN23019/240507/coherence/session1"
+    thisDir = r"Z:/DATA/experiment_trackball_Optomotor/Zball/GN23001/231121/coherence/session1"
     # thisDir = (
     #     "Z:/DATA/experiment_trackball_Optomotor/Zball/GN23019/240507/coherence/session1"
     # )

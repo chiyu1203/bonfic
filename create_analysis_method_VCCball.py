@@ -8,7 +8,7 @@ analysis_methods = {
     "debug_mode": False,
     "fictrac_posthoc_analysis": False,
     "use_led_to_align_stimulus_timing": True,
-    "isi_onset_log": False,
+    "align_with_isi_onset": False,
     "filtering_method": "sg_filter",
     "plotting_tbt_overview": True,
     "plotting_trajectory": False,
@@ -18,10 +18,12 @@ analysis_methods = {
     "load_experiment_condition_from_database": True,
     "select_animals_by_condition": True,
     "analysis_by_stimulus_type": False,
+    "camera_fps":144,
     "trackball_radius": 40,
-    "frame_rate": 144,
+    "monitor_fps": 144,
     "stim_duration": 25,
     "interval_duration": 5,
+    "prestim_duration": 60,
     "stim_type": [
         -100,
         -75,
@@ -33,7 +35,8 @@ analysis_methods = {
         75,
         100,
     ],
-}  # plue value representing clockwise, counterclockwise is minus, then the rest is coherence leve
+}
+  # plue value representing clockwise, counterclockwise is minus, then the rest is coherence leve
 json_string = json.dumps(analysis_methods, indent=1)
 with open(file_name, "w") as f:
     f.write(json_string)
