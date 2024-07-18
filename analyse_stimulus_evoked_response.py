@@ -22,7 +22,7 @@ from align_data_with_ttl import analyse_led_signal
 current_working_directory = Path.cwd()
 parent_dir = current_working_directory.resolve().parents[0]
 sys.path.insert(0, str(parent_dir) + "\\utilities")
-from useful_tools import select_animals_gpt,find_file
+from useful_tools import select_animals_gpt, find_file
 from data_cleaning import sorting_trial_info
 
 
@@ -124,7 +124,12 @@ def recovery_detection(dev_trial, dev_timing_from_analysis_window):
 
 
 def generate_stimulus_evoked_response(
-    stim_to_analyse, vz, travel_distance_fbf, analysis_window, monitor_fps, stim_duration
+    stim_to_analyse,
+    vz,
+    travel_distance_fbf,
+    analysis_window,
+    monitor_fps,
+    stim_duration,
 ):
     print(f"plotting data from {analysis_window[0]} to {analysis_window[1]}")
     sec_thres_min = 5
@@ -241,7 +246,7 @@ def optomotor_response_idx(ev_dat):
 
 
 def main(thisDir, json_file):
-    thisDir=Path(thisDir)
+    thisDir = Path(thisDir)
     ##Figuring out path and directory
     if isinstance(json_file, dict):
         analysis_methods = json_file
@@ -357,22 +362,17 @@ def main(thisDir, json_file):
     stim_variable = []
     stimulus_timestamp = []
     if visual_paradigm_name == "gratings":
+        stim_info = stim_info.reset_index()
         for row in range(0, len(stim_info)):
+
             # delete the bracket in current speed and save it as integer in new list
-            stim_variable.append(int(stim_info.loc[row, "Frame"].replace("(", "")))
-            # combine the last two values into the timestamp (were divided into 2 columns cause german computer
-            # used comma as decimal seperator and save timestamp as float in new file
-            if isinstance(stim_info.loc[row, "Value"], float):
-                timestamp = stim_info.loc[row, "Timestamp"]
-            else:
-                timestamp = (
-                    str(stim_info.loc[row, "Timestamp"])
-                    + "."
-                    + stim_info.loc[row, "Value"]
-                )
-            stimulus_timestamp.append(float(timestamp.replace(")", "")))
+            stim_variable.append(int(stim_info.iloc[row, 2].replace("(", "")))
+            stimulus_timestamp.append(float(stim_info.iloc[row, 3].replace(")", "")))
         stim_variable = np.array(stim_variable).reshape((len(stim_info), -1))
-        stim_info["stim_type"] = np.select(filters, stim_type)
+        stim_info["stim_type"] = stim_variable
+        stim_type = np.unique(stim_variable)
+        # or stim_type = stim_variable if I need to use list
+        # stim_type = np.sort(stim_info.stim_type.unique()).tolist()
 
     elif visual_paradigm_name == "sweeploom":
         stim_type = analysis_methods.get("stim_type")
@@ -862,14 +862,15 @@ if __name__ == "__main__":
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23004/230218/densities"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23012\231126\coherence\session1"
-    thisDir = r"Z:/DATA/experiment_trackball_Optomotor/Zball/GN23019/240507/coherence/session1"
-    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\locustMatrex\GN24001\240713\gratings\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
     # thisDir = (
     #     "Z:/DATA/experiment_trackball_Optomotor/Zball/GN23019/240507/coherence/session1"
     # )
     # thisDir = r"Z:/DATA/experiment_trackball_Optomotor/VCCball/L23009/230309/densities"
     # thisDir = "/Users/cylee/Downloads/bonfic_led"
-    json_file = "analysis_methods_dictionary.json"
+    # json_file = "analysis_methods_dictionary.json"
+    json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
     toc = time.perf_counter()
