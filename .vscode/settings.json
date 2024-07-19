@@ -1,0 +1,20 @@
+{
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "launch": {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "Python: Current File",
+                "type": "python",
+                "request": "launch",
+                "program": "${file}",
+                "console": "integratedTerminal",
+                "env": {
+                    "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "2"
+                }
+            }
+        ]
+    }
+}
