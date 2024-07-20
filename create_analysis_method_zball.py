@@ -19,7 +19,7 @@ analysis_methods = {
     "select_animals_by_condition": True,
     "analysis_by_stimulus_type": False,
     "camera_fps":100,
-    "trackball_radius": 100,
+    "trackball_radius": 50,
     "monitor_fps": 144,
     "stim_duration": 20,
     "interval_duration": 10,

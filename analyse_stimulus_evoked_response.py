@@ -279,7 +279,7 @@ def main(thisDir, json_file):
     turning_threshold = 0.33
     df = pd.read_pickle(database)
     [exp_date, exp_hour] = csv_file_directory.stem.split("events")[1].split("T")
-    exp_place = csv_file_directory.parts[3]
+    exp_place = csv_file_directory.parts[-4]
     # exp_place = "Zball"
     if analysis_methods.get("filtering_method") == "sg_filter":
         x_all = savgol_filter(df.loc[:, ["intergrated x position"]], 71, 3, axis=0)
@@ -358,96 +358,16 @@ def main(thisDir, json_file):
     # csv_file_directory = os.path.join(thisDir, csv_file[0])
     stim_info = pd.read_csv(csv_file_directory)
     # stim_info = stim_info.reset_index()
-    raw_column_number = stim_info.shape[1]
-    stim_variable = []
-    stimulus_timestamp = []
-    if visual_paradigm_name == "gratings":
-        stim_info = stim_info.reset_index()
-        for row in range(0, len(stim_info)):
 
-            # delete the bracket in current speed and save it as integer in new list
-            stim_variable.append(int(stim_info.iloc[row, 2].replace("(", "")))
-            stimulus_timestamp.append(float(stim_info.iloc[row, 3].replace(")", "")))
-        stim_variable = np.array(stim_variable).reshape((len(stim_info), -1))
-        stim_info["stim_type"] = stim_variable
-        stim_type = np.unique(stim_variable)
-        # or stim_type = stim_variable if I need to use list
-        # stim_type = np.sort(stim_info.stim_type.unique()).tolist()
+    if visual_paradigm_name == "gratings":
+        stim_info, stim_type = sorting_trial_info(
+            stim_info, visual_paradigm_name=visual_paradigm_name, exp_place="matrexVR"
+        )
 
     elif visual_paradigm_name == "sweeploom":
-        stim_type = analysis_methods.get("stim_type")
-        # stim_type = [
-        #     "c2b_f_sloom",
-        #     "c2b_s_sloom",
-        #     "c2f_f_sloom",
-        #     "c2f_s_sloom",
-        #     "c2c_f_loom",
-        #     "c2c_s_loom",
-        # ]
-        for row in range(0, len(stim_info)):
-            stim_variable.append(int(stim_info.iloc[row, 2].split("=", 1)[1]))
-            stim_variable.append(int(stim_info.iloc[row, 3].split("=", 1)[1]))
-            stim_variable.append(int(stim_info.iloc[row, 4].split("=", 1)[1]))
-            stim_variable.append(int(stim_info.iloc[row, 5].split("=", 1)[1]))
-            stim_variable.append(int(stim_info.iloc[row, 6].split("=", 1)[1]))
-            if exp_date in ["221102", "221103"]:
-                stim_variable.append(int(stim_info.iloc[row, 7].split("=", 1)[1]))
-                stim_variable.append(int(stim_info.iloc[row, 8].split("=", 1)[1]))
-            # stim_variable.append(int(re.split(r'=|}',stim_info.iloc[row,5])[1]))
-            if isinstance(stim_info.loc[row, "Value"], float):
-                timestamp = stim_info.loc[row, "Timestamp"]
-            else:
-                timestamp = (
-                    str(stim_info.loc[row, "Timestamp"])
-                    + "."
-                    + stim_info.loc[row, "Value"]
-                )
-            stim_variable.append(float(timestamp.replace(")", "")))
-        stim_variable = np.array(stim_variable).reshape((len(stim_info), -1))
-        column_names = [
-            "size_start",
-            "size_end",
-            "location1_start",
-            "location1_end",
-            "location2_start",
-            "location2_end",
-            "time",
-            "timestamp",
-        ]
-        stim_info = pd.DataFrame(stim_variable, columns=column_names)
-        if exp_date in ["2022-10-15", "2022-10-16"]:
-            ### use this criteria for experiments during exp_date=['221015','221016']
-            filters = [
-                (stim_info.iloc[:, 0] == 1)
-                & (stim_info.iloc[:, 2] > stim_info.iloc[:, 3]),
-                (stim_info.iloc[:, 0] == 8)
-                & (stim_info.iloc[:, 2] > stim_info.iloc[:, 3]),
-                (stim_info.iloc[:, 0] == 1)
-                & (stim_info.iloc[:, 2] < stim_info.iloc[:, 3]),
-                (stim_info.iloc[:, 0] == 8)
-                & (stim_info.iloc[:, 2] < stim_info.iloc[:, 3]),
-                (stim_info.iloc[:, 0] == 1)
-                & (stim_info.iloc[:, 2] == stim_info.iloc[:, 3]),
-                (stim_info.iloc[:, 0] == 8)
-                & (stim_info.iloc[:, 2] == stim_info.iloc[:, 3]),
-            ]
-
-        else:
-            filters = [
-                (stim_info.iloc[:, 6] == 1)
-                & (stim_info.iloc[:, 2] > stim_info.iloc[:, 3]),
-                (stim_info.iloc[:, 6] == 2)
-                & (stim_info.iloc[:, 2] > stim_info.iloc[:, 3]),
-                (stim_info.iloc[:, 6] == 1)
-                & (stim_info.iloc[:, 2] < stim_info.iloc[:, 3]),
-                (stim_info.iloc[:, 6] == 2)
-                & (stim_info.iloc[:, 2] < stim_info.iloc[:, 3]),
-                (stim_info.iloc[:, 6] == 1)
-                & (stim_info.iloc[:, 2] == stim_info.iloc[:, 3]),
-                (stim_info.iloc[:, 6] == 2)
-                & (stim_info.iloc[:, 2] == stim_info.iloc[:, 3]),
-            ]
-        stim_info["stim_type"] = np.select(filters, stim_type)
+        stim_info, stim_type = sorting_trial_info(
+            stim_info, visual_paradigm_name=visual_paradigm_name, exp_place="VCCball"
+        )
 
     elif visual_paradigm_name == "coherence" or visual_paradigm_name.endswith(
         "densities"
@@ -462,11 +382,14 @@ def main(thisDir, json_file):
     # compare the timestamp between event file and dat file
     stimulus_timestamp = stim_info["ts"].to_numpy()
     if fictrac_posthoc_analysis:
-        stim_onset, isi_onset = analyse_led_signal(thisDir, json_file)
-        transition_onset = np.ones((len(stim_onset) + len(isi_onset),), dtype=int)
-        transition_onset[1::2] = stim_onset
-        transition_onset[::2] = isi_onset
-        stim_info["stim_onset"] = transition_onset
+        stim_onset, isi_onset = analyse_led_signal(thisDir, json_file,stim_info)
+        if visual_paradigm_name=='gratings' or visual_paradigm_name=='sweeploom':
+            stim_info["stim_onset"]=stim_onset
+        else:
+            transition_onset = np.ones((len(stim_onset) + len(isi_onset),), dtype=int)
+            transition_onset[1::2] = stim_onset
+            transition_onset[::2] = isi_onset
+            stim_info["stim_onset"] = transition_onset
     elif df["timestamp"][1] != df["timestamp"][2]:
         data_timestamp = df.loc[:, "timestamp"]
         stimulus_timestamp_b = np.tile(stimulus_timestamp, (len(data_timestamp), 1))
@@ -497,8 +420,7 @@ def main(thisDir, json_file):
         sweep_duration = 2
         velocity_threshold = 5
     elif visual_paradigm_name == "coherence" or visual_paradigm_name.endswith(
-        "densities"
-    ):
+        "densities") or visual_paradigm_name == "gratings":
         analysis_window = [interval_duration * -1, stim_duration + interval_duration]
     else:
         print(
@@ -573,7 +495,10 @@ def main(thisDir, json_file):
             z_list.append(cum_z_vector[:, :, 0])
     else:
         if align_with_isi_onset:
-            stim_to_analyse = stim_info.loc[::2, "stim_onset"]
+            if visual_paradigm_name=="gratings" or visual_paradigm_name=="sweeploom":
+                stim_to_analyse = isi_onset
+            else:
+                stim_to_analyse = stim_info.loc[::2, "stim_onset"]
             analysis_window_isi = [
                 interval_duration * -1,
                 interval_duration + interval_duration,
@@ -615,7 +540,10 @@ def main(thisDir, json_file):
             velocity_isi.append(velocity[:, :, 0])
             z_isi.append(cum_z_vector[:, :, 0])
         else:
-            stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
+            if visual_paradigm_name=="gratings" or visual_paradigm_name=="sweeploom":
+                stim_to_analyse = stim_info["stim_onset"]
+            else:
+                stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
             stim_name_list = np.array(stim_info["stim_type"][stim_to_analyse.index])
             (
                 cum_travel_distance,
@@ -862,7 +790,6 @@ if __name__ == "__main__":
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23004/230218/densities"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23012\231126\coherence\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\locustMatrex\GN24001\240713\gratings\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
     # thisDir = (
     #     "Z:/DATA/experiment_trackball_Optomotor/Zball/GN23019/240507/coherence/session1"
@@ -870,7 +797,10 @@ if __name__ == "__main__":
     # thisDir = r"Z:/DATA/experiment_trackball_Optomotor/VCCball/L23009/230309/densities"
     # thisDir = "/Users/cylee/Downloads/bonfic_led"
     # json_file = "analysis_methods_dictionary.json"
-    json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\locustMatrex\GN24001\240713\gratings\session1"
+    thisDir = r"C:\Users\neuroLaptop\Documents\gratings\session1"
+    #json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
+    json_file = r"C:\Users\neuroLaptop\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
     toc = time.perf_counter()
