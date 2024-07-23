@@ -1,4 +1,4 @@
-import os, fnmatch,sys, time, json, cv2, warnings
+import os, fnmatch, sys, time, json, cv2, warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -7,7 +7,8 @@ from pathlib import Path
 current_working_directory = Path.cwd()
 parent_dir = current_working_directory.resolve().parents[0]
 sys.path.insert(0, str(parent_dir) + "\\utilities")
-from useful_tools import find_file,find_file_multiple_patterns
+from useful_tools import find_file, find_file_multiple_patterns
+
 
 def find_transitions(arr):
     transitions = []
@@ -27,19 +28,20 @@ print("Transition indices:", transition_indices)
 def edge_detector(inp):
     return np.arange(len(inp) - 1)[~inp[:-1] & inp[1:]]
 
-def detect_transition(arr, on_threshold, off_threshold,sample_rate=100):
+
+def detect_transition(arr, on_threshold, off_threshold, sample_rate=100):
     # pre_stim_interval = 180
     # max_value=np.max(arr[:100])
     # np.min(arr[:18000])
     pass_threshold = arr > on_threshold
-    #transition = edge_detector(pass_threshold)
+    # transition = edge_detector(pass_threshold)
     b2w = find_transitions(pass_threshold)
-    # set an arbitary threshold to remove any kind of instrumental noise in the first 30 secs, usually during pre-stim interval 
+    # set an arbitary threshold to remove any kind of instrumental noise in the first 30 secs, usually during pre-stim interval
     b2w = b2w[b2w > sample_rate * 30]
     pass_threshold = off_threshold > arr
     w2b = find_transitions(pass_threshold)
     w2b = w2b[w2b > sample_rate * 30]
-    return b2w,w2b
+    return b2w, w2b
     # =arr[transition]>0
     # bright = arr[arr > on_threshold]
     # ttl_diff = np.diff(bright)
@@ -101,27 +103,26 @@ def get_led_value(this_video, analysis_methods):
     return gray_list
 
 
-def analyse_led_signal(thisDir, json_file,stim_info):
+def analyse_led_signal(thisDir, json_file, stim_info):
     if isinstance(json_file, dict):
         analysis_methods = json_file
     else:
         with open(json_file, "r") as f:
             print(f"load analysis methods from file {json_file}")
             analysis_methods = json.loads(f.read())
-    sample_rate=analysis_methods.get("camera_fps")
-    visual_paradigm_name=analysis_methods.get("experiment_name")
-    if visual_paradigm_name=="gratings" or visual_paradigm_name=="sloom":
-        trial_num=stim_info.shape[0]
+    sample_rate = analysis_methods.get("camera_fps")
+    visual_paradigm_name = analysis_methods.get("experiment_name")
+    if visual_paradigm_name == "gratings" or visual_paradigm_name == "sloom":
+        trial_num = stim_info.shape[0]
     else:
-        trial_num=int(stim_info.shape[0]/2)
+        trial_num = int(stim_info.shape[0] / 2)
     pd_pattern = "PD*.csv"
     this_PD = find_file(thisDir, pd_pattern)
 
     trial_pattern = "trial*.csv"
     this_trial_info = find_file(thisDir, trial_pattern)
     [exp_date, exp_hour] = this_trial_info.stem.split("events")[1].split("T")
-    exp_place = this_trial_info.parts[-4]
-    
+    exp_place = this_trial_info.parts[-6]
 
     video_pattern = "*.avi"
     this_video = find_file(thisDir, video_pattern)
@@ -129,16 +130,16 @@ def analyse_led_signal(thisDir, json_file,stim_info):
     # output_file_name = file_name + "_timestamp.csv"
 
     # Load videos
-    led_pattern = ["*sync_pulse.csv","*LED.csv","lux*.csv"]
+    led_pattern = ["*sync_pulse.csv", "*LED.csv", "lux*.csv"]
     led_files = find_file_multiple_patterns(thisDir, led_pattern)
     if led_files is None:
         return print("led file is not found")
-    
+
     fictrac_vidLog_pattern = "fictrac-vidLogFrames*.txt"
     fictrac_vidLog = find_file(thisDir, fictrac_vidLog_pattern)
     led_value = []
-    on_thresholds=[]
-    off_thresholds=[]
+    on_thresholds = []
+    off_thresholds = []
     """
     if len(led_files) == 0:
         on_thresholds = [25000, 80000]
@@ -149,19 +150,24 @@ def analyse_led_signal(thisDir, json_file,stim_info):
     """
     if isinstance(led_files, list):
         print(f"multiple led files {led_files} were found. They came from bonsai")
-        std_weight=100
+        std_weight = 100
         for i in range(len(led_files)):
             arr = np.genfromtxt(led_files[i], delimiter=",", dtype=int)
-            if arr.ndim==2:
-                arr=arr[:,0]
+            if arr.ndim == 2:
+                arr = arr[:, 0]
             sort_arr = arr[np.argsort(arr)]
-            lower_mean = np.mean(sort_arr[:10000])
-            lower_std = np.std(sort_arr[:10000])
-            higher_mean = np.mean(sort_arr[-10000:])
-            higher_std = np.std(sort_arr[-10000:])
-            if exp_place=='Documents':
+            lower_mean = np.mean(sort_arr[10000:20000])
+            lower_std = np.std(sort_arr[10000:20000])
+            higher_mean = np.mean(sort_arr[-30000:-20000])
+            higher_std = np.std(sort_arr[-30000:-20000])
+            # if exp_place == "locustMatrex" and visual_paradigm_name == "coherence":
+            if exp_place == "locustMatrex":
                 on_thresholds.append(int(np.mean(sort_arr)))
                 off_thresholds.append(int(np.mean(sort_arr)))
+            # elif exp_place == "locustMatrex" and visual_paradigm_name == "gratings":
+            #     std_weight = 40
+            #     on_thresholds.append(int(higher_mean - higher_std * std_weight))
+            #     off_thresholds.append(int(lower_mean + lower_std * std_weight))
             else:
                 on_thresholds.append(int(higher_mean - higher_std * std_weight))
                 off_thresholds.append(int(lower_mean + lower_std * std_weight))
@@ -189,33 +195,34 @@ def analyse_led_signal(thisDir, json_file,stim_info):
 
     ## use led value to detect the transition.
     for i in range(len(led_value)):
-        b2w, w2b = detect_transition(led_value[i], on_thresholds[i], off_thresholds[i],sample_rate)
-        '''hardcode here for the pilot experiment due to sync path for 0 coherence stimulus is programmed into the wrong colour'''
-        if exp_date=='2024-07-19' or exp_date=='2024-07-17':
-            duration_med=(np.median(np.diff(b2w)))
-            num_stim_inbetween=np.round(np.diff(b2w)/duration_med)
-            missing_onset=np.where(num_stim_inbetween.astype(int)>=2)
-            missing_onset_num=num_stim_inbetween.astype(int)[missing_onset]
-            for i,j in zip(missing_onset[0][::-1],missing_onset_num[::-1]):
-                if j==2:
-                    b2w=np.insert(b2w,i+1,b2w[i]+duration_med)
-                    w2b=np.insert(w2b,i,w2b[i-1]+duration_med)
-                if j==3:
-                    b2w=np.insert(b2w,i+1,b2w[i]+duration_med)
-                    b2w=np.insert(b2w,i+2,b2w[i]+duration_med*2)
-                    w2b=np.insert(w2b,i,w2b[i-1]+duration_med)
-                    w2b=np.insert(w2b,i+1,w2b[i-1]+duration_med*2)
+        b2w, w2b = detect_transition(
+            led_value[i], on_thresholds[i], off_thresholds[i], sample_rate
+        )
+        """hardcode here for the pilot experiment due to sync path for 0 coherence stimulus is programmed into the wrong colour"""
+        if exp_date == "2024-07-19" or exp_date == "2024-07-17":
+            duration_med = np.median(np.diff(b2w))
+            num_stim_inbetween = np.round(np.diff(b2w) / duration_med)
+            missing_onset = np.where(num_stim_inbetween.astype(int) >= 2)
+            missing_onset_num = num_stim_inbetween.astype(int)[missing_onset]
+            for i, j in zip(missing_onset[0][::-1], missing_onset_num[::-1]):
+                if j == 2:
+                    b2w = np.insert(b2w, i + 1, b2w[i] + duration_med)
+                    w2b = np.insert(w2b, i, w2b[i - 1] + duration_med)
+                if j == 3:
+                    b2w = np.insert(b2w, i + 1, b2w[i] + duration_med)
+                    b2w = np.insert(b2w, i + 2, b2w[i] + duration_med * 2)
+                    w2b = np.insert(w2b, i, w2b[i - 1] + duration_med)
+                    w2b = np.insert(w2b, i + 1, w2b[i - 1] + duration_med * 2)
 
-
-        b2w=b2w[: trial_num + 1]
-        w2b=w2b[:trial_num]
+        b2w = b2w[: trial_num + 1]
+        w2b = w2b[:trial_num]
 
     ## this probably means the same as dict fictrac_posthoc_analysis, if fictrac_vidLog exists, then probably do not posthoc analysis
     if fictrac_vidLog:
         arr = np.genfromtxt(fictrac_vidLog, delimiter=",", dtype=int)
         stim_onset_frame = arr[w2b]
         isi_onset_frame = arr[b2w]
-    elif visual_paradigm_name=='gratings':
+    elif visual_paradigm_name == "gratings":
         stim_onset_frame = b2w[: len(w2b)]
         isi_onset_frame = w2b
     else:

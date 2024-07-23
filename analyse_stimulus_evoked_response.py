@@ -7,7 +7,7 @@ velocity vector across time in a trial plus optomotor response
 analyis methods needs to tell us what to analye. For example optomotor response, acceleration epochs, deceleration epochs, transition between stationary to walk and walk to stationary
 """
 
-import json, sys, re, time, os, fnmatch, warnings
+import json, sys, re, time, warnings
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
@@ -22,7 +22,7 @@ from align_data_with_ttl import analyse_led_signal
 current_working_directory = Path.cwd()
 parent_dir = current_working_directory.resolve().parents[0]
 sys.path.insert(0, str(parent_dir) + "\\utilities")
-from useful_tools import select_animals_gpt, find_file
+from useful_tools import find_file
 from data_cleaning import sorting_trial_info
 
 
@@ -279,7 +279,7 @@ def main(thisDir, json_file):
     turning_threshold = 0.33
     df = pd.read_pickle(database)
     [exp_date, exp_hour] = csv_file_directory.stem.split("events")[1].split("T")
-    exp_place = csv_file_directory.parts[-4]
+    exp_place = csv_file_directory.parts[-6]
     # exp_place = "Zball"
     if analysis_methods.get("filtering_method") == "sg_filter":
         x_all = savgol_filter(df.loc[:, ["intergrated x position"]], 71, 3, axis=0)
@@ -361,7 +361,7 @@ def main(thisDir, json_file):
 
     if visual_paradigm_name == "gratings":
         stim_info, stim_type = sorting_trial_info(
-            stim_info, visual_paradigm_name=visual_paradigm_name, exp_place="matrexVR"
+            stim_info, visual_paradigm_name=visual_paradigm_name, exp_place=exp_place
         )
 
     elif visual_paradigm_name == "sweeploom":
@@ -382,9 +382,9 @@ def main(thisDir, json_file):
     # compare the timestamp between event file and dat file
     stimulus_timestamp = stim_info["ts"].to_numpy()
     if fictrac_posthoc_analysis:
-        stim_onset, isi_onset = analyse_led_signal(thisDir, json_file,stim_info)
-        if visual_paradigm_name=='gratings' or visual_paradigm_name=='sweeploom':
-            stim_info["stim_onset"]=stim_onset
+        stim_onset, isi_onset = analyse_led_signal(thisDir, json_file, stim_info)
+        if visual_paradigm_name == "gratings" or visual_paradigm_name == "sweeploom":
+            stim_info["stim_onset"] = stim_onset
         else:
             transition_onset = np.ones((len(stim_onset) + len(isi_onset),), dtype=int)
             transition_onset[1::2] = stim_onset
@@ -419,8 +419,11 @@ def main(thisDir, json_file):
         presence_duration = 1
         sweep_duration = 2
         velocity_threshold = 5
-    elif visual_paradigm_name == "coherence" or visual_paradigm_name.endswith(
-        "densities") or visual_paradigm_name == "gratings":
+    elif (
+        visual_paradigm_name == "coherence"
+        or visual_paradigm_name.endswith("densities")
+        or visual_paradigm_name == "gratings"
+    ):
         analysis_window = [interval_duration * -1, stim_duration + interval_duration]
     else:
         print(
@@ -495,7 +498,10 @@ def main(thisDir, json_file):
             z_list.append(cum_z_vector[:, :, 0])
     else:
         if align_with_isi_onset:
-            if visual_paradigm_name=="gratings" or visual_paradigm_name=="sweeploom":
+            if (
+                visual_paradigm_name == "gratings"
+                or visual_paradigm_name == "sweeploom"
+            ):
                 stim_to_analyse = isi_onset
             else:
                 stim_to_analyse = stim_info.loc[::2, "stim_onset"]
@@ -540,7 +546,10 @@ def main(thisDir, json_file):
             velocity_isi.append(velocity[:, :, 0])
             z_isi.append(cum_z_vector[:, :, 0])
         else:
-            if visual_paradigm_name=="gratings" or visual_paradigm_name=="sweeploom":
+            if (
+                visual_paradigm_name == "gratings"
+                or visual_paradigm_name == "sweeploom"
+            ):
                 stim_to_analyse = stim_info["stim_onset"]
             else:
                 stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
@@ -692,9 +701,9 @@ def main(thisDir, json_file):
             linestyle="--",
             label="Stimulus Ends",
         )
-        ax4.set_ylim(-14400, 14400)
+        ax4.set_ylim(-2000, 2000)
         ax4.set(
-            yticks=[-14400, 0, 14400],
+            yticks=[-2000, 0, 2000],
             ylabel="Cumulative Rotation Velocity(sec)",
             xticks=[0, init_frame, end_frame],
             xticklabels=[str(analysis_window[0]), "0", str(stim_duration)],
@@ -797,10 +806,14 @@ if __name__ == "__main__":
     # thisDir = r"Z:/DATA/experiment_trackball_Optomotor/VCCball/L23009/230309/densities"
     # thisDir = "/Users/cylee/Downloads/bonfic_led"
     # json_file = "analysis_methods_dictionary.json"
-    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\locustMatrex\GN24001\240713\gratings\session1"
-    thisDir = r"C:\Users\neuroLaptop\Documents\gratings\session1"
-    #json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
-    json_file = r"C:\Users\neuroLaptop\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
+
+    # thisDir = r"C:\Users\neuroLaptop\Documents\gratings\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\locustMatrex\GN24004\240713\gratings\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\locustMatrex\GN24012\240714\gratings\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\locustMatrex\GN24007\240714\gratings\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\locustMatrex\GN24010\240714\gratings\session1"
+    json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
+    # json_file = r"C:\Users\neuroLaptop\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
     toc = time.perf_counter()
