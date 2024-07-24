@@ -161,7 +161,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
             higher_mean = np.mean(sort_arr[-30000:-20000])
             higher_std = np.std(sort_arr[-30000:-20000])
             # if exp_place == "locustMatrex" and visual_paradigm_name == "coherence":
-            if exp_place == "locustMatrex":
+            if exp_place == "MatrexVR":
                 on_thresholds.append(int(np.mean(sort_arr)))
                 off_thresholds.append(int(np.mean(sort_arr)))
             # elif exp_place == "locustMatrex" and visual_paradigm_name == "gratings":

@@ -701,9 +701,10 @@ def main(thisDir, json_file):
             linestyle="--",
             label="Stimulus Ends",
         )
-        ax4.set_ylim(-2000, 2000)
+        z_vector_limit = 3000
+        ax4.set_ylim(z_vector_limit * -1, z_vector_limit)
         ax4.set(
-            yticks=[-2000, 0, 2000],
+            yticks=[z_vector_limit * -1, 0, z_vector_limit],
             ylabel="Cumulative Rotation Velocity(sec)",
             xticks=[0, init_frame, end_frame],
             xticklabels=[str(analysis_window[0]), "0", str(stim_duration)],
@@ -808,10 +809,10 @@ if __name__ == "__main__":
     # json_file = "analysis_methods_dictionary.json"
 
     # thisDir = r"C:\Users\neuroLaptop\Documents\gratings\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\locustMatrex\GN24004\240713\gratings\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\locustMatrex\GN24012\240714\gratings\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\locustMatrex\GN24007\240714\gratings\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\locustMatrex\GN24010\240714\gratings\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24004\240713\gratings\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24012\240714\gratings\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24007\240714\gratings\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24010\240714\gratings\session1"
     json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     # json_file = r"C:\Users\neuroLaptop\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     tic = time.perf_counter()
