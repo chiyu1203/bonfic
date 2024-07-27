@@ -22,8 +22,8 @@ from align_data_with_ttl import analyse_led_signal
 current_working_directory = Path.cwd()
 parent_dir = current_working_directory.resolve().parents[0]
 sys.path.insert(0, str(parent_dir) + "\\utilities")
-from useful_tools import find_file
-from data_cleaning import sorting_trial_info
+from useful_tools import find_file,find_nearest
+from data_cleaning import sorting_trial_info,load_temperature_data
 
 
 # custom_cmap = [
@@ -279,6 +279,11 @@ def main(thisDir, json_file):
     turning_threshold = 0.33
     df = pd.read_pickle(database)
     [exp_date, exp_hour] = csv_file_directory.stem.split("events")[1].split("T")
+    test=test=exp_date+" "+exp_hour
+    test_dt=pd.to_datetime(test,format='%Y-%m-%d %H_%M_%S')
+    tem_df=load_temperature_data(txt_path=r'C:\Users\neuroLaptop\Documents\Zt611_locustVR_from10thJulyto25thJuly.txt')
+    start_time_tem=find_nearest(tem_df.index,test_dt)
+    print(tem_df[tem_df.index==start_time_tem])#find the start of EL-USB data that might be used for further data analysis. For example, oversampling to align with existing data size
     exp_place = csv_file_directory.parts[-6]
     # exp_place = "Zball"
     if analysis_methods.get("filtering_method") == "sg_filter":
@@ -328,7 +333,7 @@ def main(thisDir, json_file):
     travel_distance_whole_session = np.sum(travel_distance_fbf)
     if analysis_methods.get("plotting_trajectory") == True:
         plt.scatter(x_all, y_all, c=np.arange(len(y_all)), marker=".", alpha=0.5)
-        # plt.show()
+        plt.show()
 
     ##here to start analying stimulus-evoked response.
     ##Firstly, load stimulus information
@@ -794,27 +799,12 @@ In this case, the original database_curated.pickle should be renamed as tracking
 
 
 if __name__ == "__main__":
-    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/L22131/221102/sweeploom"
-    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22036/220819/densities"
-    # thisDir = ("Z:/DATA/experiment_trackball_Optomotor/VCCball/L23002/230221/long_densities")
-    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L23004/230218/densities"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23012\231126\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN23001\231121\coherence\session1"
-    # thisDir = (
-    #     "Z:/DATA/experiment_trackball_Optomotor/Zball/GN23019/240507/coherence/session1"
-    # )
-    # thisDir = r"Z:/DATA/experiment_trackball_Optomotor/VCCball/L23009/230309/densities"
-    # thisDir = "/Users/cylee/Downloads/bonfic_led"
-    # json_file = "analysis_methods_dictionary.json"
-
-    # thisDir = r"C:\Users\neuroLaptop\Documents\gratings\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24004\240713\gratings\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24012\240714\gratings\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24007\240714\gratings\session1"
+    thisDir = r"C:\Users\neuroLaptop\Documents\GN24029\240717\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24010\240714\gratings\session1"
-    json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
-    # json_file = r"C:\Users\neuroLaptop\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
+    #json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
+    json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
     toc = time.perf_counter()
