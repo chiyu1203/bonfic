@@ -2,8 +2,6 @@ import os, fnmatch, sys, time, json, cv2, warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-
-
 current_working_directory = Path.cwd()
 parent_dir = current_working_directory.resolve().parents[0]
 sys.path.insert(0, str(parent_dir) + "\\utilities")
@@ -30,17 +28,17 @@ def edge_detector(inp):
 
 
 def detect_transition(arr, on_threshold, off_threshold, sample_rate=100):
-    # pre_stim_interval = 180
+    pre_stim_interval = 60
     # max_value=np.max(arr[:100])
     # np.min(arr[:18000])
     pass_threshold = arr > on_threshold
     # transition = edge_detector(pass_threshold)
     b2w = find_transitions(pass_threshold)
     # set an arbitary threshold to remove any kind of instrumental noise in the first 30 secs, usually during pre-stim interval
-    b2w = b2w[b2w > sample_rate * 30]
+    b2w = b2w[b2w > sample_rate * (pre_stim_interval-10)]
     pass_threshold = off_threshold > arr
     w2b = find_transitions(pass_threshold)
-    w2b = w2b[w2b > sample_rate * 30]
+    w2b = w2b[w2b > sample_rate * (pre_stim_interval-10)]
     return b2w, w2b
     # =arr[transition]>0
     # bright = arr[arr > on_threshold]
@@ -152,22 +150,28 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         print(f"multiple led files {led_files} were found. They came from bonsai")
         std_weight = 100
         for i in range(len(led_files)):
-            arr = np.genfromtxt(led_files[i], delimiter=",", dtype=int)
+            arr = np.genfromtxt(led_files[i], delimiter=",")
+            #arr = np.genfromtxt(led_files[i], delimiter=",", dtype=int)
             if arr.ndim == 2:
                 arr = arr[:, 0]
+            arr.astype(np.int64)
+            #plt.scatter(np.arange(arr.shape[0]), arr)
             sort_arr = arr[np.argsort(arr)]
             lower_mean = np.mean(sort_arr[10000:20000])
             lower_std = np.std(sort_arr[10000:20000])
             higher_mean = np.mean(sort_arr[-30000:-20000])
             higher_std = np.std(sort_arr[-30000:-20000])
             # if exp_place == "locustMatrex" and visual_paradigm_name == "coherence":
-            if exp_place == "MatrexVR":
-                on_thresholds.append(int(np.mean(sort_arr)))
-                off_thresholds.append(int(np.mean(sort_arr)))
-            # elif exp_place == "locustMatrex" and visual_paradigm_name == "gratings":
-            #     std_weight = 40
-            #     on_thresholds.append(int(higher_mean - higher_std * std_weight))
-            #     off_thresholds.append(int(lower_mean + lower_std * std_weight))
+            if exp_place == "MatrexVR" or exp_place == "Documents":
+                if thisDir.parts[-4]=="GN24029":
+                    on_thresholds.append(623575)
+                    off_thresholds.append(623575)
+                elif thisDir.parts[-4]=="GN24032":
+                    on_thresholds.append(198450)
+                    off_thresholds.append(198450)
+                else:
+                    on_thresholds.append(int(np.mean(sort_arr)))
+                    off_thresholds.append(int(np.mean(sort_arr)))
             else:
                 on_thresholds.append(int(higher_mean - higher_std * std_weight))
                 off_thresholds.append(int(lower_mean + lower_std * std_weight))
