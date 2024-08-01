@@ -22,8 +22,8 @@ from align_data_with_ttl import analyse_led_signal
 current_working_directory = Path.cwd()
 parent_dir = current_working_directory.resolve().parents[0]
 sys.path.insert(0, str(parent_dir) + "\\utilities")
-from useful_tools import find_file,find_nearest
-from data_cleaning import sorting_trial_info,load_temperature_data
+from useful_tools import find_file, find_nearest
+from data_cleaning import sorting_trial_info, load_temperature_data
 
 
 # custom_cmap = [
@@ -247,14 +247,14 @@ def optomotor_response_idx(ev_dat):
 
 def main(thisDir, json_file):
     thisDir = Path(thisDir)
-    #Figuring out path and directory
+    # Figuring out path and directory
     if isinstance(json_file, dict):
         analysis_methods = json_file
     else:
         with open(json_file, "r") as f:
             print(f"load analysis methods from file {json_file}")
             analysis_methods = json.loads(f.read())
-    #Load analysis methods
+    # Load analysis methods
     monitor_fps = analysis_methods.get("monitor_fps")
     camera_fps = analysis_methods.get("camera_fps")
     stim_duration = analysis_methods.get("stim_duration")
@@ -262,9 +262,16 @@ def main(thisDir, json_file):
     visual_paradigm_name = analysis_methods.get("experiment_name")
     fictrac_posthoc_analysis = analysis_methods.get("fictrac_posthoc_analysis")
     align_with_isi_onset = analysis_methods.get("align_with_isi_onset")
-    
+
+    # Here to set some environmental variables
+    colormap_name = "coolwarm"
+    COL = MplColorHelper(colormap_name, 0, 8)
+    sm = cm.ScalarMappable(cmap=colormap_name)
+    running_speed_threshold = 50
+    turning_threshold = 0.33
+
     # Here to allocate files
-    '''
+    """
     this kind of commands is useful to process multple files 
     dat_pattern = "*.dat"
     found_result = find_file(thisDir, dat_pattern)
@@ -277,7 +284,7 @@ def main(thisDir, json_file):
                 load_fictrac_data_file(this_file,analysis_methods)
         elif len(found_result.stem) > 0:
             load_fictrac_data_file(found_result,analysis_methods)
-    '''
+    """
     pd_pattern = "lux*.csv"
     this_PD_directory = find_file(thisDir, pd_pattern)
     trial_pattern = "trial*.csv"
@@ -289,37 +296,6 @@ def main(thisDir, json_file):
     # csv_pattern = "trial_*.csv"
     # tracking_csv_pattern = "tracking_*.csv"
     # database_pattern = "*.pickle"
-    
-    #Here to load time and temperature data if possible
-    if this_PD_directory:
-        file_name=this_PD_directory.stem
-        [_,exp_time] = re.split("lux\d_",file_name)
-        [exp_date, exp_hour]=re.split("T",exp_time)
-        test_dt=pd.to_datetime(exp_time,format='%Y-%m-%dT%H_%M_%S')
-    else:
-        [exp_date, exp_hour] = csv_file_directory.stem.split("events")[1].split("T")
-        exp_time=exp_date+" "+exp_hour
-        test_dt=pd.to_datetime(exp_time,format='%Y-%m-%d %H_%M_%S')
-    try:
-        tem_df=load_temperature_data(txt_path=r'C:\Users\neuroPC\Documents\Zt611_locustVR_from10thJulyto25thJuly.txt')
-        try:
-            start_time_tem=find_nearest(tem_df.index,test_dt)
-            print(tem_df[tem_df.index==start_time_tem])#find the start of EL-USB data that might be used for further data analysis. For example, oversampling to align with existing data size
-            tem_df_after_exp=tem_df[tem_df.index>start_time_tem]
-            frequency_milisecond=int(1000/camera_fps)
-            tem_df_after_exp=tem_df_after_exp.resample(f'{frequency_milisecond}L').interpolate()
-        except:
-            print("Unable to find the corresponding time stamp")
-
-    except:
-        print("temperature file is not found")
-
-    #Do not know where to place the following variables yet
-    colormap_name = "coolwarm"
-    COL = MplColorHelper(colormap_name, 0, 8)
-    sm = cm.ScalarMappable(cmap=colormap_name)
-    running_speed_threshold = 50
-    turning_threshold = 0.33
 
     exp_place = csv_file_directory.parts[-6]
     # exp_place = "Zball"
@@ -373,11 +349,42 @@ def main(thisDir, json_file):
         plt.scatter(x_all, y_all, c=np.arange(len(y_all)), marker=".", alpha=0.5)
         plt.show()
 
+    # Here to load time and temperature data if possible
+    if this_PD_directory:
+        file_name = this_PD_directory.stem
+        [_, exp_time] = re.split("lux\d_", file_name)
+        [exp_date, exp_hour] = re.split("T", exp_time)
+        test_dt = pd.to_datetime(exp_time, format="%Y-%m-%dT%H_%M_%S")
+    else:
+        [exp_date, exp_hour] = csv_file_directory.stem.split("events")[1].split("T")
+        exp_time = exp_date + " " + exp_hour
+        test_dt = pd.to_datetime(exp_time, format="%Y-%m-%d %H_%M_%S")
+    try:
+        tem_df = load_temperature_data(
+            txt_path=r"Z:\Users\chiyu\Zt611_locustVR_from10thJulyto25thJuly.txt"
+        )
+        try:
+            start_time_tem = find_nearest(tem_df.index, test_dt)
+            print(
+                tem_df[tem_df.index == start_time_tem]
+            )  # find the start of EL-USB data that might be used for further data analysis. For example, oversampling to align with existing data size
+            tem_df_after_exp = tem_df[tem_df.index > start_time_tem]
+            frequency_milisecond = int(1000 / camera_fps)
+            tem_df_after_exp = tem_df_after_exp.resample(
+                f"{frequency_milisecond}L"
+            ).interpolate()
+            tem_df_after_exp[: df.shape[0]]
+            # a rough way to merge temperature data from EL-USB-2 into pd datafram. The better way would be use bonsai to merge them during data collection.
+            pd.concat([df, tem_df_after_exp[: df.shape[0]]], axis=0, ignore_index=True)
+        except:
+            print("Unable to find the corresponding time stamp")
+
+    except:
+        print("temperature file is not found")
+
     ##here to start analying stimulus-evoked response.
-    ##Firstly, load stimulus information
-    # tracking_csv_file = fnmatch.filter(file, tracking_csv_pattern)
-    # tracking_csv_file_directory = os.path.join(thisDir, tracking_csv_file[0])
-    if tracking_csv_file_directory != None:
+    ## if the tracking data is logged on bonsai (come from fictrac realtime). The file name is tracking_events...
+    if tracking_csv_file_directory != None and fictrac_posthoc_analysis is False:
         tracking_info = pd.read_csv(
             tracking_csv_file_directory, delimiter="(", engine="python"
         )
@@ -397,8 +404,8 @@ def main(thisDir, json_file):
         tracking_info["timestamp"] = pd.to_numeric(tracking_info["timestamp"])
         tracking_info["timestamp"] = tracking_info["timestamp"].astype("float32")
         tracking_info["value"] = pd.to_numeric(tracking_info["value"])
-    # csv_file = fnmatch.filter(file, csv_pattern)
-    # csv_file_directory = os.path.join(thisDir, csv_file[0])
+
+    ##Firstly, load stimulus information
     stim_info = pd.read_csv(csv_file_directory)
     # stim_info = stim_info.reset_index()
 
@@ -839,9 +846,9 @@ In this case, the original database_curated.pickle should be renamed as tracking
 if __name__ == "__main__":
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24004\240713\gratings\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24012\240714\gratings\session1"
-    thisDir = r"C:\Users\neuroLaptop\Documents\GN24032\240717\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24010\240714\gratings\session1"
-    #json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
+    # thisDir = r"C:\Users\neuroLaptop\Documents\GN24032\240717\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24032\240717\coherence\session1"
+    # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
