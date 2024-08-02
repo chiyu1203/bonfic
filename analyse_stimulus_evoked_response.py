@@ -17,7 +17,6 @@ import matplotlib as mpl
 from matplotlib import cm
 from pathlib import Path
 from align_data_with_ttl import analyse_led_signal
-from types import SimpleNamespace
 
 ##need to add this additional cell because useful tools are in another folder. Need to integrate these two folders one day
 current_working_directory = Path.cwd()
@@ -352,38 +351,8 @@ def main(thisDir, json_file):
     sm = cm.ScalarMappable(cmap=colormap_name)
     running_speed_threshold = 50
     turning_threshold = 0.33
-    # df_column_name = (
-    #     "opto_index",
-    #     "opto_index_isi",
-    #     "travel_distance",
-    #     "travel_distance_isi",
-    #     "stim_index",
-    #     "stim_type",
-    # )
-    # df_column_name = {
-    #     "opto_index": 0,
-    #     "opto_index_isi": 0,
-    #     "travel_distance": 0,
-    #     "travel_distance_isi": 0,
-    #     "stim_index": 0,
-    #     "stim_type": 0,
-    # }
-    # summary_list = SimpleNamespace(**df_column_name)
+
     # Here to allocate files
-    """
-    this kind of commands is useful to process multple files 
-    dat_pattern = "*.dat"
-    found_result = find_file(thisDir, dat_pattern)
-    if found_result is None:
-        return print(f"file with {dat_pattern} not found")
-    else:
-        if isinstance(found_result, list):
-            for this_file in found_result:
-                print(f"found multiple files with {dat_pattern}. Use a for-loop to go through them")
-                load_fictrac_data_file(this_file,analysis_methods)
-        elif len(found_result.stem) > 0:
-            load_fictrac_data_file(found_result,analysis_methods)
-    """
     pd_pattern = "lux*.csv"
     this_PD_directory = find_file(thisDir, pd_pattern)
     trial_pattern = "trial*.csv"
@@ -394,9 +363,6 @@ def main(thisDir, json_file):
     database = find_file(thisDir, database_pattern)
     temperature_pattern = "temperature_humidity.npy.gz"
     this_temp_directory = find_file(thisDir, temperature_pattern)
-    # csv_pattern = "trial_*.csv"
-    # tracking_csv_pattern = "tracking_*.csv"
-    # database_pattern = "*.pickle"
 
     exp_place = csv_file_directory.parts[-6]
     # exp_place = "Zball"
@@ -416,35 +382,7 @@ def main(thisDir, json_file):
     travel_distance_fbf = np.sqrt(
         np.add(np.square(np.diff(x_all, axis=0)), np.square(np.diff(y_all, axis=0)))
     )
-    """
 
-    velocity_fbf = travel_distance_fbf * monitor_fps
-
-    putative_walk = classify_walk(velocity_fbf[:, 0], 5, monitor_fps * 1)
-    dif_putative_walk = np.diff(putative_walk, axis=0)
-    gap_len = np.where(dif_putative_walk > monitor_fps * 1)
-    walk_events_end = putative_walk[gap_len]
-    walk_events_start = np.concatenate(
-        (
-            [walk_events_end[0] - gap_len[0][0] - 1],
-            walk_events_end[1:] - gap_len[0][1:] + gap_len[0][:-1],
-        )
-    )
-    # walk_events_start = []
-    # for i in range(len(walk_events_end)):
-    #     if i == 0:
-    #         walk_events_start.append(walk_events_end[i] - gap_len[0][i] - 1)
-    #         continue
-    #     else:
-    #         walk_events_start.append(
-    #             walk_events_end[i] - gap_len[0][i] + gap_len[0][i - 1]
-    #         )
-
-    pcm = plt.pcolormesh(np.transpose(velocity_fbf), cmap="magma", vmin=0, vmax=100)
-    for i in walk_events_start:
-        plt.axvline(x=i, color="w")
-    plt.show()
-    """
     travel_distance_whole_session = np.sum(travel_distance_fbf)
     if analysis_methods.get("plotting_trajectory") == True:
         plt.scatter(x_all, y_all, c=np.arange(len(y_all)), marker=".", alpha=0.5)
@@ -486,11 +424,6 @@ def main(thisDir, json_file):
                     f = gzip.GzipFile(np_file_name, "w")
                     np.save(file=f, arr=tem_df_this_exp)
                     f.close()
-
-                # a rough way to merge temperature data from EL-USB-2 into pd datafram. The better way would be use bonsai to merge them during data collection.
-                # df = pd.concat(
-                #     [df, tem_df_after_exp[: df.shape[0]]], axis=0, ignore_index=True
-                # )
             except:
                 print("Unable to find the corresponding time stamp")
 
