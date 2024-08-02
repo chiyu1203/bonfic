@@ -373,9 +373,21 @@ def main(thisDir, json_file):
             tem_df_after_exp = tem_df_after_exp.resample(
                 f"{frequency_milisecond}L"
             ).interpolate()
-            tem_df_after_exp[: df.shape[0]]
+            if analysis_methods.get("debug_mode") == True:
+                print("Nothing is saved in the debug mode. Move to the next animal")
+            else:
+                np_file_name = Path(thisDir) / "temperature_humidity.npy"
+                with open(np_file_name, "wb") as f:
+                    np.save(
+                        f,
+                        "temp_humidity.npy",
+                        tem_df_after_exp[: df.shape[0]].values[:, 0:2],
+                    )
+
             # a rough way to merge temperature data from EL-USB-2 into pd datafram. The better way would be use bonsai to merge them during data collection.
-            pd.concat([df, tem_df_after_exp[: df.shape[0]]], axis=0, ignore_index=True)
+            # df = pd.concat(
+            #     [df, tem_df_after_exp[: df.shape[0]]], axis=0, ignore_index=True
+            # )
         except:
             print("Unable to find the corresponding time stamp")
 
@@ -523,7 +535,35 @@ def main(thisDir, json_file):
             ) = generate_stimulus_evoked_response(
                 stim_to_analyse,
                 vz,
+                analysis_window,
+                monitor_fps,
+                stim_duration,
+            )
+            (
+                cum_travel_distance,
+                opto_all_trials,
+                opto_all_isi,
+                cum_z_vector,
+                init_frame,
+                end_frame,
+                velocity,
+            ) = generate_stimulus_evoked_response(
+                stim_to_analyse,
                 travel_distance_fbf,
+                analysis_window,
+                monitor_fps,
+                stim_duration,
+            )
+            (
+                cum_travel_distance,
+                opto_all_trials,
+                opto_all_isi,
+                cum_z_vector,
+                init_frame,
+                end_frame,
+                velocity,
+            ) = generate_stimulus_evoked_response(
+                stim_to_analyse,
                 analysis_window,
                 monitor_fps,
                 stim_duration,
@@ -830,7 +870,6 @@ def main(thisDir, json_file):
         Zvector_file_name = Path(thisDir) / "z_vector.npy"
         with open(Zvector_file_name, "wb") as f:
             np.save(f, cum_z_vector)
-
     return summary_df, velocity_arr, cum_z_vector, travel_distance_whole_session
 
 
