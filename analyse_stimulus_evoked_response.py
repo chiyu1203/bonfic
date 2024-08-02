@@ -7,7 +7,7 @@ velocity vector across time in a trial plus optomotor response
 analyis methods needs to tell us what to analye. For example optomotor response, acceleration epochs, deceleration epochs, transition between stationary to walk and walk to stationary
 """
 
-import json, sys, re, time, warnings
+import json, sys, re, time, warnings, gzip
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
@@ -17,6 +17,7 @@ import matplotlib as mpl
 from matplotlib import cm
 from pathlib import Path
 from align_data_with_ttl import analyse_led_signal
+from types import SimpleNamespace
 
 ##need to add this additional cell because useful tools are in another folder. Need to integrate these two folders one day
 current_working_directory = Path.cwd()
@@ -59,6 +60,96 @@ def a_guest(x):
     b[np.arange(i.size), i] = np.logical_or.reduce(x, axis=1)
 
     return b
+
+
+def analysis_stim_evoked_response_combo(
+    stim_to_analyse,
+    yaw_rotation_vector,
+    travel_distance_fbf,
+    tem_df_this_exp,
+    analysis_window,
+    monitor_fps,
+    optomotor_range,
+    stim_name_list,
+    summary_df_list,
+    cum_travel_list,
+    velocity_list,
+    yaw_rotation_list,
+):
+    (
+        yaw_rotation_tbt,
+        init_frame,
+        end_frame,
+    ) = extract_stim_locked_data(
+        stim_to_analyse, yaw_rotation_vector, analysis_window, monitor_fps
+    )
+    (
+        travel_distance_tbt,
+        _,
+        _,
+    ) = extract_stim_locked_data(
+        stim_to_analyse,
+        travel_distance_fbf,
+        analysis_window,
+        monitor_fps,
+    )
+    (
+        temp_tbt,
+        _,
+        _,
+    ) = extract_stim_locked_data(
+        stim_to_analyse,
+        tem_df_this_exp[:, 0],
+        analysis_window,
+        monitor_fps,
+    )
+    (
+        humid_tbt,
+        _,
+        _,
+    ) = extract_stim_locked_data(
+        stim_to_analyse,
+        tem_df_this_exp[:, 1],
+        analysis_window,
+        monitor_fps,
+    )
+    velocity = travel_distance_tbt * monitor_fps
+    cum_yaw_rotation = np.cumsum(yaw_rotation_tbt, axis=1)
+    opto_all_trials, opto_all_isi = probes_optomoro_index(
+        yaw_rotation_tbt, init_frame, monitor_fps
+    )
+    cum_travel_distance = np.cumsum(travel_distance_tbt, axis=1)
+    travel_distance_prior_stim = cum_travel_distance[:, init_frame, 0]
+    travel_distance_during_stim = (
+        cum_travel_distance[:, end_frame, 0] - travel_distance_prior_stim
+    )
+
+    summary_list = {
+        "opto_index_isi": opto_all_isi[:, 0],
+        "opto_index": opto_all_trials[:, optomotor_range],
+        "travel_distance_isi": travel_distance_prior_stim,
+        "travel_distance": travel_distance_during_stim,
+        "stim_index": stim_to_analyse.index,
+        "stim_type": stim_name_list,
+        "temperature": np.mean(temp_tbt, axis=1),
+        "humidity": np.mean(humid_tbt, axis=1),
+    }
+
+    summary_df = pd.DataFrame(summary_list)
+    # classify_trial_type(summary_df, turning_threshold, running_speed_threshold)
+    # wrap data as a list so that no matter the analysis go through the for loop or not, the shape of data is consistent
+    summary_df_list.append(summary_df)
+    cum_travel_list.append(cum_travel_distance[:, :, 0])
+    velocity_list.append(velocity[:, :, 0])
+    yaw_rotation_list.append(cum_yaw_rotation[:, :, 0])
+    return (
+        summary_df_list,
+        cum_travel_list,
+        velocity_list,
+        yaw_rotation_list,
+        init_frame,
+        end_frame,
+    )
 
 
 def deceleration_detection(v_array=[], *args):
@@ -123,49 +214,41 @@ def recovery_detection(dev_trial, dev_timing_from_analysis_window):
     return index_list
 
 
-def generate_stimulus_evoked_response(
+def extract_stim_locked_data(
     stim_to_analyse,
-    vz,
-    travel_distance_fbf,
+    data,
     analysis_window,
     monitor_fps,
-    stim_duration,
 ):
     print(f"plotting data from {analysis_window[0]} to {analysis_window[1]}")
-    sec_thres_min = 5
-    sec_thres_max = 30
-    sec_steps = 5
+
     init_time = abs(analysis_window[0])
     init_frame = init_time * monitor_fps
     end_frame = analysis_window[1] * monitor_fps
     index_points = generate_index_points(stim_to_analyse, analysis_window, monitor_fps)
-    velocity_z = vz[index_points]
-    stim_travel_distance = travel_distance_fbf[index_points]
-    velocity = stim_travel_distance * monitor_fps
-    cum_z_vector = np.cumsum(velocity_z, axis=1)
-    cum_travel_distance = np.cumsum(stim_travel_distance, axis=1)
-    opto_all_trials = np.ones((velocity_z.shape[0], 5))
-    opto_all_isi = np.ones((velocity_z.shape[0], 1))
+    stim_locked_data = data[index_points]
+    return stim_locked_data, init_frame, end_frame
+
+
+def probes_optomoro_index(yaw_rotation_tbt, init_frame, monitor_fps):
+    sec_thres_min = 5
+    sec_thres_max = 30
+    sec_steps = 5
+    opto_all_trials = np.ones((yaw_rotation_tbt.shape[0], 5))
+    opto_all_isi = np.ones((yaw_rotation_tbt.shape[0], 1))
     ## when quantifying optomotor response, we focus on only stimulus onset so using init_frame:end_frame
+    # this is a function to systematically calculate optomotor index based on jaw rotation vector
     for j, analysis_length in enumerate(range(sec_thres_min, sec_thres_max, sec_steps)):
-        this_end = (init_time + analysis_length) * monitor_fps
-        for i in range(0, velocity_z.shape[0]):
+        this_end = init_frame + analysis_length * monitor_fps
+        for i in range(0, yaw_rotation_tbt.shape[0]):
             opto_all_trials[i, j] = optomotor_response_idx(
-                velocity_z[i, init_frame:this_end, 0]
+                yaw_rotation_tbt[i, init_frame:this_end, 0]
             )
             if j == 0:
                 opto_all_isi[i, j] = optomotor_response_idx(
-                    velocity_z[i, :init_frame, 0]
+                    yaw_rotation_tbt[i, :init_frame, 0]
                 )
-    return (
-        cum_travel_distance,
-        opto_all_trials,
-        opto_all_isi,
-        cum_z_vector,
-        init_frame,
-        end_frame,
-        velocity,
-    )
+    return opto_all_trials, opto_all_isi
 
 
 def classify_walk(arr, speed_threshold=10, consecutive_length=5):
@@ -269,7 +352,23 @@ def main(thisDir, json_file):
     sm = cm.ScalarMappable(cmap=colormap_name)
     running_speed_threshold = 50
     turning_threshold = 0.33
-
+    # df_column_name = (
+    #     "opto_index",
+    #     "opto_index_isi",
+    #     "travel_distance",
+    #     "travel_distance_isi",
+    #     "stim_index",
+    #     "stim_type",
+    # )
+    # df_column_name = {
+    #     "opto_index": 0,
+    #     "opto_index_isi": 0,
+    #     "travel_distance": 0,
+    #     "travel_distance_isi": 0,
+    #     "stim_index": 0,
+    #     "stim_type": 0,
+    # }
+    # summary_list = SimpleNamespace(**df_column_name)
     # Here to allocate files
     """
     this kind of commands is useful to process multple files 
@@ -293,6 +392,8 @@ def main(thisDir, json_file):
     tracking_csv_file_directory = find_file(thisDir, tracking_csv_pattern)
     database_pattern = "database*.pickle"
     database = find_file(thisDir, database_pattern)
+    temperature_pattern = "temperature_humidity.npy.gz"
+    this_temp_directory = find_file(thisDir, temperature_pattern)
     # csv_pattern = "trial_*.csv"
     # tracking_csv_pattern = "tracking_*.csv"
     # database_pattern = "*.pickle"
@@ -306,12 +407,12 @@ def main(thisDir, json_file):
         # instant_v = savgol_filter(df.loc[:, ["instant speed"]], 39, 3, axis=0)
         # runmean_v = df["instant speed"].rolling(10).mean().values
         # vx=savgol_filter(df.loc[:, ['instant speed']], 39, 3, axis=0)
-        # vz=savgol_filter(df.loc[:, ['instant speed']], 39, 3, axis=0)
+        # yaw_rotation_vector=savgol_filter(df.loc[:, ['instant speed']], 39, 3, axis=0)
     else:
         x_all = df.loc[:, ["intergrated x position"]]
         y_all = df.loc[:, ["intergrated y position"]]
     ## here write an additional function to classify stationary, moving and total travel distance
-    vz = df.loc[:, ["delta rotation vector lab z"]].values
+    yaw_rotation_vector = df.loc[:, ["delta rotation vector lab z"]].values
     travel_distance_fbf = np.sqrt(
         np.add(np.square(np.diff(x_all, axis=0)), np.square(np.diff(y_all, axis=0)))
     )
@@ -359,40 +460,42 @@ def main(thisDir, json_file):
         [exp_date, exp_hour] = csv_file_directory.stem.split("events")[1].split("T")
         exp_time = exp_date + " " + exp_hour
         test_dt = pd.to_datetime(exp_time, format="%Y-%m-%d %H_%M_%S")
-    try:
-        tem_df = load_temperature_data(
-            txt_path=r"Z:\Users\chiyu\Zt611_locustVR_from10thJulyto25thJuly.txt"
-        )
+    if this_temp_directory:
+        f = gzip.GzipFile(this_temp_directory, "r")
+        tem_df_this_exp = np.load(f)
+    else:
         try:
-            start_time_tem = find_nearest(tem_df.index, test_dt)
-            print(
-                tem_df[tem_df.index == start_time_tem]
-            )  # find the start of EL-USB data that might be used for further data analysis. For example, oversampling to align with existing data size
-            tem_df_after_exp = tem_df[tem_df.index > start_time_tem]
-            frequency_milisecond = int(1000 / camera_fps)
-            tem_df_after_exp = tem_df_after_exp.resample(
-                f"{frequency_milisecond}L"
-            ).interpolate()
-            if analysis_methods.get("debug_mode") == True:
-                print("Nothing is saved in the debug mode. Move to the next animal")
-            else:
-                np_file_name = Path(thisDir) / "temperature_humidity.npy"
-                with open(np_file_name, "wb") as f:
-                    np.save(
-                        f,
-                        "temp_humidity.npy",
-                        tem_df_after_exp[: df.shape[0]].values[:, 0:2],
-                    )
+            tem_df = load_temperature_data(
+                txt_path=r"Z:\Users\chiyu\Zt611_locustVR_from10thJulyto25thJuly.txt"
+            )
+            try:
+                start_time_tem = find_nearest(tem_df.index, test_dt)
+                print(
+                    tem_df[tem_df.index == start_time_tem]
+                )  # find the start of EL-USB data that might be used for further data analysis. For example, oversampling to align with existing data size
+                tem_df_after_exp = tem_df[tem_df.index > start_time_tem]
+                frequency_milisecond = int(1000 / camera_fps)
+                tem_df_after_exp = tem_df_after_exp.resample(
+                    f"{frequency_milisecond}L"
+                ).interpolate()
+                if analysis_methods.get("debug_mode") == True:
+                    print("Nothing is saved in the debug mode. Move to the next animal")
+                else:
+                    np_file_name = Path(thisDir) / "temperature_humidity.npy.gz"
+                    tem_df_this_exp = tem_df_after_exp[: df.shape[0]].values[:, 0:2]
+                    f = gzip.GzipFile(np_file_name, "w")
+                    np.save(file=f, arr=tem_df_this_exp)
+                    f.close()
 
-            # a rough way to merge temperature data from EL-USB-2 into pd datafram. The better way would be use bonsai to merge them during data collection.
-            # df = pd.concat(
-            #     [df, tem_df_after_exp[: df.shape[0]]], axis=0, ignore_index=True
-            # )
+                # a rough way to merge temperature data from EL-USB-2 into pd datafram. The better way would be use bonsai to merge them during data collection.
+                # df = pd.concat(
+                #     [df, tem_df_after_exp[: df.shape[0]]], axis=0, ignore_index=True
+                # )
+            except:
+                print("Unable to find the corresponding time stamp")
+
         except:
-            print("Unable to find the corresponding time stamp")
-
-    except:
-        print("temperature file is not found")
+            print("temperature file is not found")
 
     ##here to start analying stimulus-evoked response.
     ## if the tracking data is logged on bonsai (come from fictrac realtime). The file name is tracking_events...
@@ -493,14 +596,10 @@ def main(thisDir, json_file):
         )
         return
 
-    cum_travel_isi = []
-    summary_list_isi = []
-    velocity_isi = []
-    z_isi = []
     cum_travel_list = []
     summary_df_list = []
     velocity_list = []
-    z_list = []
+    yaw_rotation_list = []
     tick_positions = np.linspace(0, 1, len(stim_type))
     tick_labels = [str(value) for value in stim_type]
     if (
@@ -525,67 +624,26 @@ def main(thisDir, json_file):
                 else:
                     print("something wrong with the stim list")
             (
-                cum_travel_distance,
-                opto_all_trials,
-                opto_all_isi,
-                cum_z_vector,
+                summary_df_list,
+                cum_travel_list,
+                velocity_list,
+                yaw_rotation_list,
                 init_frame,
                 end_frame,
-                velocity,
-            ) = generate_stimulus_evoked_response(
+            ) = analysis_stim_evoked_response_combo(
                 stim_to_analyse,
-                vz,
-                analysis_window,
-                monitor_fps,
-                stim_duration,
-            )
-            (
-                cum_travel_distance,
-                opto_all_trials,
-                opto_all_isi,
-                cum_z_vector,
-                init_frame,
-                end_frame,
-                velocity,
-            ) = generate_stimulus_evoked_response(
-                stim_to_analyse,
+                yaw_rotation_vector,
                 travel_distance_fbf,
+                tem_df_this_exp,
                 analysis_window,
                 monitor_fps,
-                stim_duration,
+                optomotor_range,
+                stim_name_list,
+                summary_df_list,
+                cum_travel_list,
+                velocity_list,
+                yaw_rotation_list,
             )
-            (
-                cum_travel_distance,
-                opto_all_trials,
-                opto_all_isi,
-                cum_z_vector,
-                init_frame,
-                end_frame,
-                velocity,
-            ) = generate_stimulus_evoked_response(
-                stim_to_analyse,
-                analysis_window,
-                monitor_fps,
-                stim_duration,
-            )
-            travel_distance_prior_stim = cum_travel_distance[:, init_frame, 0]
-            travel_distance_during_stim = (
-                cum_travel_distance[:, end_frame, 0] - travel_distance_prior_stim
-            )
-            summary_list = {
-                "opto_index_isi": opto_all_isi[:, 0],
-                "opto_index": opto_all_trials,
-                "travel_distance_isi": travel_distance_prior_stim,
-                "travel_distance": travel_distance_during_stim,
-                "stim_index": stim_to_analyse.index,
-                "stim_type": stim_name_list,
-            }
-            summary_df = pd.DataFrame(summary_list)
-            classify_trial_type(summary_df, turning_threshold, running_speed_threshold)
-            cum_travel_list.append(cum_travel_distance[:, :, 0])
-            summary_df_list.append(summary_df)
-            velocity_list.append(velocity[:, :, 0])
-            z_list.append(cum_z_vector[:, :, 0])
     else:
         if align_with_isi_onset:
             if (
@@ -595,46 +653,11 @@ def main(thisDir, json_file):
                 stim_to_analyse = isi_onset
             else:
                 stim_to_analyse = stim_info.loc[::2, "stim_onset"]
-            analysis_window_isi = [
-                interval_duration * -1,
-                interval_duration + interval_duration,
-            ]
-            stim_name_list = np.array(stim_info["stim_type"][stim_to_analyse.index])
-            (
-                cum_travel_distance,
-                opto_all_trials,
-                opto_all_isi,
-                cum_z_vector,
-                init_frame_isi,
-                end_frame_isi,
-                velocity,
-            ) = generate_stimulus_evoked_response(
-                stim_to_analyse,
-                vz,
-                travel_distance_fbf,
-                analysis_window_isi,
-                monitor_fps,
-                interval_duration,
-            )
-            travel_distance_prior_stim = cum_travel_distance[:, init_frame_isi, 0]
-            travel_distance_during_stim = (
-                cum_travel_distance[:, end_frame_isi, 0] - travel_distance_prior_stim
-            )
+                analysis_window = [
+                    interval_duration * -1,
+                    interval_duration + interval_duration,
+                ]
             optomotor_range = 1
-            summary_isi = {
-                "opto_index_last5": opto_all_isi[:, 0],
-                "opto_index_isi": opto_all_trials[:, optomotor_range],
-                "travel_distance_last5": travel_distance_prior_stim,
-                "travel_distance_isi": travel_distance_during_stim,
-                "stim_index": stim_to_analyse.index,
-                "stim_type": stim_name_list,
-            }
-            summary_df_isi = pd.DataFrame(summary_isi)
-            # classify_trial_type(summary_df, turning_threshold, running_speed_threshold)
-            cum_travel_isi.append(cum_travel_distance[:, :, 0])
-            summary_list_isi.append(summary_df_isi)
-            velocity_isi.append(velocity[:, :, 0])
-            z_isi.append(cum_z_vector[:, :, 0])
         else:
             if (
                 visual_paradigm_name == "gratings"
@@ -643,57 +666,38 @@ def main(thisDir, json_file):
                 stim_to_analyse = stim_info["stim_onset"]
             else:
                 stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
-            stim_name_list = np.array(stim_info["stim_type"][stim_to_analyse.index])
-            (
-                cum_travel_distance,
-                opto_all_trials,
-                opto_all_isi,
-                cum_z_vector,
-                init_frame,
-                end_frame,
-                velocity,
-            ) = generate_stimulus_evoked_response(
-                stim_to_analyse,
-                vz,
-                travel_distance_fbf,
-                analysis_window,
-                monitor_fps,
-                stim_duration,
-            )
-            travel_distance_prior_stim = cum_travel_distance[:, init_frame, 0]
-            travel_distance_during_stim = (
-                cum_travel_distance[:, end_frame, 0] - travel_distance_prior_stim
-            )
             optomotor_range = 3
-            summary_list = {
-                "opto_index_isi": opto_all_isi[:, 0],
-                "opto_index": opto_all_trials[:, optomotor_range],
-                "travel_distance_isi": travel_distance_prior_stim,
-                "travel_distance": travel_distance_during_stim,
-                "stim_index": stim_to_analyse.index,
-                "stim_type": stim_name_list,
-            }
-            summary_df = pd.DataFrame(summary_list)
-            classify_trial_type(summary_df, turning_threshold, running_speed_threshold)
-            cum_travel_list.append(cum_travel_distance[:, :, 0])
-            summary_df_list.append(summary_df)
-            velocity_list.append(velocity[:, :, 0])
-            z_list.append(cum_z_vector[:, :, 0])
+        stim_name_list = np.array(stim_info["stim_type"][stim_to_analyse.index])
+        (
+            summary_df_list,
+            cum_travel_list,
+            velocity_list,
+            yaw_rotation_list,
+            init_frame,
+            end_frame,
+        ) = analysis_stim_evoked_response_combo(
+            stim_to_analyse,
+            yaw_rotation_vector,
+            travel_distance_fbf,
+            tem_df_this_exp,
+            analysis_window,
+            monitor_fps,
+            optomotor_range,
+            stim_name_list,
+            summary_df_list,
+            cum_travel_list,
+            velocity_list,
+            yaw_rotation_list,
+        )
 
     ##concatenate travel distance for histogram
 
     print("ready to plot graph with some data and decompose those lists")
     ##concatenate velocity list for heatmap
-    if align_with_isi_onset:
-        summary_df = pd.concat(cum_travel_isi)
-        cum_travel_distance = np.vstack(summary_list_isi)
-        velocity_arr = np.vstack(velocity_isi)
-        cum_z_vector = np.vstack(z_isi)
-    else:
-        summary_df = pd.concat(summary_df_list)
-        cum_travel_distance = np.vstack(cum_travel_list)
-        velocity_arr = np.vstack(velocity_list)
-        cum_z_vector = np.vstack(z_list)
+    summary_df = pd.concat(summary_df_list)
+    cum_travel_distance = np.vstack(cum_travel_list)
+    velocity_arr = np.vstack(velocity_list)
+    cum_yaw_rotation = np.vstack(yaw_rotation_list)
 
     if analysis_methods.get("plotting_tbt_overview") == True:
         ##arrange xticks at onset and offset of the stimulus for heatmap
@@ -766,7 +770,7 @@ def main(thisDir, json_file):
                 elinewidth=2,
                 capsize=3,
             )
-            this_z = cum_z_vector[summary_df["stim_type"] == this_coherence, :]
+            this_z = cum_yaw_rotation[summary_df["stim_type"] == this_coherence, :]
             time_points = np.arange(this_z.shape[1])
             time_points_b = np.tile(time_points, (this_z.shape[0], 1))
             # ax4.scatter(time_points_b, this_z, s=1, color=custom_cmap[i])
@@ -864,18 +868,18 @@ def main(thisDir, json_file):
     else:
         summary_file_name = Path(thisDir) / "behavioural_summary.pickle"
         summary_df.to_pickle(summary_file_name)
-        velocity_file_name = Path(thisDir) / "trial_velocity.npy"
+        velocity_file_name = Path(thisDir) / "velocity_tbt.npy"
         with open(velocity_file_name, "wb") as f:
             np.save(f, velocity_arr)
-        Zvector_file_name = Path(thisDir) / "z_vector.npy"
-        with open(Zvector_file_name, "wb") as f:
-            np.save(f, cum_z_vector)
-    return summary_df, velocity_arr, cum_z_vector, travel_distance_whole_session
+        file_name = Path(thisDir) / "cum_jaw_rotation.npy"
+        with open(file_name, "wb") as f:
+            np.save(f, cum_yaw_rotation)
+    return summary_df, velocity_arr, cum_yaw_rotation, travel_distance_whole_session
 
 
 """
-need to write something here to save summary_df,velocity_arr, cum_z_vector, but what is the efficent way to manage these data
-If everything is in summary_df then that's easy but now it looks like I have other two big tables velocity_arr and cum_z_vector.
+need to write something here to save summary_df,velocity_arr, cum_yaw_rotation, but what is the efficent way to manage these data
+If everything is in summary_df then that's easy but now it looks like I have other two big tables velocity_arr and cum_yaw_rotation.
 or should I export the original location and then do the calculation after aligning behaviour data with ephys data
 My gut feeling is that we still have a place for hdf-based curated database, which we can throw all the information there
 In this case, the original database_curated.pickle should be renamed as tracking_curated.pickle.
