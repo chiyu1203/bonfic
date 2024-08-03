@@ -92,26 +92,30 @@ def analysis_stim_evoked_response_combo(
         analysis_window,
         monitor_fps,
     )
-    (
-        temp_tbt,
-        _,
-        _,
-    ) = extract_stim_locked_data(
-        stim_to_analyse,
-        tem_df_this_exp[:, 0],
-        analysis_window,
-        monitor_fps,
-    )
-    (
-        humid_tbt,
-        _,
-        _,
-    ) = extract_stim_locked_data(
-        stim_to_analyse,
-        tem_df_this_exp[:, 1],
-        analysis_window,
-        monitor_fps,
-    )
+    if len(tem_df_this_exp) > 0:
+        (
+            temp_tbt,
+            _,
+            _,
+        ) = extract_stim_locked_data(
+            stim_to_analyse,
+            tem_df_this_exp[:, 0],
+            analysis_window,
+            monitor_fps,
+        )
+        (
+            humid_tbt,
+            _,
+            _,
+        ) = extract_stim_locked_data(
+            stim_to_analyse,
+            tem_df_this_exp[:, 1],
+            analysis_window,
+            monitor_fps,
+        )
+    else:
+        temp_tbt = np.zeros((stim_to_analyse.shape[0], 2))
+        humid_tbt = np.zeros((stim_to_analyse.shape[0], 2))
     velocity = travel_distance_tbt * monitor_fps
     cum_yaw_rotation = np.cumsum(yaw_rotation_tbt, axis=1)
     opto_all_trials, opto_all_isi = probes_optomoro_index(
@@ -398,6 +402,7 @@ def main(thisDir, json_file):
         [exp_date, exp_hour] = csv_file_directory.stem.split("events")[1].split("T")
         exp_time = exp_date + " " + exp_hour
         test_dt = pd.to_datetime(exp_time, format="%Y-%m-%d %H_%M_%S")
+    tem_df_this_exp = []
     if this_temp_directory:
         f = gzip.GzipFile(this_temp_directory, "r")
         tem_df_this_exp = np.load(f)
@@ -406,27 +411,26 @@ def main(thisDir, json_file):
             tem_df = load_temperature_data(
                 txt_path=r"Z:\Users\chiyu\Zt611_locustVR_from10thJulyto25thJuly.txt"
             )
-            try:
-                start_time_tem = find_nearest(tem_df.index, test_dt)
-                print(
-                    tem_df[tem_df.index == start_time_tem]
-                )  # find the start of EL-USB data that might be used for further data analysis. For example, oversampling to align with existing data size
-                tem_df_after_exp = tem_df[tem_df.index > start_time_tem]
+            start_time_tem = find_nearest(tem_df.index, test_dt)
+            print(
+                tem_df[tem_df.index == start_time_tem]
+            )  # find the start of EL-USB data that might be used for further data analysis. For example, oversampling to align with existing data size
+            tem_df_after_exp = tem_df[tem_df.index > start_time_tem]
+            if len(tem_df_after_exp) > 0:
                 frequency_milisecond = int(1000 / camera_fps)
                 tem_df_after_exp = tem_df_after_exp.resample(
                     f"{frequency_milisecond}L"
                 ).interpolate()
+                tem_df_this_exp = tem_df_after_exp[: df.shape[0]].values[:, 0:2]
                 if analysis_methods.get("debug_mode") == True:
                     print("Nothing is saved in the debug mode. Move to the next animal")
                 else:
                     np_file_name = Path(thisDir) / "temperature_humidity.npy.gz"
-                    tem_df_this_exp = tem_df_after_exp[: df.shape[0]].values[:, 0:2]
                     f = gzip.GzipFile(np_file_name, "w")
                     np.save(file=f, arr=tem_df_this_exp)
                     f.close()
-            except:
+            else:
                 print("Unable to find the corresponding time stamp")
-
         except:
             print("temperature file is not found")
 
@@ -522,7 +526,27 @@ def main(thisDir, json_file):
         or visual_paradigm_name.endswith("densities")
         or visual_paradigm_name == "gratings"
     ):
-        analysis_window = [interval_duration * -1, stim_duration + interval_duration]
+        # While duration consists of more than two int, use the largest one to set analysis window
+        if type(interval_duration) == list and type(stim_duration) == list:
+            analysis_window = [
+                max(interval_duration) * -1,
+                max(stim_duration) + max(interval_duration),
+            ]
+        elif type(interval_duration) == list:
+            analysis_window = [
+                max(interval_duration) * -1,
+                stim_duration + max(interval_duration),
+            ]
+        elif type(stim_duration) == list:
+            analysis_window = [
+                interval_duration * -1,
+                max(stim_duration) + interval_duration,
+            ]
+        else:
+            analysis_window = [
+                interval_duration * -1,
+                stim_duration + interval_duration,
+            ]
     else:
         print(
             "visual paradigm name does not match with avaliable options. Please check"
@@ -586,9 +610,11 @@ def main(thisDir, json_file):
                 stim_to_analyse = isi_onset
             else:
                 stim_to_analyse = stim_info.loc[::2, "stim_onset"]
+                if type(interval_duration) == list:
+                    interval_duration = max(interval_duration)
                 analysis_window = [
                     interval_duration * -1,
-                    interval_duration + interval_duration,
+                    interval_duration * 2,
                 ]
             optomotor_range = 1
         else:
@@ -710,12 +736,14 @@ def main(thisDir, json_file):
             ax4.scatter(time_points_b, this_z, s=1, color=COL.get_rgb(i))
 
         ax3.set_ylim(-1, 1)
+        xticks = np.sort(summary_df.stim_type.unique()).tolist()
         ax3.set(
             xlabel=visual_paradigm_name,
+            xticks=xticks,
             yticks=[-1, 0, 1],
             ylabel="Optomotor Index during stimulus",
         )
-        # xticks=[np.max(stim_type), 0, np.min(stim_type)],
+        # xticks=[np.max(stim_type), 0, np.min(stim_type)], np.sort(summary_df.stim_type.unique())
         ax4.axvline(
             x=init_frame,
             color="black",
@@ -728,13 +756,27 @@ def main(thisDir, json_file):
             linestyle="--",
             label="Stimulus Ends",
         )
-        z_vector_limit = 3000
-        ax4.set_ylim(z_vector_limit * -1, z_vector_limit)
+        yaw_vector_limit = 3000
+        y_axis_lim = [yaw_vector_limit * -1, yaw_vector_limit]
+        ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
+        if type(stim_duration) == list:
+            frame_difference = (max(stim_duration) - min(stim_duration)) * camera_fps
+            shortest_stim_end_frame = end_frame - frame_difference
+            xticks = [0, init_frame, shortest_stim_end_frame, end_frame]
+            xticklabels = [
+                str(analysis_window[0]),
+                "0",
+                str(min(stim_duration)),
+                str(max(stim_duration)),
+            ]
+        else:
+            xticks = [0, init_frame, end_frame]
+            xticklabels = [str(analysis_window[0]), "0", str(stim_duration)]
         ax4.set(
-            yticks=[z_vector_limit * -1, 0, z_vector_limit],
+            yticks=[y_axis_lim[0], 0, y_axis_lim[1]],
             ylabel="Cumulative Rotation Velocity(sec)",
-            xticks=[0, init_frame, end_frame],
-            xticklabels=[str(analysis_window[0]), "0", str(stim_duration)],
+            xticks=xticks,
+            xticklabels=xticklabels,
             xlabel="Time (s)",
         )
         cbar = plt.colorbar(sm, ax=ax4, orientation="vertical", ticks=tick_positions)
@@ -823,7 +865,9 @@ if __name__ == "__main__":
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24004\240713\gratings\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24012\240714\gratings\session1"
     # thisDir = r"C:\Users\neuroLaptop\Documents\GN24032\240717\coherence\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24032\240717\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24032\240717\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24034\240801\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24026\240717\coherence\session1"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
