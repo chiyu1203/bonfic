@@ -22,7 +22,7 @@ from align_data_with_ttl import analyse_led_signal
 current_working_directory = Path.cwd()
 parent_dir = current_working_directory.resolve().parents[0]
 sys.path.insert(0, str(parent_dir) + "\\utilities")
-from useful_tools import find_file, find_nearest
+from useful_tools import find_file, find_nearest, calculate_fft
 from data_cleaning import sorting_trial_info, load_temperature_data
 
 
@@ -223,7 +223,7 @@ def extract_stim_locked_data(
     analysis_window,
     monitor_fps,
 ):
-    print(f"plotting data from {analysis_window[0]} to {analysis_window[1]}")
+    # print(f"plotting data from {analysis_window[0]} to {analysis_window[1]}")
 
     init_time = abs(analysis_window[0])
     init_frame = init_time * monitor_fps
@@ -348,7 +348,8 @@ def main(thisDir, json_file):
     visual_paradigm_name = analysis_methods.get("experiment_name")
     fictrac_posthoc_analysis = analysis_methods.get("fictrac_posthoc_analysis")
     align_with_isi_onset = analysis_methods.get("align_with_isi_onset")
-
+    exp_place = analysis_methods.get("exp_place")
+    temperature_data_path = analysis_methods.get("temperature_data_path")
     # Here to set some environmental variables
     colormap_name = "coolwarm"
     COL = MplColorHelper(colormap_name, 0, 8)
@@ -368,8 +369,6 @@ def main(thisDir, json_file):
     temperature_pattern = "temperature_humidity.npy.gz"
     this_temp_directory = find_file(thisDir, temperature_pattern)
 
-    exp_place = csv_file_directory.parts[-6]
-    # exp_place = "Zball"
     df = pd.read_pickle(database)
     if analysis_methods.get("filtering_method") == "sg_filter":
         x_all = savgol_filter(df.loc[:, ["intergrated x position"]], 71, 3, axis=0)
@@ -408,9 +407,7 @@ def main(thisDir, json_file):
         tem_df_this_exp = np.load(f)
     else:
         try:
-            tem_df = load_temperature_data(
-                txt_path=r"Z:\Users\chiyu\Zt611_locustVR_from10thJulyto25thJuly.txt"
-            )
+            tem_df = load_temperature_data(txt_path=temperature_data_path)
             start_time_tem = find_nearest(tem_df.index, test_dt)
             print(
                 tem_df[tem_df.index == start_time_tem]
@@ -475,7 +472,7 @@ def main(thisDir, json_file):
         "densities"
     ):
         stim_info, stim_type = sorting_trial_info(
-            stim_info, visual_paradigm_name="coherence", exp_place="Zball"
+            stim_info, visual_paradigm_name=visual_paradigm_name, exp_place=exp_place
         )
     else:
         warnings.warn("stimulus paradigm can not be recognised")
@@ -557,8 +554,6 @@ def main(thisDir, json_file):
     summary_df_list = []
     velocity_list = []
     yaw_rotation_list = []
-    tick_positions = np.linspace(0, 1, len(stim_type))
-    tick_labels = [str(value) for value in stim_type]
     if (
         analysis_methods.get("analysis_by_stimulus_type") == True
     ):  ## this is usually use when stimulus length is different
@@ -621,6 +616,7 @@ def main(thisDir, json_file):
             if (
                 visual_paradigm_name == "gratings"
                 or visual_paradigm_name == "sweeploom"
+                or visual_paradigm_name.endswith("sities")
             ):
                 stim_to_analyse = stim_info["stim_onset"]
             else:
@@ -657,6 +653,8 @@ def main(thisDir, json_file):
     cum_travel_distance = np.vstack(cum_travel_list)
     velocity_arr = np.vstack(velocity_list)
     cum_yaw_rotation = np.vstack(yaw_rotation_list)
+    ##use fft to classify trials where animals jump
+    # fft_power,freq_axis=calculate_fft(velocity_arr[21, :], camera_fps)
 
     if analysis_methods.get("plotting_tbt_overview") == True:
         ##arrange xticks at onset and offset of the stimulus for heatmap
@@ -736,10 +734,9 @@ def main(thisDir, json_file):
             ax4.scatter(time_points_b, this_z, s=1, color=COL.get_rgb(i))
 
         ax3.set_ylim(-1, 1)
-        xticks = np.sort(summary_df.stim_type.unique()).tolist()
+        # xticks=stim_type,
         ax3.set(
             xlabel=visual_paradigm_name,
-            xticks=xticks,
             yticks=[-1, 0, 1],
             ylabel="Optomotor Index during stimulus",
         )
@@ -779,6 +776,8 @@ def main(thisDir, json_file):
             xticklabels=xticklabels,
             xlabel="Time (s)",
         )
+        tick_positions = np.linspace(0, 1, len(stim_type))
+        tick_labels = [str(value) for value in stim_type]
         cbar = plt.colorbar(sm, ax=ax4, orientation="vertical", ticks=tick_positions)
         cbar.set_ticklabels(tick_labels)
 
@@ -849,6 +848,7 @@ def main(thisDir, json_file):
         file_name = Path(thisDir) / "cum_jaw_rotation.npy"
         with open(file_name, "wb") as f:
             np.save(f, cum_yaw_rotation)
+
     return summary_df, velocity_arr, cum_yaw_rotation, travel_distance_whole_session
 
 
@@ -862,12 +862,14 @@ In this case, the original database_curated.pickle should be renamed as tracking
 
 
 if __name__ == "__main__":
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24004\240713\gratings\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24012\240714\gratings\session1"
     # thisDir = r"C:\Users\neuroLaptop\Documents\GN24032\240717\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24032\240717\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24034\240801\coherence\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24026\240717\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24032\240717\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24034\240801\coherence\session1"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
