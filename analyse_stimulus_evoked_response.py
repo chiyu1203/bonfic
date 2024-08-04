@@ -69,11 +69,6 @@ def analysis_stim_evoked_response_combo(
     analysis_window,
     monitor_fps,
     optomotor_range,
-    stim_name_list,
-    summary_df_list,
-    cum_travel_list,
-    velocity_list,
-    yaw_rotation_list,
 ):
     (
         yaw_rotation_tbt,
@@ -133,23 +128,16 @@ def analysis_stim_evoked_response_combo(
         "travel_distance_isi": travel_distance_prior_stim,
         "travel_distance": travel_distance_during_stim,
         "stim_index": stim_to_analyse.index,
-        "stim_type": stim_name_list,
         "temperature": np.mean(temp_tbt, axis=1),
         "humidity": np.mean(humid_tbt, axis=1),
     }
 
     summary_df = pd.DataFrame(summary_list)
-    # classify_trial_type(summary_df, turning_threshold, running_speed_threshold)
-    # wrap data as a list so that no matter the analysis go through the for loop or not, the shape of data is consistent
-    summary_df_list.append(summary_df)
-    cum_travel_list.append(cum_travel_distance[:, :, 0])
-    velocity_list.append(velocity[:, :, 0])
-    yaw_rotation_list.append(cum_yaw_rotation[:, :, 0])
     return (
-        summary_df_list,
-        cum_travel_list,
-        velocity_list,
-        yaw_rotation_list,
+        summary_df,
+        cum_travel_distance[:, :, 0],
+        velocity[:, :, 0],
+        cum_yaw_rotation[:, :, 0],
         init_frame,
         end_frame,
     )
@@ -456,7 +444,6 @@ def main(thisDir, json_file):
 
     ##Firstly, load stimulus information
     stim_info = pd.read_csv(csv_file_directory)
-    # stim_info = stim_info.reset_index()
 
     if visual_paradigm_name == "gratings":
         stim_info, stim_type = sorting_trial_info(
@@ -478,7 +465,6 @@ def main(thisDir, json_file):
         warnings.warn("stimulus paradigm can not be recognised")
         return
 
-    # compare the timestamp between event file and dat file
     stimulus_timestamp = stim_info["ts"].to_numpy()
     if fictrac_posthoc_analysis:
         stim_onset, isi_onset = analyse_led_signal(thisDir, json_file, stim_info)
@@ -490,6 +476,7 @@ def main(thisDir, json_file):
             transition_onset[::2] = isi_onset
             stim_info["stim_onset"] = transition_onset
     elif df["timestamp"][1] != df["timestamp"][2]:
+        # compare the timestamp between event file and dat file
         data_timestamp = df.loc[:, "timestamp"]
         stimulus_timestamp_b = np.tile(stimulus_timestamp, (len(data_timestamp), 1))
         data_timestamp_b = np.tile(data_timestamp, (len(stimulus_timestamp), 1))
@@ -499,6 +486,7 @@ def main(thisDir, json_file):
         ]
         stim_info["stim_onset"] = stim_onset
     else:
+        # compare the timestamp between event file and dat file
         data_timestamp = tracking_info["timestamp"]
         stimulus_timestamp_b = np.tile(stimulus_timestamp, (len(data_timestamp), 1))
         data_timestamp_b = np.tile(data_timestamp, (len(stimulus_timestamp), 1))
@@ -550,10 +538,6 @@ def main(thisDir, json_file):
         )
         return
 
-    cum_travel_list = []
-    summary_df_list = []
-    velocity_list = []
-    yaw_rotation_list = []
     if align_with_isi_onset:
         if visual_paradigm_name == "gratings" or visual_paradigm_name == "sweeploom":
             stim_to_analyse = isi_onset
@@ -566,6 +550,10 @@ def main(thisDir, json_file):
                 interval_duration * 2,
             ]
         optomotor_range = 1
+        previous_duration_arr = np.array(
+            stim_info["Duration"][stim_info.loc[1::2, "stim_onset"].index]
+        )
+        previous_duration_arr = np.append(np.nan, previous_duration_arr[:-1])
     else:
         if (
             visual_paradigm_name == "gratings"
@@ -576,14 +564,17 @@ def main(thisDir, json_file):
         else:
             stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
         optomotor_range = 3
-    stim_name_list = np.array(stim_info["stim_type"][stim_to_analyse.index])
-    stim_duration_list = np.array(stim_info["Duration"][stim_to_analyse.index])
+        previous_duration_arr = np.array(
+            stim_info["Duration"][stim_info.loc[::2, "stim_onset"].index]
+        )
+    stim_name_arr = np.array(stim_info["stim_type"][stim_to_analyse.index])
+    present_duration_arr = np.array(stim_info["Duration"][stim_to_analyse.index])
 
     (
-        summary_df_list,
-        cum_travel_list,
-        velocity_list,
-        yaw_rotation_list,
+        summary_df,
+        cum_travel_distance,
+        velocity_arr,
+        cum_yaw_rotation,
         init_frame,
         end_frame,
     ) = analysis_stim_evoked_response_combo(
@@ -594,21 +585,13 @@ def main(thisDir, json_file):
         analysis_window,
         monitor_fps,
         optomotor_range,
-        stim_name_list,
-        summary_df_list,
-        cum_travel_list,
-        velocity_list,
-        yaw_rotation_list,
     )
-
-    ##concatenate travel distance for histogram
+    # add trial info to summary_df
+    summary_df["stim_type"] = stim_name_arr
+    summary_df["present_trial_duration"] = present_duration_arr
+    summary_df["previous_trial_duration"] = previous_duration_arr
 
     print("ready to plot graph with some data and decompose those lists")
-    ##concatenate velocity list for heatmap
-    summary_df = pd.concat(summary_df_list)
-    cum_travel_distance = np.vstack(cum_travel_list)
-    velocity_arr = np.vstack(velocity_list)
-    cum_yaw_rotation = np.vstack(yaw_rotation_list)
     ##use fft to classify trials where animals jump. So far this method can be used to detect some obvious jumps but there might be some miss detecting
     # for i in range(50):
     #     fft_power, freq_axis = calculate_fft(velocity_arr[-i, :], camera_fps)
