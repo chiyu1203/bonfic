@@ -554,96 +554,52 @@ def main(thisDir, json_file):
     summary_df_list = []
     velocity_list = []
     yaw_rotation_list = []
-    if (
-        analysis_methods.get("analysis_by_stimulus_type") == True
-    ):  ## this is usually use when stimulus length is different
-        for thisStim in stim_type:
-            stim_to_analyse = stim_info.loc[
-                np.where((stim_info.loc[:, "stim_type"] == thisStim)), "stim_onset"
-            ]
-            stim_name_list = stim_info.loc[stim_to_analyse.index, "stim_type"].values
-            if visual_paradigm_name == "sweeploom":
-                if re.search(
-                    "_f_", thisStim
-                ):  ##create this condition so that stim_duration became dynamics
-                    stim_duration = 3
-                    presence_duration = 1
-                    sweep_duration = 1
-                elif re.search("_s_", thisStim):
-                    stim_duration = 4
-                    presence_duration = 1
-                    sweep_duration = 2
-                else:
-                    print("something wrong with the stim list")
-            (
-                summary_df_list,
-                cum_travel_list,
-                velocity_list,
-                yaw_rotation_list,
-                init_frame,
-                end_frame,
-            ) = analysis_stim_evoked_response_combo(
-                stim_to_analyse,
-                yaw_rotation_vector,
-                travel_distance_fbf,
-                tem_df_this_exp,
-                analysis_window,
-                monitor_fps,
-                optomotor_range,
-                stim_name_list,
-                summary_df_list,
-                cum_travel_list,
-                velocity_list,
-                yaw_rotation_list,
-            )
-    else:
-        if align_with_isi_onset:
-            if (
-                visual_paradigm_name == "gratings"
-                or visual_paradigm_name == "sweeploom"
-            ):
-                stim_to_analyse = isi_onset
-            else:
-                stim_to_analyse = stim_info.loc[::2, "stim_onset"]
-                if type(interval_duration) == list:
-                    interval_duration = max(interval_duration)
-                analysis_window = [
-                    interval_duration * -1,
-                    interval_duration * 2,
-                ]
-            optomotor_range = 1
+    if align_with_isi_onset:
+        if visual_paradigm_name == "gratings" or visual_paradigm_name == "sweeploom":
+            stim_to_analyse = isi_onset
         else:
-            if (
-                visual_paradigm_name == "gratings"
-                or visual_paradigm_name == "sweeploom"
-                or visual_paradigm_name.endswith("sities")
-            ):
-                stim_to_analyse = stim_info["stim_onset"]
-            else:
-                stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
-            optomotor_range = 3
-        stim_name_list = np.array(stim_info["stim_type"][stim_to_analyse.index])
-        (
-            summary_df_list,
-            cum_travel_list,
-            velocity_list,
-            yaw_rotation_list,
-            init_frame,
-            end_frame,
-        ) = analysis_stim_evoked_response_combo(
-            stim_to_analyse,
-            yaw_rotation_vector,
-            travel_distance_fbf,
-            tem_df_this_exp,
-            analysis_window,
-            monitor_fps,
-            optomotor_range,
-            stim_name_list,
-            summary_df_list,
-            cum_travel_list,
-            velocity_list,
-            yaw_rotation_list,
-        )
+            stim_to_analyse = stim_info.loc[::2, "stim_onset"]
+            if type(interval_duration) == list:
+                interval_duration = max(interval_duration)
+            analysis_window = [
+                interval_duration * -1,
+                interval_duration * 2,
+            ]
+        optomotor_range = 1
+    else:
+        if (
+            visual_paradigm_name == "gratings"
+            or visual_paradigm_name == "sweeploom"
+            or visual_paradigm_name.endswith("sities")
+        ):
+            stim_to_analyse = stim_info["stim_onset"]
+        else:
+            stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
+        optomotor_range = 3
+    stim_name_list = np.array(stim_info["stim_type"][stim_to_analyse.index])
+    stim_duration_list = np.array(stim_info["Duration"][stim_to_analyse.index])
+
+    (
+        summary_df_list,
+        cum_travel_list,
+        velocity_list,
+        yaw_rotation_list,
+        init_frame,
+        end_frame,
+    ) = analysis_stim_evoked_response_combo(
+        stim_to_analyse,
+        yaw_rotation_vector,
+        travel_distance_fbf,
+        tem_df_this_exp,
+        analysis_window,
+        monitor_fps,
+        optomotor_range,
+        stim_name_list,
+        summary_df_list,
+        cum_travel_list,
+        velocity_list,
+        yaw_rotation_list,
+    )
 
     ##concatenate travel distance for histogram
 
@@ -653,8 +609,9 @@ def main(thisDir, json_file):
     cum_travel_distance = np.vstack(cum_travel_list)
     velocity_arr = np.vstack(velocity_list)
     cum_yaw_rotation = np.vstack(yaw_rotation_list)
-    ##use fft to classify trials where animals jump
-    # fft_power,freq_axis=calculate_fft(velocity_arr[21, :], camera_fps)
+    ##use fft to classify trials where animals jump. So far this method can be used to detect some obvious jumps but there might be some miss detecting
+    # for i in range(50):
+    #     fft_power, freq_axis = calculate_fft(velocity_arr[-i, :], camera_fps)
 
     if analysis_methods.get("plotting_tbt_overview") == True:
         ##arrange xticks at onset and offset of the stimulus for heatmap
@@ -673,6 +630,17 @@ def main(thisDir, json_file):
         ax1.set_ylabel("frequency")
         ax1.set_title("travel distance during stimulus presentation")
         ## draw subplot2
+        if analysis_methods.get("analysis_by_stimulus_type") == True:
+            velocity_sorted_list = []
+            for thisStim in stim_type:
+                velocity_sorted_list.append(
+                    velocity_arr[
+                        np.where((summary_df.loc[:, "stim_type"] == thisStim)), :
+                    ]
+                )
+            # velocity_arr = np.vstack(velocity_sorted_list)
+            test = np.hstack(velocity_sorted_list)
+            velocity_arr = test[0, :, :]
         pcm = ax2.pcolormesh(velocity_arr, cmap="magma", vmin=0, vmax=100)
         # pcm=ax2.pcolormesh(velocity_tbt, cmap = 'magma') ##sometimes, we dont need a vmax
         ## add colorbar
@@ -862,7 +830,7 @@ In this case, the original database_curated.pickle should be renamed as tracking
 
 
 if __name__ == "__main__":
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24004\240713\gratings\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24012\240714\gratings\session1"
     # thisDir = r"C:\Users\neuroLaptop\Documents\GN24032\240717\coherence\session1"
@@ -870,6 +838,8 @@ if __name__ == "__main__":
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24034\240801\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24032\240717\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24034\240801\coherence\session1"
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24021/240717/coherence/session1"  # good for checking fft
+    thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24026/240717/coherence/session1"  # good for checking fft
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
