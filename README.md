@@ -1,44 +1,46 @@
 # General info about using fictrac + bonsai to run experiment on tethered animals:
 
-### RoomZ745: 
+### RoomZ745 or matrexVR room 
 
-we try to keep the temperature between 30-32 degree during recording. This is meant to avoid introducing new variables into the behavioural matrics. 
+we try to keep the temperature between 30-32 degree during recording. This is meant to avoid introducing new variables into the behavioural matrics.
 
-However, the setup does not let us to keep the temperature precise, so we still need to record the fluctuation of temperature. 
+However, the setup does not let us to keep the temperature precise, so we still need to record the fluctuation of temperature. In addition, LED panels can heat up the matrexVR setup up to 39 degree. 
 
 In the future, let's try to push this fluctuation only 1 degree differences
+
+Below is the protocol when running experiments in Room Z745.
 
 To raise the temperature on, keep the radiator on at level 5, turn on the air conditioner and set the temperature to 32 degree.
 
 Turn on this computer, as monitors do contribute to a lot of heat to the setup
 
-It takes around 3 hours to raise temperature from 27 degree to 30 degree so start this process early.
+It takes around 3 hours to raise temperature from 27 degree to 30 degree so start this process early. The monitor will heat up the setup so eventually the setup will be around 32 degree.
 
 ### Animal preparation: 
 
 animals should be left without food at least overnight (no more than over 2 nights) and they should be kept in VCC Zt611 
 
-as there is automatic lighting to keep animals' biological clock consistent (make sure to double check with me how to use the automatic lighting system). 
+as there is automatic lighting to keep animals' biological clock consistent (make sure to turn off the automatic lighting system when not running new experiments). 
 
-Keeping animals in Z building is possible but please be aware that the animals holding room can not go up to 30 degree (I need to double check. this probably 27, 28 degree is the maximum already).
+Keeping animals in Z building is possible but please be aware that the animals holding room can not go up to 30 degree (probably 27, 28 degree is the maximum already).
 
-Tethering animals: teathering animal itself is not that hard but electrophysiology, we want to fix animals by head, which is not trivial (as locust's head is small and round). 
+Tethering animals: teathering animal itself is not that hard but electrophysiology, we want to fix animals by head, which is not trivial (as locust's head is small and round). When not doing electrophysiology, I fix animals by thorax (the anterior part of the thorax) and apply additional drop in between head and thorax to dampen animals' head movement. 
 
-We 3D print a customised headbar and use two kind of UHU glue for tethering. First use sand paper to get rid of wax on animal's head and thorax. 
+For ephys, we used a 3D-printed headbar and for behaviours, we used needles. To glue animals, we use two kind of UHU glue for tethering. First use sand paper to get rid of wax on animal's head and thorax (for matrexVR, use the motorised grinder).
 
 Then use a sharp thing to place the red UHU glue and stick it on the animal.
 
-Then apply blue UHU glue on the holes of the headbar and use shape thing to make sure the glue cover all edges. Shine the animal with UV light for 30 seconds from multiple angle.
+Then apply blue UHU glue on the holes of the headbar (or at the edge of needles) and use shape thing to make sure the glue cover all edges. Shine the animal with UV light for 30 seconds from multiple angle.
 
-(There is a small ball you can use while tething the animal before the stage is avaiable, just put the ball under a tethered animal, the animal shall climb it due to its instinct. 
+(There is a small ball you can use while tethering the animal before the stage is available, just put the ball under a tethered animal, the animal shall climb it due to its instinct. 
 
 But dont start tethering animals too early because even if you use the ball to keep locusts calm, locusts will eat the ball)
 
 ### Lighting: 
 
-switch on extension located at the bottom of the rig. This will turn on both IR lights and OpenEphys DAQ (and maybe a light above the animal). 
+switch on extension located at the bottom of the rig. This will turn on both IR lights and OpenEphys DAQ. 
 
-These light create some noise so they are wrapped with tin foil and connect to ground bus.
+These light create some noises so they are wrapped with tin foil and connect to ground bus.
 
 There are two ways to run the experiment, using online fictrac or offline fictrac. Online fictrac is essential for closed-loop experiment. 
 
@@ -175,16 +177,95 @@ Move those files into their respective folders
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
-### Additional package for data analysis
+### python environment for data analysis
 
-When using timestamp to align stimulus onset with fictrac data, be aware that there is a recent fictrac bug outputting timestamp.
+# creating virtual environment and installing packages via commands
 
-This affects Zball system but not VCC ball system. Hence, a customised code is writen to extract timestamp from log file, which requires a package called **chardet**. 
+Below is the command to install packages via conda environment 
 
-Otherwise, most of the package shall be the same as behavioural_analysis (need to check this soon though). 
+```
+conda create --name tracking_analysis --channel conda-forge python=3.11
+conda activate tracking_analysis
+conda update -n base -c defaults conda
+conda config --add channels conda-forge
+conda config --set channel_priority strict
+conda install --yes -c conda-forge -v h5py opencv ipython jupyter matplotlib pandas matplotlib scipy openpyxl
+conda install numpy"<=2.0.0"
+pip install roipoly lsq-ellipse opencv-contrib-python==4.5.5.64 ipyparallel
+```
+
+# creating virtual environment from an environment.yml file or a requirement.txt
+```
+conda env create -f environment.yml
+```
+```
+conda create --name tracking_analysis --file requirements.txt
+```
+
+Below packages are optional
+```
+pip install roipoly lsq-ellipse
+```
+
+When using timestamp to align stimulus onset with fictrac data, be aware that there is a recent fictrac bug outputting timestamp, which affects airball systems in Z745 but not in VCC. Hence, a customised code is written to extract timestamp from log file, which requires a package called **chardet**. 
+
 ```
 pip install chardet
 ```
+
 In addition, the log file is not encoded in utf-8 but in another scheme called iso-8859-5
 
 Notably, this bug only applies to using timestamp to align stimuluus, so not the case when using LED sync pulse to align stimulus
+
+
+Other than those packages, most of the package shall be the same as behavioural_analysis.
+
+### Other packages required to run this analysis
+
+There are useful tools stored in other packages so after you cloned this repo, remember to clone the other as well.
+
+```
+git clone https://github.com/chiyu1203/bonfic
+git clone https://github.com/chiyu1203/utilities.git
+```
+
+### How to use the analysis pipeline and jupyter notebook
+
+Use bonfic_tutorial.ipynb, which includes the essence of 'analyse_stimulus_evoked_response.py' in this repo and 'preprocess_fictrac_data' from the utilities and plotting some group data.
+
+The analysis methods are organised into a json file, which is created from a python file. This json file tells the notebook and python script how to analysis the data (with some boolean options) and include meta information of the experiment that is not included during data collection phase. 
+
+Therefore, each project (or each experiment) has its own json file.
+
+
+    "overwrite_curated_dataset", this means whether to overwrite the existing pickle file or not, which is generated from fictrac. If True, then the programme will overwrite the pickle file
+
+    "debug_mode": this means whether to save any output during data analysis. If True, then do not save any output
+    
+    "fictrac_posthoc_analysis": this means whether the fictrac data comes from online tracking or posthoc analysis. If True, then entering the analysis pipeline for posthoc analysis.
+    
+    "use_led_to_align_stimulus_timing": this means whether to use independent light source to track stimulus onset and offset. If True, then entering the analysis pipeline for that. If False, the programme will try to use timestamp coming from trials and from cameras to isolate the onset (this can only be achieved when posthoc analysis is not applied)
+    
+    "align_with_isi_onset": this means whether to use align the stimulus-evoked response based on stimulus onset or ISI onset. If True, then aligning the data based on ISI onset (this only works with Bonsai projects where ISI is logged)
+    
+    "filtering_method": this means what kind of filter to apply for tracking animals
+    
+    "plotting_tbt_overview": this means whether to plot a heat map of animal's velocity trial by trial and two histograms of animals travel distance and optomotor index.
+    
+    "plotting_trajectory": this means whether to plot the trajectory of the animals in the experiment.
+    
+    "plotting_event_related_trajectory": this means whether to plot a heat map of animal's trajectory after the stimulus onset
+    
+    "plotting_deceleration_accerleration": this means whether to plot the average deceleration and accerleration onset of the animals (this is still under construction
+    )
+    "plotting_optomotor_response": this means whether to plot the animal's mean optomotor index across stimulus type and the trajectory of yaw rotation vector trial by trial.
+    
+    "load_experiment_condition_from_database": this is used in the jypter notebook to see whether you want to access google-sheet-based database. If False, all animals stored in the server will be included.
+    
+    "select_animals_by_condition": this is used in the jypter notebook to extract specific animals for analysis. If True, you need to specify what condition in a dictionary. If False, all animals in the database (google sheet) will be included.
+    
+    "analysis_by_stimulus_type": this is used in the python script to see whether you want to plot the velocity heatmap based on stimlus type or based on time. If True, the heatmap will be stored based on stimulus type.
+
+
+
+
