@@ -1,6 +1,6 @@
 # General info about using fictrac + bonsai to run experiment on tethered animals:
 
-### RoomZ745 or matrexVR room 
+## RoomZ745 or matrexVR room 
 
 we try to keep the temperature between 30-32 degree during recording. This is meant to avoid introducing new variables into the behavioural matrics.
 
@@ -16,7 +16,7 @@ Turn on this computer, as monitors do contribute to a lot of heat to the setup
 
 It takes around 3 hours to raise temperature from 27 degree to 30 degree so start this process early. The monitor will heat up the setup so eventually the setup will be around 32 degree.
 
-### Animal preparation: 
+## Animal preparation: 
 
 animals should be left without food at least overnight (no more than over 2 nights) and they should be kept in VCC Zt611 
 
@@ -36,7 +36,7 @@ Then apply blue UHU glue on the holes of the headbar (or at the edge of needles)
 
 But dont start tethering animals too early because even if you use the ball to keep locusts calm, locusts will eat the ball)
 
-### Lighting: 
+## Lighting: 
 
 switch on extension located at the bottom of the rig. This will turn on both IR lights and OpenEphys DAQ. 
 
@@ -46,7 +46,7 @@ There are two ways to run the experiment, using online fictrac or offline fictra
 
 However, due to some potential incompatability issue between AMD CPU and OpenCL, we drop a lot of frames when doing online fictrac analysis and saving frames into video 
 
-(On average, 40% of the frame are dropped at 100Hz. This means those videos can hardly be backtrack), so highly recommend to use bonsai to save videos when online fictrac is not necessary.
+(On average, 40% of the frame are dropped at 100Hz those videos can hardly be backtrack), so highly recommend to use bonsai to save videos when online fictrac is not necessary.
 
 
 ## Running the experiment (online fictrac):
@@ -177,9 +177,9 @@ Move those files into their respective folders
 
 ---------------------------------------------------------------------------------------------------------------------------------
 
-### python environment for data analysis
+# python environment for data analysis
 
-# creating virtual environment and installing packages via commands
+## creating virtual environment and installing packages via commands
 
 Below is the command to install packages via conda environment 
 
@@ -194,7 +194,7 @@ conda install numpy"<=2.0.0"
 pip install roipoly lsq-ellipse opencv-contrib-python==4.5.5.64 ipyparallel
 ```
 
-# creating virtual environment from an environment.yml file or a requirement.txt
+## creating virtual environment from an environment.yml file or a requirement.txt
 ```
 conda env create -f environment.yml
 ```
@@ -229,36 +229,36 @@ git clone https://github.com/chiyu1203/bonfic
 git clone https://github.com/chiyu1203/utilities.git
 ```
 
-### How to use the analysis pipeline and jupyter notebook
+## How to use the analysis pipeline and jupyter notebook
 
-Use bonfic_tutorial.ipynb, which includes the essence of 'analyse_stimulus_evoked_response.py' in this repo and 'preprocess_fictrac_data' from the utilities and plotting some group data.
+Use **bonfic_tutorial.ipynb**, which includes the essence of **analyse_stimulus_evoked_response.py** in this repo and **preprocess_fictrac_data** from **utilities** and plotting some group data.
 
 The analysis methods are organised into a json file, which is created from a python file. This json file tells the notebook and python script how to analysis the data (with some boolean options) and include meta information of the experiment that is not included during data collection phase. 
 
-Therefore, each project (or each experiment) has its own json file.
+Therefore, each project (or each experiment) has its own json file. Below explains what those analysis methods are about.
 
 
-    "overwrite_curated_dataset", this means whether to overwrite the existing pickle file or not, which is generated from fictrac. If True, then the programme will overwrite the pickle file
+    "overwrite_curated_dataset": whether to overwrite the existing pickle file or not, which is generated from fictrac. If True, then the programme will overwrite the pickle file
 
-    "debug_mode": this means whether to save any output during data analysis. If True, then do not save any output
+    "debug_mode": whether to save any output during data analysis. If True, then do not save any output
     
-    "fictrac_posthoc_analysis": this means whether the fictrac data comes from online tracking or posthoc analysis. If True, then entering the analysis pipeline for posthoc analysis.
+    "fictrac_posthoc_analysis": whether the fictrac data comes from online tracking or posthoc analysis. If True, then entering the analysis pipeline for posthoc analysis.
     
-    "use_led_to_align_stimulus_timing": this means whether to use independent light source to track stimulus onset and offset. If True, then entering the analysis pipeline for that. If False, the programme will try to use timestamp coming from trials and from cameras to isolate the onset (this can only be achieved when posthoc analysis is not applied)
+    "use_led_to_align_stimulus_timing": whether to use independent light source to track stimulus onset and offset. If True, then entering the analysis pipeline for that. If False, the programme will try to use timestamp coming from trials and from cameras to isolate the onset (this can only be achieved when posthoc analysis is not applied)
     
-    "align_with_isi_onset": this means whether to use align the stimulus-evoked response based on stimulus onset or ISI onset. If True, then aligning the data based on ISI onset (this only works with Bonsai projects where ISI is logged)
+    "align_with_isi_onset": whether to use align the stimulus-evoked response based on stimulus onset or ISI onset. If True, then aligning the data based on ISI onset (this only works with Bonsai projects where ISI is logged)
     
-    "filtering_method": this means what kind of filter to apply for tracking animals
+    "filtering_method": what kind of filter to apply for tracking animals
     
-    "plotting_tbt_overview": this means whether to plot a heat map of animal's velocity trial by trial and two histograms of animals travel distance and optomotor index.
+    "plotting_tbt_overview": whether to plot a heat map of animal's velocity trial by trial and two histograms of animals travel distance and optomotor index.
     
-    "plotting_trajectory": this means whether to plot the trajectory of the animals in the experiment.
+    "plotting_trajectory": whether to plot the trajectory of the animals in the experiment.
     
-    "plotting_event_related_trajectory": this means whether to plot a heat map of animal's trajectory after the stimulus onset
+    "plotting_event_related_trajectory": whether to plot a heat map of animal's trajectory after the stimulus onset
     
-    "plotting_deceleration_accerleration": this means whether to plot the average deceleration and accerleration onset of the animals (this is still under construction
-    )
-    "plotting_optomotor_response": this means whether to plot the animal's mean optomotor index across stimulus type and the trajectory of yaw rotation vector trial by trial.
+    "plotting_deceleration_accerleration": whether to plot the average deceleration and accerleration onset of the animals (this is still under construction)
+    
+    "plotting_optomotor_response": whether to plot the animal's mean optomotor index across stimulus type and the trajectory of yaw rotation vector trial by trial.
     
     "load_experiment_condition_from_database": this is used in the jypter notebook to see whether you want to access google-sheet-based database. If False, all animals stored in the server will be included.
     
