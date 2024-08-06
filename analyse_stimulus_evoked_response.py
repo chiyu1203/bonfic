@@ -376,7 +376,10 @@ def main(thisDir, json_file):
 
     travel_distance_whole_session = np.sum(travel_distance_fbf)
     if analysis_methods.get("plotting_trajectory") == True:
-        plt.scatter(x_all, y_all, c=np.arange(len(y_all)), marker=".", alpha=0.5)
+        fig = plt.figure()  # a new figure window
+        ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+        ax.scatter(x_all, y_all, c=np.arange(len(y_all)), marker=".", alpha=0.5)
+        #fig.show()
         plt.show()
 
     # Here to load time and temperature data if possible
@@ -707,6 +710,7 @@ def main(thisDir, json_file):
         yaw_vector_limit = 3000
         y_axis_lim = [yaw_vector_limit * -1, yaw_vector_limit]
         ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
+        #if stim duration is a list, plot the max and min values
         if type(stim_duration) == list:
             frame_difference = (max(stim_duration) - min(stim_duration)) * camera_fps
             shortest_stim_end_frame = end_frame - frame_difference
@@ -818,11 +822,11 @@ if __name__ == "__main__":
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24012\240714\gratings\session1"
     # thisDir = r"C:\Users\neuroLaptop\Documents\GN24032\240717\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24032\240717\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24034\240801\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24032\240717\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24034\240801\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24034\240801\coherence\session1"fixed by threshold 46 47 52 59 53
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24032\240717\coherence\session1"4150556272
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24034\240801\coherence\session1"50525355565759606269727679
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24021/240717/coherence/session1"  # good for checking fft
-    thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24026/240717/coherence/session1"  # good for checking fft
+    thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()

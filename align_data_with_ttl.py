@@ -8,6 +8,118 @@ parent_dir = current_working_directory.resolve().parents[0]
 sys.path.insert(0, str(parent_dir) + "\\utilities")
 from useful_tools import find_file, find_file_multiple_patterns
 
+def hardcode_customised_thresholds(on_thresholds,off_thresholds,animal_id):
+    if animal_id=='GN24032':
+        on_thresholds.append(198450)
+        off_thresholds.append(198450)
+    elif animal_id=='GN24034':
+        on_thresholds.append(429000)
+        off_thresholds.append(429000)
+    elif animal_id=='GN24036':
+        on_thresholds.append(443000)
+        off_thresholds.append(443000)
+    elif animal_id=="GN24029":
+        on_thresholds.append(623575)
+        off_thresholds.append(623575)
+    elif animal_id=="GN24039":
+        on_thresholds.append(420000)
+        off_thresholds.append(420000)
+    elif animal_id=="GN24041":
+        on_thresholds.append(429000)
+        off_thresholds.append(429000)
+    elif animal_id=="GN24043":
+        on_thresholds.append(420000)
+        off_thresholds.append(420000)
+    elif animal_id=="GN24046":
+        on_thresholds.append(430000)
+        off_thresholds.append(430000)
+    elif animal_id=="GN24047":
+        on_thresholds.append(420000)
+        off_thresholds.append(420000)
+    elif animal_id=="GN24050":
+        on_thresholds.append(435000)
+        off_thresholds.append(435000)
+    elif animal_id=="GN24052":
+        on_thresholds.append(430000)
+        off_thresholds.append(430000)
+    elif animal_id=="GN24053":
+        on_thresholds.append(430000)
+        off_thresholds.append(430000)
+    elif animal_id=="GN24055":
+        on_thresholds.append(430000)
+        off_thresholds.append(430000)
+    elif animal_id=="GN24062":
+        on_thresholds.append(440000)
+        off_thresholds.append(440000)
+    elif animal_id=="GN24064":
+        on_thresholds.append(440000)
+        off_thresholds.append(440000)
+    elif animal_id=="GN24065":
+        on_thresholds.append(430000)
+        off_thresholds.append(430000)
+    elif animal_id=="GN24066":
+        on_thresholds.append(428000)
+        off_thresholds.append(428000)
+    elif animal_id=="GN24069":
+        on_thresholds.append(424000)
+        off_thresholds.append(424000)
+    elif animal_id=="GN24070":
+        on_thresholds.append(442000)
+        off_thresholds.append(442000)
+    elif animal_id=="GN24071":
+        on_thresholds.append(425000)
+        off_thresholds.append(425000)
+    elif animal_id=="GN24072":
+        on_thresholds.append(441000)
+        off_thresholds.append(441000)
+    elif animal_id=="GN24073":
+        on_thresholds.append(450000)
+        off_thresholds.append(450000)
+    elif animal_id=="GN24074":
+        on_thresholds.append(429000)
+        off_thresholds.append(429000)
+    elif animal_id=="GN24075":
+        on_thresholds.append(425000)
+        off_thresholds.append(425000)
+    elif animal_id=="GN24078":
+        on_thresholds.append(435000)
+        off_thresholds.append(435000)
+    return on_thresholds,off_thresholds
+def fix_broken_ttl2(b2w,w2b):
+    duration_med = np.median(np.diff(b2w))
+    num_stim_inbetween = np.round(np.diff(b2w) / duration_med)
+    missing_onset = np.where(num_stim_inbetween.astype(int) >= 2)
+    missing_onset_num = num_stim_inbetween.astype(int)[missing_onset]
+    print(missing_onset)
+    print(missing_onset_num)
+    for i, j in zip(missing_onset[0][::-1], missing_onset_num[::-1]):
+        if j == 2:
+            b2w = np.insert(b2w, i + 1, b2w[i] + duration_med)
+            w2b = np.insert(w2b, i, w2b[i - 1] + duration_med)
+        if j == 3:
+            b2w = np.insert(b2w, i + 1, b2w[i] + duration_med)
+            b2w = np.insert(b2w, i + 2, b2w[i] + duration_med * 2)
+            w2b = np.insert(w2b, i, w2b[i - 1] + duration_med)
+            w2b = np.insert(w2b, i + 1, w2b[i - 1] + duration_med * 2)
+    return b2w,w2b
+def fill_dropframe_ttl(arr,stim_info,analysis_methods):
+    sample_rate = analysis_methods.get("camera_fps")
+    missing_onset=np.where((np.diff(arr)>6000) & (np.diff(arr)<9000))[0]
+    missing_onset_num=len(missing_onset)
+    if missing_onset_num==0:
+        print("drop either 0 frames or more than 1 frames")
+    elif missing_onset_num==1:
+        missing_onset_pos=missing_onset.tolist()[0]
+        duration=stim_info.loc[(missing_onset_pos+1)*2-1,"Duration"]+stim_info.loc[(missing_onset_pos+1)*2,"Duration"]
+        arr = np.insert(arr, missing_onset_pos + 1, arr[missing_onset_pos] + duration*sample_rate)
+    else:
+        for i in sorted(missing_onset.tolist(), key=abs, reverse=True):
+            #duration=stim_info.loc[i*2,"Duration"]+stim_info.loc[i*2+1,"Duration"]
+            duration=stim_info.loc[(i+1)*2-1,"Duration"]+stim_info.loc[(i+1)*2,"Duration"]
+            arr = np.insert(arr, i + 1, arr[i] + duration*sample_rate)
+    return arr
+
+
 
 def find_transitions(arr):
     transitions = []
@@ -28,18 +140,40 @@ def edge_detector(inp):
     return np.arange(len(inp) - 1)[~inp[:-1] & inp[1:]]
 
 
-def detect_transition(arr, on_threshold, off_threshold, sample_rate=100):
-    pre_stim_interval = 60
-    # max_value=np.max(arr[:100])
-    # np.min(arr[:18000])
+def detect_transition(arr, on_threshold, off_threshold, analysis_methods):
+    sample_rate = analysis_methods.get("camera_fps")
+    pre_stim_interval = analysis_methods.get("prestim_duration")
+    interval_duration = analysis_methods.get("interval_duration")
+    stim_duration = analysis_methods.get("stim_duration")
+    if type(interval_duration) == list:
+        min_isi=min(interval_duration)
+    else:
+       min_isi=interval_duration
+    if type(stim_duration) == list:
+        min_stim=min(stim_duration)
+    else:
+        min_stim=stim_duration
+    min_duration=min_stim+min_isi
     pass_threshold = arr > on_threshold
-    # transition = edge_detector(pass_threshold)
-    b2w = find_transitions(pass_threshold)
-    # set an arbitary threshold to remove any kind of instrumental noise in the first 30 secs, usually during pre-stim interval
-    b2w = b2w[b2w > sample_rate * (pre_stim_interval - 10)]
+    pass_threshold_index=np.where(pass_threshold)[0]
+    up_phase=np.append(np.where(pass_threshold)[0][0],pass_threshold_index[1:][np.diff(pass_threshold_index)>min_stim*0.9*sample_rate])
+    b2w = up_phase[up_phase> sample_rate * (pre_stim_interval - 10)]
+
     pass_threshold = off_threshold > arr
-    w2b = find_transitions(pass_threshold)
-    w2b = w2b[w2b > sample_rate * (pre_stim_interval - 10)]
+    pass_threshold_index=np.where(pass_threshold)[0]
+    down_phase=np.append(np.where(pass_threshold)[0][0],pass_threshold_index[1:][np.diff(pass_threshold_index)>min_isi*0.9*sample_rate])
+    w2b = down_phase[down_phase > sample_rate * (pre_stim_interval - 10)]
+
+
+    # pass_threshold = arr > on_threshold 
+    # # transition = edge_detector(pass_threshold)
+    # b2w = find_transitions(pass_threshold)
+    # # set an arbitary threshold to remove any kind of instrumental noise in the first 30 secs, usually during pre-stim interval
+    # b2w = b2w[b2w > sample_rate * (pre_stim_interval - 10)]#this means recording needs to start within 10 mins after pressing S
+    
+    # pass_threshold = off_threshold > arr
+    # w2b = find_transitions(pass_threshold)
+    # w2b = w2b[w2b > sample_rate * (pre_stim_interval - 10)]
     return b2w, w2b
     # =arr[transition]>0
     # bright = arr[arr > on_threshold]
@@ -102,13 +236,14 @@ def get_led_value(this_video, analysis_methods):
 
 
 def analyse_led_signal(thisDir, json_file, stim_info):
+    animal_id = thisDir.parts[-4]
     if isinstance(json_file, dict):
         analysis_methods = json_file
     else:
         with open(json_file, "r") as f:
             print(f"load analysis methods from file {json_file}")
             analysis_methods = json.loads(f.read())
-    sample_rate = analysis_methods.get("camera_fps")
+    
     visual_paradigm_name = analysis_methods.get("experiment_name")
     if visual_paradigm_name == "gratings" or visual_paradigm_name == "sloom":
         trial_num = stim_info.shape[0]
@@ -162,12 +297,8 @@ def analyse_led_signal(thisDir, json_file, stim_info):
             higher_mean = np.mean(sort_arr[-30000:-20000])
             higher_std = np.std(sort_arr[-30000:-20000])
             if exp_place == "MatrexVR":  # or exp_place == "Documents":
-                if thisDir.parts[-4] == "GN24029":
-                    on_thresholds.append(623575)
-                    off_thresholds.append(623575)
-                elif thisDir.parts[-4] == "GN24032":
-                    on_thresholds.append(198450)
-                    off_thresholds.append(198450)
+                if animal_id in ['GN24032','GN24029','GN24034','GN24036','GN24039','GN24041','GN24043','GN24046','GN24047','GN24050','GN24052',"GN24053","GN24055","GN24062","GN24064","GN24065","GN24066","GN24069","GN24070","GN24071","GN24072","GN24074","GN24075","GN24078"]:
+                    on_thresholds,off_thresholds=hardcode_customised_thresholds(on_thresholds,off_thresholds,animal_id)
                 else:
                     on_thresholds.append(int(np.mean(sort_arr)))
                     off_thresholds.append(int(np.mean(sort_arr)))
@@ -196,24 +327,27 @@ def analyse_led_signal(thisDir, json_file, stim_info):
 
     ## use led value to detect the transition.
     for i in range(len(led_value)):
-        b2w, w2b = detect_transition(
-            led_value[i], on_thresholds[i], off_thresholds[i], sample_rate
+        fig, (ax, ax1) = plt.subplots(
+            nrows=1, ncols=2, figsize=(18, 7), tight_layout=True
         )
+        ax.scatter(np.arange(arr.shape[0]), arr)
+        ax.axhline(y=on_thresholds[i],color="red",linestyle="--",label="Threshold")
+        #fig.show()
+        
+        
+        b2w, w2b = detect_transition(
+            led_value[i], on_thresholds[i], off_thresholds[i], analysis_methods
+        )
+        ax1.scatter(np.arange(b2w.shape[0]-1), np.diff(b2w),c='b')
+        ax1.scatter(np.arange(w2b.shape[0]-1), np.diff(w2b),c='r')
+        plt.show()
         """hardcode here for the pilot experiment due to sync path for 0 coherence stimulus is programmed into the wrong colour"""
-        if exp_date == "2024-07-19" or exp_date == "2024-07-17":
-            duration_med = np.median(np.diff(b2w))
-            num_stim_inbetween = np.round(np.diff(b2w) / duration_med)
-            missing_onset = np.where(num_stim_inbetween.astype(int) >= 2)
-            missing_onset_num = num_stim_inbetween.astype(int)[missing_onset]
-            for i, j in zip(missing_onset[0][::-1], missing_onset_num[::-1]):
-                if j == 2:
-                    b2w = np.insert(b2w, i + 1, b2w[i] + duration_med)
-                    w2b = np.insert(w2b, i, w2b[i - 1] + duration_med)
-                if j == 3:
-                    b2w = np.insert(b2w, i + 1, b2w[i] + duration_med)
-                    b2w = np.insert(b2w, i + 2, b2w[i] + duration_med * 2)
-                    w2b = np.insert(w2b, i, w2b[i - 1] + duration_med)
-                    w2b = np.insert(w2b, i + 1, w2b[i - 1] + duration_med * 2)
+        if exp_date in ["2024-07-19","2024-07-17" ]:
+            b2w,w2b=fix_broken_ttl(b2w,w2b)
+        if animal_id in ['GN24036','GN24041','GN24050','GN24055','GN24062','GN24065','GN24071','GN24072','GN24078']:
+            b2w=fill_dropframe_ttl(b2w,stim_info,analysis_methods)
+            w2b=fill_dropframe_ttl(w2b,stim_info,analysis_methods)
+
 
         b2w = b2w[: trial_num + 1]
         w2b = w2b[:trial_num]
