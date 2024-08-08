@@ -85,6 +85,12 @@ def hardcode_customised_thresholds(on_thresholds, off_thresholds, animal_id):
     elif animal_id == "GN24078":
         on_thresholds.append(435000)
         off_thresholds.append(435000)
+    elif animal_id == "GN24084":
+        on_thresholds.append(430000)
+        off_thresholds.append(430000)
+    elif animal_id == "GN24085":
+        on_thresholds.append(430000)
+        off_thresholds.append(430000)
     return on_thresholds, off_thresholds
 
 
@@ -343,6 +349,8 @@ def analyse_led_signal(thisDir, json_file, stim_info):
                     "GN24074",
                     "GN24075",
                     "GN24078",
+                    "GN24084",
+                    "GN24085",
                 ]:
                     on_thresholds, off_thresholds = hardcode_customised_thresholds(
                         on_thresholds, off_thresholds, animal_id

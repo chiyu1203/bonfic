@@ -4,7 +4,7 @@ file_name = "analysis_methods_dictionary.json"
 analysis_methods = {
     "exp_place": "MatrexVR",
     "experiment_name": "coherence",
-    "temperature_data_path": None,
+    "temperature_data_path": r"Z:\Users\chiyu\Zt611_locustVR_20240801-20240806.txt",
     "overwrite_curated_dataset": True,
     "graph_colour_code": ["r", "y", "m", "c", "k", "b", "g", "r"],
     "debug_mode": False,
@@ -13,7 +13,7 @@ analysis_methods = {
     "align_with_isi_onset": False,
     "filtering_method": "sg_filter",
     "plotting_tbt_overview": True,
-    "plotting_trajectory": True,
+    "plotting_trajectory": False,
     "plotting_event_related_trajectory": False,
     "plotting_deceleration_accerleration": False,
     "plotting_optomotor_response": True,
