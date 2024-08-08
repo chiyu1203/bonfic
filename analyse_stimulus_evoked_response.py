@@ -361,10 +361,6 @@ def main(thisDir, json_file):
     if analysis_methods.get("filtering_method") == "sg_filter":
         x_all = savgol_filter(df.loc[:, ["intergrated x position"]], 71, 3, axis=0)
         y_all = savgol_filter(df.loc[:, ["intergrated y position"]], 71, 3, axis=0)
-        # instant_v = savgol_filter(df.loc[:, ["instant speed"]], 39, 3, axis=0)
-        # runmean_v = df["instant speed"].rolling(10).mean().values
-        # vx=savgol_filter(df.loc[:, ['instant speed']], 39, 3, axis=0)
-        # yaw_rotation_vector=savgol_filter(df.loc[:, ['instant speed']], 39, 3, axis=0)
     else:
         x_all = df.loc[:, ["intergrated x position"]]
         y_all = df.loc[:, ["intergrated y position"]]
@@ -624,9 +620,8 @@ def main(thisDir, json_file):
                         np.where((summary_df.loc[:, "stim_type"] == thisStim)), :
                     ]
                 )
-            # velocity_arr = np.vstack(velocity_sorted_list)
-            test = np.hstack(velocity_sorted_list)
-            velocity_arr = test[0, :, :]
+            tmp = np.hstack(velocity_sorted_list)
+            velocity_arr = tmp[0, :, :]
         pcm = ax2.pcolormesh(velocity_arr, cmap="magma", vmin=0, vmax=100)
         # pcm=ax2.pcolormesh(velocity_tbt, cmap = 'magma') ##sometimes, we dont need a vmax
         ## add colorbar
@@ -806,25 +801,8 @@ def main(thisDir, json_file):
 
     return summary_df, velocity_arr, cum_yaw_rotation, travel_distance_whole_session
 
-
-"""
-need to write something here to save summary_df,velocity_arr, cum_yaw_rotation, but what is the efficent way to manage these data
-If everything is in summary_df then that's easy but now it looks like I have other two big tables velocity_arr and cum_yaw_rotation.
-or should I export the original location and then do the calculation after aligning behaviour data with ephys data
-My gut feeling is that we still have a place for hdf-based curated database, which we can throw all the information there
-In this case, the original database_curated.pickle should be renamed as tracking_curated.pickle.
-"""
-
-
 if __name__ == "__main__":
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24004\240713\gratings\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24012\240714\gratings\session1"
-    # thisDir = r"C:\Users\neuroLaptop\Documents\GN24032\240717\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24032\240717\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24034\240801\coherence\session1"fixed by threshold 46 47 52 59 53
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24032\240717\coherence\session1"4150556272
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24034\240801\coherence\session1"50525355565759606269727679
+    #weird files 50525355565759606269727679 fixed by threshold 46 47 52 59 53 fixed by filtering trial in different way 4150556272
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24021/240717/coherence/session1"  # good for checking fft
     thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
