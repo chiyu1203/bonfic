@@ -375,7 +375,7 @@ def main(thisDir, json_file):
         fig = plt.figure()  # a new figure window
         ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
         ax.scatter(x_all, y_all, c=np.arange(len(y_all)), marker=".", alpha=0.5)
-        #fig.show()
+        # fig.show()
         plt.show()
 
     # Here to load time and temperature data if possible
@@ -538,8 +538,15 @@ def main(thisDir, json_file):
         return
 
     if align_with_isi_onset:
-        if visual_paradigm_name == "gratings" or visual_paradigm_name == "sweeploom":
-            stim_to_analyse = isi_onset
+        if (
+            visual_paradigm_name == "gratings"
+            or visual_paradigm_name == "sweeploom"
+            or visual_paradigm_name.endswith("sities")
+        ):
+            print(
+                "not recommended to align with ISI onset due to the design of workflow does not log the onset of ISI"
+            )
+            return None
         else:
             stim_to_analyse = stim_info.loc[::2, "stim_onset"]
             if type(interval_duration) == list:
@@ -548,10 +555,10 @@ def main(thisDir, json_file):
                 interval_duration * -1,
                 interval_duration * 2,
             ]
+            previous_duration_arr = np.array(
+                stim_info["Duration"][stim_info.loc[1::2, "stim_onset"].index]
+            )
         optomotor_range = 1
-        previous_duration_arr = np.array(
-            stim_info["Duration"][stim_info.loc[1::2, "stim_onset"].index]
-        )
         previous_duration_arr = np.append(np.nan, previous_duration_arr[:-1])
     else:
         if (
@@ -560,12 +567,16 @@ def main(thisDir, json_file):
             or visual_paradigm_name.endswith("sities")
         ):
             stim_to_analyse = stim_info["stim_onset"]
+            previous_duration_arr = np.array(
+                stim_info["Duration"][stim_info.loc[:, "stim_onset"].index]
+            )
         else:
             stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
-        optomotor_range = 3
-        previous_duration_arr = np.array(
-            stim_info["Duration"][stim_info.loc[::2, "stim_onset"].index]
-        )
+            previous_duration_arr = np.array(
+                stim_info["Duration"][stim_info.loc[::2, "stim_onset"].index]
+            )
+        optomotor_range = 4
+        previous_duration_arr = np.append(np.nan, previous_duration_arr[:-1])
     stim_name_arr = np.array(stim_info["stim_type"][stim_to_analyse.index])
     present_duration_arr = np.array(stim_info["Duration"][stim_to_analyse.index])
 
@@ -705,7 +716,7 @@ def main(thisDir, json_file):
         yaw_vector_limit = 3000
         y_axis_lim = [yaw_vector_limit * -1, yaw_vector_limit]
         ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
-        #if stim duration is a list, plot the max and min values
+        # if stim duration is a list, plot the max and min values
         if type(stim_duration) == list:
             frame_difference = (max(stim_duration) - min(stim_duration)) * camera_fps
             shortest_stim_end_frame = end_frame - frame_difference
@@ -801,10 +812,12 @@ def main(thisDir, json_file):
 
     return summary_df, velocity_arr, cum_yaw_rotation, travel_distance_whole_session
 
+
 if __name__ == "__main__":
-    #weird files 50525355565759606269727679 fixed by threshold 46 47 52 59 53 fixed by filtering trial in different way 4150556272
+    # weird files 50525355565759606269727679 fixed by threshold 46 47 52 59 53 fixed by filtering trial in different way 4150556272
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24021/240717/coherence/session1"  # good for checking fft
     thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()

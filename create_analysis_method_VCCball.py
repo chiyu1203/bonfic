@@ -4,6 +4,7 @@ file_name = "analysis_methods_dictionary.json"
 analysis_methods = {
     "experiment_name": "dots",
     "overwrite_curated_dataset": True,
+    "temperature_data_path": None,
     "graph_colour_code": ["r", "y", "m", "c", "k", "b", "g", "r"],
     "debug_mode": False,
     "fictrac_posthoc_analysis": False,
@@ -18,7 +19,7 @@ analysis_methods = {
     "load_experiment_condition_from_database": True,
     "select_animals_by_condition": True,
     "analysis_by_stimulus_type": False,
-    "camera_fps":144,
+    "camera_fps": 144,
     "trackball_radius": 40,
     "monitor_fps": 144,
     "stim_duration": 25,
@@ -36,7 +37,7 @@ analysis_methods = {
         100,
     ],
 }
-  # plue value representing clockwise, counterclockwise is minus, then the rest is coherence leve
+# plue value representing clockwise, counterclockwise is minus, then the rest is coherence leve
 json_string = json.dumps(analysis_methods, indent=1)
 with open(file_name, "w") as f:
     f.write(json_string)
