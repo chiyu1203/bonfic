@@ -4,7 +4,7 @@ file_name = "analysis_methods_dictionary.json"
 analysis_methods = {
     "exp_place": "MatrexVR",
     "experiment_name": "coherence",
-    "temperature_data_path": r"Z:\Users\chiyu\Zt611_locustVR_from10thJulyto25thJuly.txt",
+    "temperature_data_options": "el_usb",
     "overwrite_curated_dataset": True,
     "graph_colour_code": ["r", "y", "m", "c", "k", "b", "g", "r"],
     "debug_mode": False,

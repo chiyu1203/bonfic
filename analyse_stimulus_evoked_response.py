@@ -109,8 +109,11 @@ def analysis_stim_evoked_response_combo(
             monitor_fps,
         )
     else:
-        temp_tbt = np.zeros((stim_to_analyse.shape[0], 2))
-        humid_tbt = np.zeros((stim_to_analyse.shape[0], 2))
+        # Set zeros when there is no
+        temp_tbt = np.empty((stim_to_analyse.shape[0], 2))
+        temp_tbt[:] = np.nan
+        humid_tbt = np.empty((stim_to_analyse.shape[0], 2))
+        humid_tbt[:] = np.nan
     velocity = travel_distance_tbt * monitor_fps
     cum_yaw_rotation = np.cumsum(yaw_rotation_tbt, axis=1)
     opto_all_trials, opto_all_isi = probes_optomoro_index(
@@ -337,7 +340,7 @@ def main(thisDir, json_file):
     fictrac_posthoc_analysis = analysis_methods.get("fictrac_posthoc_analysis")
     align_with_isi_onset = analysis_methods.get("align_with_isi_onset")
     exp_place = analysis_methods.get("exp_place")
-    temperature_data_path = analysis_methods.get("temperature_data_path")
+    temperature_data_options = analysis_methods.get("temperature_data_options")
     # Here to set some environmental variables
     colormap_name = "coolwarm"
     COL = MplColorHelper(colormap_name, 0, 8)
@@ -392,9 +395,13 @@ def main(thisDir, json_file):
     if this_temp_directory:
         f = gzip.GzipFile(this_temp_directory, "r")
         tem_df_this_exp = np.load(f)
-    else:
+    elif temperature_data_options == None:
+        print("Temperature is not recorded in this experiment.")
+    elif temperature_data_options.lower() == "el_usb":
+        temperature_pattern = "temperature_humidity*.txt"
+        this_temp_directory = find_file(thisDir, temperature_pattern)
         try:
-            tem_df = load_temperature_data(txt_path=temperature_data_path)
+            tem_df = load_temperature_data(txt_path=this_temp_directory)
             start_time_tem = find_nearest(tem_df.index, test_dt)
             print(
                 tem_df[tem_df.index == start_time_tem]
@@ -416,7 +423,13 @@ def main(thisDir, json_file):
             else:
                 print("Unable to find the corresponding time stamp")
         except:
-            print("temperature file is not found")
+            print("raw temperature file is not found")
+    elif temperature_data_options.lower() == "bonsai":
+        print("work in progress. Get data from one of the bonsai file")
+    else:
+        print(
+            f"Unable to find a reasonable option: {temperature_data_options} to process temperature data"
+        )
 
     ##here to start analying stimulus-evoked response.
     ## if the tracking data is logged on bonsai (come from fictrac realtime). The file name is tracking_events...
@@ -816,7 +829,7 @@ def main(thisDir, json_file):
 if __name__ == "__main__":
     # weird files 50525355565759606269727679 fixed by threshold 46 47 52 59 53 fixed by filtering trial in different way 4150556272
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24021/240717/coherence/session1"  # good for checking fft
-    thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft
     thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"

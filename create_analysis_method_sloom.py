@@ -2,8 +2,10 @@ import json
 
 file_name = "analysis_methods_dictionary.json"
 analysis_methods = {
+    "exp_place": "VCCball",
     "experiment_name": "sweeploom",
     "overwrite_curated_dataset": True,
+    "temperature_data_options": None,
     "graph_colour_code": ["r", "y", "m", "c", "k", "b", "g", "r"],
     "debug_mode": False,
     "fictrac_posthoc_analysis": False,
@@ -18,7 +20,7 @@ analysis_methods = {
     "load_experiment_condition_from_database": True,
     "select_animals_by_condition": True,
     "analysis_by_stimulus_type": False,
-    "camera_fps":144,
+    "camera_fps": 144,
     "trackball_radius": 40,
     "monitor_fps": 144,
     "stim_duration": 4,

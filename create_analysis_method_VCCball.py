@@ -2,9 +2,10 @@ import json
 
 file_name = "analysis_methods_dictionary.json"
 analysis_methods = {
-    "experiment_name": "dots",
+    "exp_place": "VCCball",
+    "experiment_name": "coherence",
     "overwrite_curated_dataset": True,
-    "temperature_data_path": None,
+    "temperature_data_options": None,
     "graph_colour_code": ["r", "y", "m", "c", "k", "b", "g", "r"],
     "debug_mode": False,
     "fictrac_posthoc_analysis": False,

@@ -2,8 +2,10 @@ import json
 
 file_name = "analysis_methods_dictionary.json"
 analysis_methods = {
+    "exp_place": "Zball",
     "experiment_name": "coherence",
     "overwrite_curated_dataset": True,
+    "temperature_data_options": None,
     "graph_colour_code": ["r", "y", "m", "c", "k", "b", "g", "r"],
     "debug_mode": False,
     "fictrac_posthoc_analysis": True,
@@ -16,9 +18,9 @@ analysis_methods = {
     "plotting_deceleration_accerleration": False,
     "plotting_optomotor_response": True,
     "load_experiment_condition_from_database": True,
-    "select_animals_by_condition": True,
+    "select_animals_by_condition": False,
     "analysis_by_stimulus_type": False,
-    "camera_fps":100,
+    "camera_fps": 100,
     "trackball_radius": 50,
     "monitor_fps": 144,
     "stim_duration": 20,
