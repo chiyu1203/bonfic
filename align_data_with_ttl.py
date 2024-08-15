@@ -91,10 +91,16 @@ def hardcode_customised_thresholds(on_thresholds, off_thresholds, animal_id):
     elif animal_id == "GN24085":
         on_thresholds.append(430000)
         off_thresholds.append(430000)
+    elif animal_id == "GN24090":
+        on_thresholds.append(435000)
+        off_thresholds.append(435000)
+    elif animal_id == "GN24095":
+        on_thresholds.append(410000)
+        off_thresholds.append(410000)
     return on_thresholds, off_thresholds
 
 
-def fix_broken_ttl2(b2w, w2b):
+def fix_broken_ttl(b2w, w2b):
     duration_med = np.median(np.diff(b2w))
     num_stim_inbetween = np.round(np.diff(b2w) / duration_med)
     missing_onset = np.where(num_stim_inbetween.astype(int) >= 2)
@@ -177,30 +183,22 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods):
     up_phase = np.append(
         np.where(pass_threshold)[0][0],
         pass_threshold_index[1:][
-            np.diff(pass_threshold_index) > min_stim * 0.9 * sample_rate
+            np.diff(pass_threshold_index) > min_stim * 0.8 * sample_rate
         ],
     )
-    b2w = up_phase[up_phase > sample_rate * (pre_stim_interval - 10)]
+    b2w = up_phase[up_phase > sample_rate * (pre_stim_interval - 20)]
 
     pass_threshold = off_threshold > arr
     pass_threshold_index = np.where(pass_threshold)[0]
     down_phase = np.append(
         np.where(pass_threshold)[0][0],
         pass_threshold_index[1:][
-            np.diff(pass_threshold_index) > min_isi * 0.9 * sample_rate
+            np.diff(pass_threshold_index) > min_isi * 0.8 * sample_rate
         ],
     )
-    w2b = down_phase[down_phase > sample_rate * (pre_stim_interval - 10)]
+    w2b = down_phase[down_phase > sample_rate * (pre_stim_interval - 20)]
 
-    # pass_threshold = arr > on_threshold
-    # # transition = edge_detector(pass_threshold)
-    # b2w = find_transitions(pass_threshold)
-    # # set an arbitary threshold to remove any kind of instrumental noise in the first 30 secs, usually during pre-stim interval
-    # b2w = b2w[b2w > sample_rate * (pre_stim_interval - 10)]#this means recording needs to start within 10 mins after pressing S
 
-    # pass_threshold = off_threshold > arr
-    # w2b = find_transitions(pass_threshold)
-    # w2b = w2b[w2b > sample_rate * (pre_stim_interval - 10)]
     return b2w, w2b
     # =arr[transition]>0
     # bright = arr[arr > on_threshold]
@@ -351,6 +349,8 @@ def analyse_led_signal(thisDir, json_file, stim_info):
                     "GN24078",
                     "GN24084",
                     "GN24085",
+                    "GN24090",
+                    "GN24095",
                 ]:
                     on_thresholds, off_thresholds = hardcode_customised_thresholds(
                         on_thresholds, off_thresholds, animal_id
@@ -409,6 +409,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
             "GN24071",
             "GN24072",
             "GN24078",
+            "GN24101",
         ]:
             b2w = fill_dropframe_ttl(b2w, stim_info, analysis_methods)
             w2b = fill_dropframe_ttl(w2b, stim_info, analysis_methods)

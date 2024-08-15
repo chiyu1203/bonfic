@@ -3,7 +3,7 @@ import json
 file_name = "analysis_methods_dictionary.json"
 analysis_methods = {
     "exp_place": "MatrexVR",
-    "experiment_name": "coherence",
+    "experiment_name": "coherence",#or gratings
     "temperature_data_options": "el_usb",
     "overwrite_curated_dataset": True,
     "graph_colour_code": ["r", "y", "m", "c", "k", "b", "g", "r"],
@@ -26,17 +26,6 @@ analysis_methods = {
     "stim_duration": 20,
     "interval_duration": 10,
     "prestim_duration": 180,
-    "stim_type": [
-        -100,
-        -75,
-        -50,
-        -25,
-        0,
-        25,
-        50,
-        75,
-        100,
-    ],
 }  # plue value representing clockwise, counterclockwise is minus, then the rest is coherence leve
 json_string = json.dumps(analysis_methods, indent=1)
 with open(file_name, "w") as f:
