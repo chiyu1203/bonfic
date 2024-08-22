@@ -20,6 +20,7 @@ analysis_methods = {
     "load_experiment_condition_from_database": True,
     "select_animals_by_condition": True,
     "analysis_by_stimulus_type": False,
+    "optomotor_index_duration": 25,
     "camera_fps": 144,
     "trackball_radius": 40,
     "monitor_fps": 144,

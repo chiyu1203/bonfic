@@ -341,7 +341,10 @@ def main(thisDir, json_file):
     align_with_isi_onset = analysis_methods.get("align_with_isi_onset")
     exp_place = analysis_methods.get("exp_place")
     temperature_data_options = analysis_methods.get("temperature_data_options")
-    overwrite_curated_dataset= analysis_methods.get("overwrite_curated_dataset")
+    overwrite_curated_dataset = analysis_methods.get("overwrite_curated_dataset")
+    optomotor_range = (
+        int(analysis_methods.get("optomotor_index_duration") / 5) - 1
+    )  # minus 1 because index start from 0
     # Here to set some environmental variables
     colormap_name = "coolwarm"
     COL = MplColorHelper(colormap_name, 0, 8)
@@ -393,7 +396,7 @@ def main(thisDir, json_file):
         exp_time = exp_date + " " + exp_hour
         test_dt = pd.to_datetime(exp_time, format="%Y-%m-%d %H_%M_%S")
     tem_df_this_exp = []
-    if this_temp_directory and overwrite_curated_dataset==False:
+    if this_temp_directory and overwrite_curated_dataset == False:
         f = gzip.GzipFile(this_temp_directory, "r")
         tem_df_this_exp = np.load(f)
     elif temperature_data_options == None:
@@ -572,7 +575,9 @@ def main(thisDir, json_file):
             previous_duration_arr = np.array(
                 stim_info["Duration"][stim_info.loc[1::2, "stim_onset"].index]
             )
-        optomotor_range = 1
+        optomotor_range = (
+            1  # this is used to analyse the first 5 second response from the ISI
+        )
         previous_duration_arr = np.append(np.nan, previous_duration_arr[:-1])
     else:
         if (
@@ -589,7 +594,6 @@ def main(thisDir, json_file):
             previous_duration_arr = np.array(
                 stim_info["Duration"][stim_info.loc[::2, "stim_onset"].index]
             )
-        optomotor_range = 4
         previous_duration_arr = np.append(np.nan, previous_duration_arr[:-1])
     stim_name_arr = np.array(stim_info["stim_type"][stim_to_analyse.index])
     present_duration_arr = np.array(stim_info["Duration"][stim_to_analyse.index])
@@ -727,7 +731,7 @@ def main(thisDir, json_file):
             linestyle="--",
             label="Stimulus Ends",
         )
-        yaw_vector_limit = 3000
+        yaw_vector_limit = 5000
         y_axis_lim = [yaw_vector_limit * -1, yaw_vector_limit]
         ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
         # if stim duration is a list, plot the max and min values
@@ -814,7 +818,7 @@ def main(thisDir, json_file):
 
     if analysis_methods.get("debug_mode") == True:
         print("Nothing is saved in the debug mode. Move to the next animal")
-    elif overwrite_curated_dataset==True:
+    elif overwrite_curated_dataset == True:
         summary_file_name = Path(thisDir) / "behavioural_summary.pickle"
         summary_df.to_pickle(summary_file_name)
         velocity_file_name = Path(thisDir) / "velocity_tbt.npy"
@@ -831,10 +835,11 @@ def main(thisDir, json_file):
 
 if __name__ == "__main__":
     # weird files 50525355565759606269727679 fixed by threshold 46 47 52 59 53 fixed by filtering trial in different way 4150556272
-    #thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24021/240717/coherence/session1"  # good for checking fft
-    #thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24101\240811\coherence\session1"
-    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24021/240717/coherence/session1"  # good for checking fft
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24114\240811\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24036\240801\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
