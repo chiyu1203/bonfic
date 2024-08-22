@@ -13,7 +13,7 @@ def hardcode_customised_thresholds(on_thresholds, off_thresholds, animal_id):
     if animal_id == "GN24032":
         on_thresholds.append(198450)
         off_thresholds.append(198450)
-    elif animal_id == "GN24034":
+    elif animal_id in ["GN24041", "GN24074", "GN24102"]:
         on_thresholds.append(429000)
         off_thresholds.append(429000)
     elif animal_id == "GN24036":
@@ -22,76 +22,32 @@ def hardcode_customised_thresholds(on_thresholds, off_thresholds, animal_id):
     elif animal_id == "GN24029":
         on_thresholds.append(623575)
         off_thresholds.append(623575)
-    elif animal_id == "GN24039":
+    elif animal_id in ["GN24039", "GN24043", "GN24047"]:
         on_thresholds.append(420000)
         off_thresholds.append(420000)
-    elif animal_id == "GN24041":
-        on_thresholds.append(429000)
-        off_thresholds.append(429000)
-    elif animal_id == "GN24043":
-        on_thresholds.append(420000)
-        off_thresholds.append(420000)
-    elif animal_id == "GN24046":
+    elif animal_id in [
+        "GN24046",
+        "GN24052",
+        "GN24053",
+        "GN24055",
+        "GN24065",
+        "GN24084",
+        "GN24085",
+        "GN24066",
+        "GN24034",
+    ]:
         on_thresholds.append(430000)
         off_thresholds.append(430000)
-    elif animal_id == "GN24047":
-        on_thresholds.append(420000)
-        off_thresholds.append(420000)
-    elif animal_id == "GN24050":
-        on_thresholds.append(435000)
-        off_thresholds.append(435000)
-    elif animal_id == "GN24052":
-        on_thresholds.append(430000)
-        off_thresholds.append(430000)
-    elif animal_id == "GN24053":
-        on_thresholds.append(430000)
-        off_thresholds.append(430000)
-    elif animal_id == "GN24055":
-        on_thresholds.append(430000)
-        off_thresholds.append(430000)
-    elif animal_id == "GN24062":
+    elif animal_id in ["GN24062", "GN24064", "GN24072"]:
         on_thresholds.append(440000)
         off_thresholds.append(440000)
-    elif animal_id == "GN24064":
-        on_thresholds.append(440000)
-        off_thresholds.append(440000)
-    elif animal_id == "GN24065":
-        on_thresholds.append(430000)
-        off_thresholds.append(430000)
-    elif animal_id == "GN24066":
-        on_thresholds.append(428000)
-        off_thresholds.append(428000)
-    elif animal_id == "GN24069":
-        on_thresholds.append(424000)
-        off_thresholds.append(424000)
     elif animal_id == "GN24070":
         on_thresholds.append(442000)
         off_thresholds.append(442000)
-    elif animal_id == "GN24071":
+    elif animal_id in ["GN24071", "GN24075", "GN24069"]:
         on_thresholds.append(425000)
         off_thresholds.append(425000)
-    elif animal_id == "GN24072":
-        on_thresholds.append(441000)
-        off_thresholds.append(441000)
-    elif animal_id == "GN24073":
-        on_thresholds.append(450000)
-        off_thresholds.append(450000)
-    elif animal_id == "GN24074":
-        on_thresholds.append(429000)
-        off_thresholds.append(429000)
-    elif animal_id == "GN24075":
-        on_thresholds.append(425000)
-        off_thresholds.append(425000)
-    elif animal_id == "GN24078":
-        on_thresholds.append(435000)
-        off_thresholds.append(435000)
-    elif animal_id == "GN24084":
-        on_thresholds.append(430000)
-        off_thresholds.append(430000)
-    elif animal_id == "GN24085":
-        on_thresholds.append(430000)
-        off_thresholds.append(430000)
-    elif animal_id == "GN24090":
+    elif animal_id in ["GN24078", "GN24090", "GN24050"]:
         on_thresholds.append(435000)
         off_thresholds.append(435000)
     elif animal_id == "GN24095":
@@ -197,7 +153,6 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods):
         ],
     )
     w2b = down_phase[down_phase > sample_rate * (pre_stim_interval - 20)]
-
 
     return b2w, w2b
     # =arr[transition]>0
@@ -351,6 +306,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
                     "GN24085",
                     "GN24090",
                     "GN24095",
+                    "GN24102",
                 ]:
                     on_thresholds, off_thresholds = hardcode_customised_thresholds(
                         on_thresholds, off_thresholds, animal_id
@@ -410,6 +366,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
             "GN24072",
             "GN24078",
             "GN24101",
+            "GN24106",
         ]:
             b2w = fill_dropframe_ttl(b2w, stim_info, analysis_methods)
             w2b = fill_dropframe_ttl(w2b, stim_info, analysis_methods)
