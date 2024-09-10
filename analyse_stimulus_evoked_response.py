@@ -26,17 +26,6 @@ from useful_tools import find_file, find_nearest, calculate_fft
 from data_cleaning import sorting_trial_info, load_temperature_data
 
 
-# custom_cmap = [
-#     [1, 0, 0, 1],
-#     [0.8, 0, 0.2, 0.1],
-#     [0.75, 0, 0.25, 0.05],
-#     [0.7, 0, 0.3, 0.02],
-#     [0.5, 0, 0.5, 0.02],
-#     [0.3, 0, 0.7, 0.02],
-#     [0.25, 0, 0.75, 0.05],
-#     [0.2, 0, 0.8, 0.1],
-#     [0, 0, 1, 1],
-# ]
 class MplColorHelper:
     def __init__(self, cmap_name, start_val, stop_val):
         self.cmap_name = cmap_name
@@ -67,15 +56,16 @@ def analysis_stim_evoked_response_combo(
     travel_distance_fbf,
     tem_df_this_exp,
     analysis_window,
-    monitor_fps,
+    camera_fps,
     optomotor_range,
+    isi_response_def=5,
 ):
     (
         yaw_rotation_tbt,
         init_frame,
         end_frame,
     ) = extract_stim_locked_data(
-        stim_to_analyse, yaw_rotation_vector, analysis_window, monitor_fps
+        stim_to_analyse, yaw_rotation_vector, analysis_window, camera_fps
     )
     (
         travel_distance_tbt,
@@ -85,7 +75,7 @@ def analysis_stim_evoked_response_combo(
         stim_to_analyse,
         travel_distance_fbf,
         analysis_window,
-        monitor_fps,
+        camera_fps,
     )
     if len(tem_df_this_exp) > 0:
         (
@@ -96,7 +86,7 @@ def analysis_stim_evoked_response_combo(
             stim_to_analyse,
             tem_df_this_exp[:, 0],
             analysis_window,
-            monitor_fps,
+            camera_fps,
         )
         (
             humid_tbt,
@@ -106,7 +96,7 @@ def analysis_stim_evoked_response_combo(
             stim_to_analyse,
             tem_df_this_exp[:, 1],
             analysis_window,
-            monitor_fps,
+            camera_fps,
         )
     else:
         # Set zeros when there is no
@@ -114,15 +104,22 @@ def analysis_stim_evoked_response_combo(
         temp_tbt[:] = np.nan
         humid_tbt = np.empty((stim_to_analyse.shape[0], 2))
         humid_tbt[:] = np.nan
-    velocity = travel_distance_tbt * monitor_fps
+
+    #######Note: opto_index_isi and travel_distance is defined based on responses during the 5 sec window prior the stimulus;
+    ####### whereas the summarised jaw, velocity arrays include values starting from minimal length of ISI prior to the stimulus
+    velocity = travel_distance_tbt * camera_fps
     cum_yaw_rotation = np.cumsum(yaw_rotation_tbt, axis=1)
     opto_all_trials, opto_all_isi = probes_optomoro_index(
-        yaw_rotation_tbt, init_frame, monitor_fps
+        yaw_rotation_tbt, init_frame, camera_fps, isi_response_def
     )
     cum_travel_distance = np.cumsum(travel_distance_tbt, axis=1)
-    travel_distance_prior_stim = cum_travel_distance[:, init_frame, 0]
+    travel_distance_ISI = cum_travel_distance[:, init_frame, 0]
+    travel_distance_prior_stim = (
+        cum_travel_distance[:, init_frame, 0]
+        - cum_travel_distance[:, isi_response_def * camera_fps, 0]
+    )
     travel_distance_during_stim = (
-        cum_travel_distance[:, end_frame, 0] - travel_distance_prior_stim
+        cum_travel_distance[:, end_frame, 0] - travel_distance_ISI
     )
 
     summary_list = {
@@ -149,9 +146,9 @@ def analysis_stim_evoked_response_combo(
 def deceleration_detection(v_array=[], *args):
     # Set initial values for variables
     init_frame = args[0]
-    monitor_fps = args[1]
+    camera_fps = args[1]
     presence_duration = args[2]
-    fir_half = int(init_frame + 0.5 * monitor_fps)
+    fir_half = int(init_frame + 0.5 * camera_fps)
 
     # Calculate mean and standard deviation of initial velocity values
     V0 = v_array[:, init_frame:fir_half]
@@ -163,11 +160,11 @@ def deceleration_detection(v_array=[], *args):
 
     # Calculate velocity of interest and create a threshold matrix
     velocity_of_interest = v_array[
-        :, fir_half : fir_half + presence_duration * monitor_fps
+        :, fir_half : fir_half + presence_duration * camera_fps
     ]
     dece_big = np.reshape(
-        np.repeat(deceleration_threshold, presence_duration * monitor_fps, axis=0),
-        (len(deceleration_threshold), presence_duration * monitor_fps),
+        np.repeat(deceleration_threshold, presence_duration * camera_fps, axis=0),
+        (len(deceleration_threshold), presence_duration * camera_fps),
     )
 
     # Check for deceleration onset and return the onset time
@@ -212,35 +209,38 @@ def extract_stim_locked_data(
     stim_to_analyse,
     data,
     analysis_window,
-    monitor_fps,
+    camera_fps,
 ):
     # print(f"plotting data from {analysis_window[0]} to {analysis_window[1]}")
 
     init_time = abs(analysis_window[0])
-    init_frame = init_time * monitor_fps
-    end_frame = analysis_window[1] * monitor_fps
-    index_points = generate_index_points(stim_to_analyse, analysis_window, monitor_fps)
+    init_frame = init_time * camera_fps
+    end_frame = analysis_window[1] * camera_fps
+    index_points = generate_index_points(stim_to_analyse, analysis_window, camera_fps)
     stim_locked_data = data[index_points]
     return stim_locked_data, init_frame, end_frame
 
 
-def probes_optomoro_index(yaw_rotation_tbt, init_frame, monitor_fps):
+def probes_optomoro_index(yaw_rotation_tbt, init_frame, camera_fps, isi_response_def=5):
     sec_thres_min = 5
     sec_thres_max = 30
     sec_steps = 5
+    ## limit the analysis of ISI response in 5 sec prior to the stimulus presentation.
+    isi_start_frame = init_frame - camera_fps * isi_response_def
     opto_all_trials = np.ones((yaw_rotation_tbt.shape[0], 5))
     opto_all_isi = np.ones((yaw_rotation_tbt.shape[0], 1))
+
     ## when quantifying optomotor response, we focus on only stimulus onset so using init_frame:end_frame
     # this is a function to systematically calculate optomotor index based on jaw rotation vector
     for j, analysis_length in enumerate(range(sec_thres_min, sec_thres_max, sec_steps)):
-        this_end = init_frame + analysis_length * monitor_fps
+        this_end = init_frame + analysis_length * camera_fps
         for i in range(0, yaw_rotation_tbt.shape[0]):
             opto_all_trials[i, j] = optomotor_response_idx(
                 yaw_rotation_tbt[i, init_frame:this_end, 0]
             )
             if j == 0:
                 opto_all_isi[i, j] = optomotor_response_idx(
-                    yaw_rotation_tbt[i, :init_frame, 0]
+                    yaw_rotation_tbt[i, isi_start_frame:init_frame, 0]
                 )
     return opto_all_trials, opto_all_isi
 
@@ -300,14 +300,14 @@ def classify_trial_type(summary_df, turning_threshold, running_speed_threshold):
         follow_count = tmp.values[:, 0]
 
 
-def generate_index_points(stim_to_analyse, analysis_window, monitor_fps):
+def generate_index_points(stim_to_analyse, analysis_window, camera_fps):
     window_length = analysis_window[1] - analysis_window[0]
     interval_onset = (
         stim_to_analyse
-        + np.ones(len(stim_to_analyse), dtype=int) * analysis_window[0] * monitor_fps
+        + np.ones(len(stim_to_analyse), dtype=int) * analysis_window[0] * camera_fps
     )
     analysie_window_tile = np.tile(
-        np.arange(window_length * monitor_fps), (len(interval_onset), 1)
+        np.arange(window_length * camera_fps), (len(interval_onset), 1)
     )
     index_points = (
         np.array(interval_onset).reshape(len(interval_onset), 1) + analysie_window_tile
@@ -530,13 +530,13 @@ def main(thisDir, json_file):
         # While duration consists of more than two int, use the largest one to set analysis window
         if type(interval_duration) == list and type(stim_duration) == list:
             analysis_window = [
-                max(interval_duration) * -1,
-                max(stim_duration) + max(interval_duration),
+                min(interval_duration) * -1,
+                max(stim_duration) + min(interval_duration),
             ]
         elif type(interval_duration) == list:
             analysis_window = [
-                max(interval_duration) * -1,
-                stim_duration + max(interval_duration),
+                min(interval_duration) * -1,
+                stim_duration + min(interval_duration),
             ]
         elif type(stim_duration) == list:
             analysis_window = [
@@ -611,7 +611,7 @@ def main(thisDir, json_file):
         travel_distance_fbf,
         tem_df_this_exp,
         analysis_window,
-        monitor_fps,
+        camera_fps,
         optomotor_range,
     )
     # add trial info to summary_df
@@ -625,21 +625,30 @@ def main(thisDir, json_file):
     #     fft_power, freq_axis = calculate_fft(velocity_arr[-i, :], camera_fps)
 
     if analysis_methods.get("plotting_tbt_overview") == True:
-        ##arrange xticks at onset and offset of the stimulus for heatmap
-        # trial_num_across_stim=np.cumsum(trial_num)
-        fig1, (ax, ax1, ax2) = plt.subplots(
-            nrows=1, ncols=3, figsize=(18, 7), tight_layout=True
-        )
-        # ax.hist(optomotor_response_during_stim, bins=20)
+        fig1 = plt.figure(figsize=(18, 7), tight_layout=True)
+
+        ax = plt.subplot(231)
         ax.hist(summary_df["opto_index"].values, bins=20)
-        ax.set_xlabel("optomotor index")
+        # ax.set_xlabel("optomotor index")
         ax.set_ylabel("frequency")
         ax.set_title("optomotor response during stimulus presentation")
+        ax3 = plt.subplot(234)
+        ax3.hist(summary_df["opto_index_isi"].values, bins=20)
+        ax3.set_xlabel("optomotor index")
+        ax3.set_ylabel("frequency")
+        ax3.set_title("optomotor response 5 sec prior to the stimulus")
         # ax1.hist(travel_distance_during_stim, bins=20)
+        ax1 = plt.subplot(232)
         ax1.hist(summary_df["travel_distance"].values, bins=20)
-        ax1.set_xlabel("travel distance (mm)")
-        ax1.set_ylabel("frequency")
+        # ax1.set_xlabel("travel distance (mm)")
+        # ax1.set_ylabel("frequency")
         ax1.set_title("travel distance during stimulus presentation")
+        ax4 = plt.subplot(235)
+        ax4.hist(summary_df["travel_distance_isi"].values, bins=20)
+        ax4.set_xlabel("travel distance (mm)")
+        # ax4.set_ylabel("frequency")
+        ax4.set_title("travel distance 5 sec prior to the stimulus")
+
         ## draw subplot2
         if analysis_methods.get("analysis_by_stimulus_type") == True:
             velocity_sorted_list = []
@@ -651,6 +660,7 @@ def main(thisDir, json_file):
                 )
             tmp = np.hstack(velocity_sorted_list)
             velocity_arr = tmp[0, :, :]
+        ax2 = plt.subplot(2, 3, (3, 6))
         pcm = ax2.pcolormesh(velocity_arr, cmap="magma", vmin=0, vmax=100)
         # pcm=ax2.pcolormesh(velocity_tbt, cmap = 'magma') ##sometimes, we dont need a vmax
         ## add colorbar
@@ -670,8 +680,26 @@ def main(thisDir, json_file):
             linestyle="--",
             label="Stimulus Ends",
         )
-        ax2.set_xticks([init_frame])
-        ax2.set_xticklabels(["0"])
+        if type(stim_duration) == list:
+            frame_difference = (max(stim_duration) - min(stim_duration)) * camera_fps
+            shortest_stim_end_frame = end_frame - frame_difference
+            xticks = [0, init_frame, shortest_stim_end_frame, end_frame]
+            xticklabels = [
+                str(analysis_window[0]),
+                "0",
+                str(min(stim_duration)),
+                str(max(stim_duration)),
+            ]
+        else:
+            xticks = [init_frame, end_frame]
+            xticklabels = ["0", str(stim_duration)]
+        ax2.set(
+            xticks=xticks,
+            xticklabels=xticklabels,
+            xlabel="Time (s)",
+        )
+        # ax2.set_xticks([init_frame])
+        # ax2.set_xticklabels(["0"])
         ax2.set_xlabel("Time (s)")
         ## add title
         ax2.set_title("stimulus evoked velocity preview")
@@ -731,7 +759,7 @@ def main(thisDir, json_file):
             linestyle="--",
             label="Stimulus Ends",
         )
-        yaw_vector_limit = 5000
+        yaw_vector_limit = 8000
         y_axis_lim = [yaw_vector_limit * -1, yaw_vector_limit]
         ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
         # if stim duration is a list, plot the max and min values
@@ -767,7 +795,7 @@ def main(thisDir, json_file):
 
     if analysis_methods.get("plotting_deceleration_accerleration") == True:
         travel_distance_after_stim_presence = cum_travel_distance[
-            :, init_frame + presence_duration * monitor_fps
+            :, init_frame + presence_duration * camera_fps
         ]
         travel_distance_1sec_prior_stim = (
             cum_travel_distance[:, init_frame] - cum_travel_distance[:, 0]
@@ -778,7 +806,7 @@ def main(thisDir, json_file):
             travel_distance_after_stim_presence[running_trial]
         )
         travel_distance_1sec_post_stim = (
-            cum_travel_distance[running_trial, init_frame + 1 * monitor_fps]
+            cum_travel_distance[running_trial, init_frame + 1 * camera_fps]
             - cum_travel_distance[running_trial, init_frame]
         )
         run_type1 = running_velocity[
@@ -791,18 +819,18 @@ def main(thisDir, json_file):
         )
         trial_to_analyse = run_type1
         detected_bool = deceleration_detection(
-            trial_to_analyse, init_frame, monitor_fps, presence_duration
+            trial_to_analyse, init_frame, camera_fps, presence_duration
         )
         dec_trial_id = detected_bool[0]
         # this reverse the frame number back so the output is the frame number no. at the detection window
-        de_test = monitor_fps * presence_duration - detected_bool[1]
+        de_test = camera_fps * presence_duration - detected_bool[1]
         ##remove trials that the true value is outside this 1-sec window
-        dev_timing = de_test[de_test != monitor_fps * presence_duration]
-        dev_trial_id = dec_trial_id[de_test != monitor_fps * presence_duration]
+        dev_timing = de_test[de_test != camera_fps * presence_duration]
+        dev_trial_id = dec_trial_id[de_test != camera_fps * presence_duration]
         dev_timing_from_analysis_window = (
             dev_timing
             + init_frame
-            + (0.5 * presence_duration + abs(analysis_window[0])) * monitor_fps
+            + (0.5 * presence_duration + abs(analysis_window[0])) * camera_fps
         )
         # dev_timing_from_stim_presence = (
         #     dev_timing / monitor_fps + 0.5 * presence_duration + init_time
@@ -835,10 +863,13 @@ def main(thisDir, json_file):
 
 if __name__ == "__main__":
     # weird files 50525355565759606269727679 fixed by threshold 46 47 52 59 53 fixed by filtering trial in different way 4150556272
+    # GN24098 seems not follow the dot motion
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24021/240717/coherence/session1"  # good for checking fft
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24114\240811\coherence\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24036\240801\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24098\240810\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24089\240810\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24036\240801\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
