@@ -347,7 +347,6 @@ def main(thisDir, json_file):
     )  # minus 1 because index start from 0
     # Here to set some environmental variables
     colormap_name = "coolwarm"
-    COL = MplColorHelper(colormap_name, 0, 8)
     sm = cm.ScalarMappable(cmap=colormap_name)
     running_speed_threshold = 50
     turning_threshold = 0.33
@@ -709,6 +708,7 @@ def main(thisDir, json_file):
         plt.show()
 
     if analysis_methods.get("plotting_optomotor_response") == True:
+        COL = MplColorHelper(colormap_name, 0, len(stim_type))
         # colormap = np.array(["k", "y", "m", "c", "r", "b", "g", "k"])
         fig2, (ax3, ax4) = plt.subplots(
             nrows=1, ncols=2, figsize=(18, 7), tight_layout=True
