@@ -52,7 +52,7 @@ def a_guest(x):
 
 def analysis_stim_evoked_response_combo(
     stim_to_analyse,
-    yaw_rotation_vector,
+    yaw_angular_velocity,
     travel_distance_fbf,
     tem_df_this_exp,
     analysis_window,
@@ -65,7 +65,7 @@ def analysis_stim_evoked_response_combo(
         init_frame,
         end_frame,
     ) = extract_stim_locked_data(
-        stim_to_analyse, yaw_rotation_vector, analysis_window, camera_fps
+        stim_to_analyse, yaw_angular_velocity, analysis_window, camera_fps
     )
     (
         travel_distance_tbt,
@@ -108,7 +108,7 @@ def analysis_stim_evoked_response_combo(
     #######Note: opto_index_isi and travel_distance is defined based on responses during the 5 sec window prior the stimulus;
     ####### whereas the summarised jaw, velocity arrays include values starting from minimal length of ISI prior to the stimulus
     velocity = travel_distance_tbt * camera_fps
-    cum_yaw_rotation = np.cumsum(yaw_rotation_tbt, axis=1)
+    cum_yaw_rotation = np.cumsum(yaw_rotation_tbt, axis=1) / camera_fps
     opto_all_trials, opto_all_isi = probes_optomoro_index(
         yaw_rotation_tbt, init_frame, camera_fps, isi_response_def
     )
@@ -371,7 +371,9 @@ def main(thisDir, json_file):
         x_all = df.loc[:, ["intergrated x position"]]
         y_all = df.loc[:, ["intergrated y position"]]
     ## here write an additional function to classify stationary, moving and total travel distance
-    yaw_rotation_vector = df.loc[:, ["delta rotation vector lab z"]].values
+    yaw_angular_velocity = df.loc[
+        :, ["delta rotation vector lab z"]
+    ].values  # unit is radian/s
     travel_distance_fbf = np.sqrt(
         np.add(np.square(np.diff(x_all, axis=0)), np.square(np.diff(y_all, axis=0)))
     )
@@ -606,7 +608,7 @@ def main(thisDir, json_file):
         end_frame,
     ) = analysis_stim_evoked_response_combo(
         stim_to_analyse,
-        yaw_rotation_vector,
+        yaw_angular_velocity,
         travel_distance_fbf,
         tem_df_this_exp,
         analysis_window,
@@ -761,7 +763,7 @@ def main(thisDir, json_file):
         )
         yaw_vector_limit = 8000
         y_axis_lim = [yaw_vector_limit * -1, yaw_vector_limit]
-        ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
+        # ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
         # if stim duration is a list, plot the max and min values
         if type(stim_duration) == list:
             frame_difference = (max(stim_duration) - min(stim_duration)) * camera_fps
@@ -778,7 +780,8 @@ def main(thisDir, json_file):
             xticklabels = [str(analysis_window[0]), "0", str(stim_duration)]
         ax4.set(
             yticks=[y_axis_lim[0], 0, y_axis_lim[1]],
-            ylabel="Cumulative Rotation Velocity(sec)",
+            ylim=[y_axis_lim[0], y_axis_lim[1]],
+            ylabel="Orientation (rad)",
             xticks=xticks,
             xticklabels=xticklabels,
             xlabel="Time (s)",
