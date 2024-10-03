@@ -10,6 +10,7 @@ analyis methods needs to tell us what to analye. For example optomotor response,
 import json, sys, re, time, warnings, gzip
 import pandas as pd
 import numpy as np
+from scipy.io import savemat
 from scipy.signal import savgol_filter
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
@@ -761,8 +762,8 @@ def main(thisDir, json_file):
             linestyle="--",
             label="Stimulus Ends",
         )
-        yaw_vector_limit = 8000
-        y_axis_lim = [yaw_vector_limit * -1, yaw_vector_limit]
+        yaw_orientation_limit = 150
+        y_axis_lim = [yaw_orientation_limit * -1, yaw_orientation_limit]
         # ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
         # if stim duration is a list, plot the max and min values
         if type(stim_duration) == list:
@@ -852,6 +853,10 @@ def main(thisDir, json_file):
     elif overwrite_curated_dataset == True:
         summary_file_name = Path(thisDir) / "behavioural_summary.pickle"
         summary_df.to_pickle(summary_file_name)
+        # data_dict = summary_df.to_dict()
+        data_dict = {name: col.values for name, col in summary_df.items()}
+        summary_file_name = Path(thisDir) / "behavioural_summary.mat"
+        savemat(summary_file_name, data_dict)
         velocity_file_name = Path(thisDir) / "velocity_tbt.npy"
         with open(velocity_file_name, "wb") as f:
             np.save(f, velocity_arr)
@@ -871,7 +876,8 @@ if __name__ == "__main__":
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24114\240811\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24098\240810\coherence\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24089\240810\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24089\240810\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24064\240803\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24036\240801\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
