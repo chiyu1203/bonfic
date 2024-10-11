@@ -343,6 +343,7 @@ def main(thisDir, json_file):
     exp_place = analysis_methods.get("exp_place")
     temperature_data_options = analysis_methods.get("temperature_data_options")
     overwrite_curated_dataset = analysis_methods.get("overwrite_curated_dataset")
+    save_output = analysis_methods.get("save_output")
     optomotor_range = (
         int(analysis_methods.get("optomotor_index_duration") / 5) - 1
     )  # minus 1 because index start from 0
@@ -419,13 +420,13 @@ def main(thisDir, json_file):
                     f"{frequency_milisecond}L"
                 ).interpolate()
                 tem_df_this_exp = tem_df_after_exp[: df.shape[0]].values[:, 0:2]
-                if analysis_methods.get("debug_mode") == True:
-                    print("Nothing is saved in the debug mode. Move to the next animal")
-                else:
+                if save_output == True:
                     np_file_name = Path(thisDir) / "temperature_humidity.npy.gz"
                     f = gzip.GzipFile(np_file_name, "w")
                     np.save(file=f, arr=tem_df_this_exp)
                     f.close()
+                else:
+                    print("Nothing is saved in the debug mode. Move to the next animal")
             else:
                 print("Unable to find the corresponding time stamp")
         except:
@@ -530,26 +531,29 @@ def main(thisDir, json_file):
         or visual_paradigm_name == "gratings"
     ):
         # While duration consists of more than two int, use the largest one to set analysis window
-        if type(interval_duration) == list and type(stim_duration) == list:
-            analysis_window = [
-                min(interval_duration) * -1,
-                max(stim_duration) + min(interval_duration),
-            ]
-        elif type(interval_duration) == list:
-            analysis_window = [
-                min(interval_duration) * -1,
-                stim_duration + min(interval_duration),
-            ]
-        elif type(stim_duration) == list:
-            analysis_window = [
-                interval_duration * -1,
-                max(stim_duration) + interval_duration,
-            ]
+        if analysis_methods.get("analysis_window") == None:
+            if type(interval_duration) == list and type(stim_duration) == list:
+                analysis_window = [
+                    min(interval_duration) * -1,
+                    max(stim_duration) + min(interval_duration),
+                ]
+            elif type(interval_duration) == list:
+                analysis_window = [
+                    min(interval_duration) * -1,
+                    stim_duration + min(interval_duration),
+                ]
+            elif type(stim_duration) == list:
+                analysis_window = [
+                    interval_duration * -1,
+                    max(stim_duration) + interval_duration,
+                ]
+            else:
+                analysis_window = [
+                    interval_duration * -1,
+                    stim_duration + interval_duration,
+                ]
         else:
-            analysis_window = [
-                interval_duration * -1,
-                stim_duration + interval_duration,
-            ]
+            analysis_window = analysis_methods.get("analysis_window")
     else:
         print(
             "visual paradigm name does not match with available options. Please check"
@@ -574,13 +578,15 @@ def main(thisDir, json_file):
                 interval_duration * -1,
                 interval_duration * 2,
             ]
-            previous_duration_arr = np.array(
+            ISI_duration = np.array(
                 stim_info["Duration"][stim_info.loc[1::2, "stim_onset"].index]
             )
         optomotor_range = (
             1  # this is used to analyse the first 5 second response from the ISI
         )
-        previous_duration_arr = np.append(np.nan, previous_duration_arr[:-1])
+        preStim_ISI_duration = np.append(
+            analysis_methods.get("prestim_duration"), ISI_duration[:-1]
+        )
     else:
         if (
             visual_paradigm_name == "gratings"
@@ -588,15 +594,17 @@ def main(thisDir, json_file):
             or visual_paradigm_name.endswith("sities")
         ):
             stim_to_analyse = stim_info["stim_onset"]
-            previous_duration_arr = np.array(
-                stim_info["Duration"][stim_info.loc[:, "stim_onset"].index]
+            ISI_duration = np.repeat(
+                analysis_methods.get("interval_duration"), stim_to_analyse.shape[0]
+            )
+            preStim_ISI_duration = np.append(
+                analysis_methods.get("prestim_duration"), ISI_duration[:-1]
             )
         else:
             stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
-            previous_duration_arr = np.array(
+            preStim_ISI_duration = np.array(
                 stim_info["Duration"][stim_info.loc[::2, "stim_onset"].index]
             )
-        previous_duration_arr = np.append(np.nan, previous_duration_arr[:-1])
     stim_name_arr = np.array(stim_info["stim_type"][stim_to_analyse.index])
     present_duration_arr = np.array(stim_info["Duration"][stim_to_analyse.index])
 
@@ -619,7 +627,7 @@ def main(thisDir, json_file):
     # add trial info to summary_df
     summary_df["stim_type"] = stim_name_arr
     summary_df["present_trial_duration"] = present_duration_arr
-    summary_df["previous_trial_duration"] = previous_duration_arr
+    summary_df["preStim_ISI_duration"] = preStim_ISI_duration
 
     print("ready to plot graph with some data and decompose those lists")
     ##use fft to classify trials where animals jump. So far this method can be used to detect some obvious jumps but there might be some miss detecting
@@ -706,7 +714,7 @@ def main(thisDir, json_file):
         ## add title
         ax2.set_title("stimulus evoked velocity preview")
         plot_name = "optomotor_overview.png"
-        if analysis_methods.get("debug_mode") == False:
+        if save_output == True:
             fig1.savefig(Path(thisDir) / plot_name)
         plt.show()
 
@@ -793,7 +801,7 @@ def main(thisDir, json_file):
         cbar.set_ticklabels(tick_labels)
 
         plot_name = f"optomotor_analysis_until{(optomotor_range+1)*5}s.png"
-        if analysis_methods.get("debug_mode") == False:
+        if save_output == True:
             fig2.savefig(Path(thisDir) / plot_name)
         plt.show()
 
@@ -848,9 +856,7 @@ def main(thisDir, json_file):
             index_list - dev_timing_from_analysis_window
         )  # this normalise the recovery duration from the first deceleration
 
-    if analysis_methods.get("debug_mode") == True:
-        print("Nothing is saved in the debug mode. Move to the next animal")
-    elif overwrite_curated_dataset == True:
+    if save_output == True and overwrite_curated_dataset == True:
         summary_file_name = Path(thisDir) / "behavioural_summary.pickle"
         summary_df.to_pickle(summary_file_name)
         # data_dict = summary_df.to_dict()
@@ -863,8 +869,11 @@ def main(thisDir, json_file):
         file_name = Path(thisDir) / "cum_jaw_rotation.npy"
         with open(file_name, "wb") as f:
             np.save(f, cum_yaw_rotation)
-    else:
+        print("Nothing is saved in the debug mode. Move to the next animal")
+    elif overwrite_curated_dataset == False:
         print(f"dont overwrite existing database.")
+    else:
+        print("dont save anything")
 
     return summary_df, velocity_arr, cum_yaw_rotation, travel_distance_whole_session
 
@@ -877,9 +886,9 @@ if __name__ == "__main__":
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24114\240811\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24098\240810\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24089\240810\coherence\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24064\240803\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24064\240803\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24036\240801\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
