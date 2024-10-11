@@ -7,7 +7,7 @@ analysis_methods = {
     "overwrite_curated_dataset": True,
     "temperature_data_options": None,
     "graph_colour_code": ["r", "y", "m", "c", "k", "b", "g", "r"],
-    "debug_mode": False,
+    "save_output": False,
     "fictrac_posthoc_analysis": False,
     "use_led_to_align_stimulus_timing": True,
     "align_with_isi_onset": False,
