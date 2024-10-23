@@ -11,6 +11,7 @@ analysis_methods = {
     "fictrac_posthoc_analysis": True,
     "use_led_to_align_stimulus_timing": True,
     "align_with_isi_onset": False,
+    "active_trials_only": True,
     "filtering_method": "sg_filter",
     "plotting_tbt_overview": True,
     "plotting_trajectory": False,

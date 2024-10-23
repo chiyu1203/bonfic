@@ -118,7 +118,7 @@ def analysis_stim_evoked_response_combo(
     travel_distance_prior_stim = (
         cum_travel_distance[:, init_frame, 0]
         - cum_travel_distance[:, isi_response_def * camera_fps, 0]
-    )
+    )  ##remove the initial five sec during isi
     travel_distance_during_stim = (
         cum_travel_distance[:, end_frame, 0] - travel_distance_ISI
     )
@@ -886,9 +886,9 @@ if __name__ == "__main__":
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24114\240811\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24098\240810\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24089\240810\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24064\240803\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24064\240803\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24036\240801\coherence\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
