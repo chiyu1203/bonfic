@@ -108,12 +108,12 @@ def analysis_stim_evoked_response_combo(
 
     #######Note: opto_index_isi and travel_distance is defined based on responses during the 5 sec window prior the stimulus;
     ####### whereas the summarised jaw, velocity arrays include values starting from minimal length of ISI prior to the stimulus
-    velocity = travel_distance_tbt * camera_fps
-    cum_yaw_rotation = np.cumsum(yaw_rotation_tbt, axis=1) / camera_fps
+    velocity = travel_distance_tbt * camera_fps  # over 1.0 is probably a jump
+    cum_yaw_rotation = np.nancumsum(yaw_rotation_tbt, axis=1) / camera_fps
     opto_all_trials, opto_all_isi = probes_optomoro_index(
         yaw_rotation_tbt, init_frame, camera_fps, isi_response_def
     )
-    cum_travel_distance = np.cumsum(travel_distance_tbt, axis=1)
+    cum_travel_distance = np.nancumsum(travel_distance_tbt, axis=1)
     travel_distance_ISI = cum_travel_distance[:, init_frame, 0]
     travel_distance_prior_stim = (
         cum_travel_distance[:, init_frame, 0]
@@ -129,8 +129,8 @@ def analysis_stim_evoked_response_combo(
         "travel_distance_isi": travel_distance_prior_stim,
         "travel_distance": travel_distance_during_stim,
         "stim_index": stim_to_analyse.index,
-        "temperature": np.mean(temp_tbt, axis=1),
-        "humidity": np.mean(humid_tbt, axis=1),
+        "temperature": np.nanmean(temp_tbt, axis=1),
+        "humidity": np.nanmean(humid_tbt, axis=1),
     }
 
     summary_df = pd.DataFrame(summary_list)
@@ -206,6 +206,39 @@ def recovery_detection(dev_trial, dev_timing_from_analysis_window):
     return index_list
 
 
+def extract_events(array, min_length=10, threshold=0.5):
+    """
+    Extracts events from a 1D array based on given criteria.
+
+    Parameters:
+        array (np.ndarray): The input 1D array.
+        min_length (int): Minimum length of the event.
+        threshold (float): Minimum value for all elements in the event.
+
+    Returns:
+        List[Tuple[int, int]]: A list of tuples (start_index, end_index) for each event.
+    """
+    events = []
+    start = None  # To track the start index of an event
+
+    for i in range(len(array)):
+        if array[i] > threshold:
+            if start is None:
+                start = i  # Start of a new event
+        else:
+            if start is not None:
+                # End of an event, check its length
+                if i - start >= min_length:
+                    events.append((start, i))
+                start = None  # Reset the start
+
+    # Check if an event ends at the last index
+    if start is not None and len(array) - start >= min_length:
+        events.append((start, len(array)))
+
+    return events
+
+
 def extract_stim_locked_data(
     stim_to_analyse,
     data,
@@ -246,7 +279,10 @@ def probes_optomoro_index(yaw_rotation_tbt, init_frame, camera_fps, isi_response
     return opto_all_trials, opto_all_isi
 
 
+##### this works and should be faster than extract_events but for some reason this always miss the last consecutive_length-1 elements
+# for example if the correct one is 169:181, this function will return 169:177
 def classify_walk(arr, speed_threshold=10, consecutive_length=5):
+
     binary_array = arr > speed_threshold
 
     # Create a kernel of length 5 filled with ones
@@ -343,6 +379,7 @@ def main(thisDir, json_file):
     exp_place = analysis_methods.get("exp_place")
     temperature_data_options = analysis_methods.get("temperature_data_options")
     overwrite_curated_dataset = analysis_methods.get("overwrite_curated_dataset")
+    mark_jump_as_nan = analysis_methods.get("mark_jump_as_nan", False)
     save_output = analysis_methods.get("save_output")
     optomotor_range = (
         int(analysis_methods.get("optomotor_index_duration") / 5) - 1
@@ -379,8 +416,29 @@ def main(thisDir, json_file):
     travel_distance_fbf = np.sqrt(
         np.add(np.square(np.diff(x_all, axis=0)), np.square(np.diff(y_all, axis=0)))
     )
-
-    travel_distance_whole_session = np.sum(travel_distance_fbf)
+    if mark_jump_as_nan:
+        events = extract_events(travel_distance_fbf, min_length=20)
+        ##use fft to classify trials where animals jump. So far this method can be used to detect some obvious jumps but there might be some miss detecting
+        auc = np.zeros(len(events))
+        for i in range(len(events)):
+            event_to_analyse = np.transpose(
+                travel_distance_fbf[events[i][0] : events[i][1]]
+            )[0]
+            fft_power, freq_axis = calculate_fft(
+                event_to_analyse,
+                camera_fps,
+            )
+            N = event_to_analyse.size
+            amplitude = 2.0 / N * np.abs(fft_power[0 : N // 2])
+            auc[i] = amplitude[0]
+            if (
+                amplitude[0] > 2
+            ):  # need to use signal detection theory to find a good threshold in the future;
+                # 2 is a safer threshold, which would includes false negative cases.
+                travel_distance_fbf[events[i][0] : events[i][1]] = np.nan
+    else:
+        pass
+    travel_distance_whole_session = np.nansum(travel_distance_fbf)
     if analysis_methods.get("plotting_trajectory") == True:
         fig = plt.figure()  # a new figure window
         ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
@@ -630,9 +688,6 @@ def main(thisDir, json_file):
     summary_df["preStim_ISI_duration"] = preStim_ISI_duration
 
     print("ready to plot graph with some data and decompose those lists")
-    ##use fft to classify trials where animals jump. So far this method can be used to detect some obvious jumps but there might be some miss detecting
-    # for i in range(50):
-    #     fft_power, freq_axis = calculate_fft(velocity_arr[-i, :], camera_fps)
 
     if analysis_methods.get("plotting_tbt_overview") == True:
         fig1 = plt.figure(figsize=(18, 7), tight_layout=True)
@@ -731,8 +786,8 @@ def main(thisDir, json_file):
             ].values
             if len(this_response) == 0:
                 continue
-            mean_response = np.mean(this_response, axis=0)
-            sem_response = np.std(this_response, axis=0, ddof=1) / np.sqrt(
+            mean_response = np.nanmean(this_response, axis=0)
+            sem_response = np.nanstd(this_response, axis=0, ddof=1) / np.sqrt(
                 this_response.shape[0]
             )
             ax3.errorbar(
@@ -881,12 +936,14 @@ def main(thisDir, json_file):
 if __name__ == "__main__":
     # weird files 50525355565759606269727679 fixed by threshold 46 47 52 59 53 fixed by filtering trial in different way 4150556272
     # GN24098 seems not follow the dot motion
-    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24021/240717/coherence/session1"  # good for checking fft
-    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft
+    thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24021/240717/coherence/session1"  # good for checking fft, where potential false nagative show up;1:11:33;1:15:08
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft, where 2 comes from
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24076/240804/coherence/session1"
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24084/240805/coherence/session1"# good for checking fft, where false nagative show up
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24114\240811\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24098\240810\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24089\240810\coherence\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24064\240803\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24064\240803\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24036\240801\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
