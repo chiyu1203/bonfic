@@ -189,9 +189,8 @@ conda activate tracking_analysis
 conda update -n base -c defaults conda
 conda config --add channels conda-forge
 conda config --set channel_priority strict
-conda install --yes -c conda-forge -v h5py opencv ipython jupyter matplotlib pandas matplotlib scipy openpyxl
+conda install --yes -c conda-forge -v h5py opencv ipython jupyter matplotlib pandas matplotlib scipy openpyxl ipyparallel
 conda install numpy"<=2.0.0"
-pip install roipoly lsq-ellipse opencv-contrib-python==4.5.5.64 ipyparallel
 ```
 
 ## creating virtual environment from an environment.yml file or a requirement.txt
@@ -202,9 +201,9 @@ conda env create -f environment.yml
 conda create --name tracking_analysis --file requirements.txt
 ```
 
-Below packages are optional
+[Optional] Below packages are used to read parquet file
 ```
-pip install roipoly lsq-ellipse
+conda install pyarrow fastparquet
 ```
 
 When using timestamp to align stimulus onset with fictrac data, be aware that there is a recent fictrac bug outputting timestamp, which affects airball systems in Z745 but not in VCC. Hence, a customised code is written to extract timestamp from log file, which requires a package called **chardet**. 
