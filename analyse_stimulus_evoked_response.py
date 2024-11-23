@@ -109,7 +109,6 @@ def analysis_stim_evoked_response_combo(
     #######Note: opto_index_isi and travel_distance is defined based on responses during the 5 sec window prior the stimulus;
     ####### whereas the summarised jaw, velocity arrays include values starting from minimal length of ISI prior to the stimulus
     velocity = travel_distance_tbt * camera_fps  # over 1.0 is probably a jump
-    cum_yaw_rotation = np.nancumsum(yaw_rotation_tbt, axis=1) / camera_fps
     opto_all_trials, opto_all_isi = probes_optomoro_index(
         yaw_rotation_tbt, init_frame, camera_fps, isi_response_def
     )
@@ -138,7 +137,7 @@ def analysis_stim_evoked_response_combo(
         summary_df,
         cum_travel_distance[:, :, 0],
         velocity[:, :, 0],
-        cum_yaw_rotation[:, :, 0],
+        yaw_rotation_tbt[:, :, 0],
         init_frame,
         end_frame,
     )
@@ -410,9 +409,9 @@ def main(thisDir, json_file):
         x_all = df.loc[:, ["intergrated x position"]]
         y_all = df.loc[:, ["intergrated y position"]]
     ## here write an additional function to classify stationary, moving and total travel distance
-    yaw_angular_velocity = df.loc[
-        :, ["delta rotation vector lab z"]
-    ].values  # unit is radian/s
+    yaw_angular_velocity = (
+        df.loc[:, ["delta rotation vector lab z"]].values / camera_fps
+    )  # unit is radian/s
     travel_distance_fbf = np.sqrt(
         np.add(np.square(np.diff(x_all, axis=0)), np.square(np.diff(y_all, axis=0)))
     )
@@ -670,7 +669,7 @@ def main(thisDir, json_file):
         summary_df,
         cum_travel_distance,
         velocity_arr,
-        cum_yaw_rotation,
+        yaw_rotation_tbt,
         init_frame,
         end_frame,
     ) = analysis_stim_evoked_response_combo(
@@ -682,6 +681,7 @@ def main(thisDir, json_file):
         camera_fps,
         optomotor_range,
     )
+    cum_yaw_rotation = np.nancumsum(yaw_rotation_tbt, axis=1)
     # add trial info to summary_df
     summary_df["stim_type"] = stim_name_arr
     summary_df["present_trial_duration"] = present_duration_arr
@@ -921,22 +921,22 @@ def main(thisDir, json_file):
         velocity_file_name = Path(thisDir) / "velocity_tbt.npy"
         with open(velocity_file_name, "wb") as f:
             np.save(f, velocity_arr)
-        file_name = Path(thisDir) / "cum_jaw_rotation.npy"
+        file_name = Path(thisDir) / "angular_velocity_tbt.npy"
         with open(file_name, "wb") as f:
-            np.save(f, cum_yaw_rotation)
+            np.save(f, yaw_rotation_tbt)
         print("Nothing is saved in the debug mode. Move to the next animal")
     elif overwrite_curated_dataset == False:
         print(f"dont overwrite existing database.")
     else:
         print("dont save anything")
 
-    return summary_df, velocity_arr, cum_yaw_rotation, travel_distance_whole_session
+    return summary_df, velocity_arr, yaw_rotation_tbt, travel_distance_whole_session
 
 
 if __name__ == "__main__":
     # weird files 50525355565759606269727679 fixed by threshold 46 47 52 59 53 fixed by filtering trial in different way 4150556272
     # GN24098 seems not follow the dot motion
-    thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24021/240717/coherence/session1"  # good for checking fft, where potential false nagative show up;1:11:33;1:15:08
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24021/240717/coherence/session1"  # good for checking fft, where potential false nagative show up;1:11:33;1:15:08
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft, where 2 comes from
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24076/240804/coherence/session1"
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24084/240805/coherence/session1"# good for checking fft, where false nagative show up
@@ -946,6 +946,7 @@ if __name__ == "__main__":
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24064\240803\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24036\240801\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
+    thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22056/220905/densities"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
