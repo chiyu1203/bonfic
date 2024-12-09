@@ -11,7 +11,7 @@ from useful_tools import find_file
 from data_cleaning import sorting_trial_info
 
 
-def load_data(thisDir, json_file):
+def load_data(thisDir, json_file, trial_num):
     thisDir = Path(thisDir)
     # Figuring out path and directory
     if isinstance(json_file, dict):
@@ -26,6 +26,18 @@ def load_data(thisDir, json_file):
     stim_info, stim_type = sorting_trial_info(
         stim_info, visual_paradigm_name=visual_paradigm_name, exp_place="matrexvr"
     )
+    if "trial_num" in locals() and trial_num * 2 < stim_info.shape[0]:
+        stim_info = stim_info.iloc[: trial_num * 2, :]
+        ylim4 = [75, 95]
+        ylim5 = [55, 85]
+        ylim6 = [15, 35]
+    else:
+        ylim4 = [150, 190]
+        ylim5 = [110, 170]
+        ylim6 = [30, 70]
+        print(
+            "defined trial number is bigger than total number of trial. So use the entire info."
+        )
     lag_length = np.linspace(1, 5, 5, dtype=int)
     lag_data = np.ones((3, lag_length.shape[0]))
     for i in range(lag_length.shape[0]):
@@ -46,19 +58,23 @@ def load_data(thisDir, json_file):
     ax2.set(title="stim ID autocorrelation", ylim=[-0.25, 0.25])
     ax3.set(title="stim type autocorrelation", ylim=[-0.25, 0.25])
     ax4.scatter(ISI_type_count.index.values, ISI_type_count.values)
-    ax4.set(ylim=[150, 190], title="ISI type count", yticks=[150, 160, 170, 180, 190])
+    ax4.set(ylim=ylim4, title="ISI type count")
     ax5.scatter(stim_direction_count.index.values, stim_direction_count.values)
-    ax5.set(ylim=[110, 170], title="stim direction count", yticks=[110, 130, 150, 170])
+    ax5.set(ylim=ylim5, title="stim direction count")
     ax6.scatter(stim_type_count.index.values, stim_type_count.values)
-    ax6.set(ylim=[30, 70], title="stim type count", yticks=[30, 40, 50, 60, 70])
-    fig_name = f"{thisDir.stem}.jpg"
+    ax6.set(ylim=ylim6, title="stim type count")
+    if "trial_num" in locals():
+        fig_name = f"{thisDir.stem}_{trial_num}.jpg"
+    else:
+        fig_name = f"{thisDir.stem}.jpg"
     fig.savefig(fig_name)
 
 
 if __name__ == "__main__":
-    thisDir = "Z:/Users/chiyu/trial_events1.csv"
+    thisDir = "Z:/Users/chiyu/trial_events44.csv"
     json_file = "./analysis_methods_dictionary.json"
+    trial_num = 168
     tic = time.perf_counter()
-    load_data(thisDir, json_file)
+    load_data(thisDir, json_file, trial_num)
     toc = time.perf_counter()
     print(f"it takes {toc-tic:0.4f} seconds to run the main function")
