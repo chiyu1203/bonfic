@@ -225,7 +225,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
             analysis_methods = json.loads(f.read())
 
     visual_paradigm_name = analysis_methods.get("experiment_name")
-    if visual_paradigm_name == "gratings" or visual_paradigm_name == "sloom":
+    if visual_paradigm_name == "gratings" or visual_paradigm_name == "sloom" or visual_paradigm_name == "conflict":
         trial_num = stim_info.shape[0]
     else:
         trial_num = int(stim_info.shape[0] / 2)
@@ -315,8 +315,12 @@ def analyse_led_signal(thisDir, json_file, stim_info):
                     on_thresholds.append(int(np.mean(sort_arr)))
                     off_thresholds.append(int(np.mean(sort_arr)))
             else:
-                on_thresholds.append(int(higher_mean - higher_std * std_weight))
-                off_thresholds.append(int(lower_mean + lower_std * std_weight))
+                #on_thresholds.append(int(higher_mean - higher_std * std_weight))
+                #off_thresholds.append(int(lower_mean + lower_std * std_weight))
+                on_thresholds.append(int(np.mean(sort_arr)))
+                off_thresholds.append(int(np.mean(sort_arr)))
+                #on_thresholds.append(40000)
+                #off_thresholds.append(40000)
             led_value.append(arr)
     elif len(led_files.stem) > 0:
         print(f"using led file {led_files}, extracted from bonsai or elsewhere")

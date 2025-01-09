@@ -461,8 +461,11 @@ def main(thisDir, json_file):
         tem_df_this_exp = np.load(f)
     elif temperature_data_options == None:
         print("Temperature is not recorded in this experiment.")
-    elif temperature_data_options.lower() == "el_usb":
-        temperature_pattern = "temperature_humidity*.txt"
+    elif temperature_data_options.lower() == "el_usb" or temperature_data_options == "DL220THP":
+        if temperature_data_options.lower() == "el_usb":
+            temperature_pattern = "temperature_humidity*.txt"
+        if temperature_data_options == "DL220THP":
+            temperature_pattern = "DL220*.csv"
         this_temp_directory = find_file(thisDir, temperature_pattern)
         try:
             tem_df = load_temperature_data(txt_path=this_temp_directory)
@@ -520,31 +523,12 @@ def main(thisDir, json_file):
 
     ##Firstly, load stimulus information
     stim_info = pd.read_csv(csv_file_directory)
-
-    if visual_paradigm_name == "gratings":
-        stim_info, stim_type = sorting_trial_info(
-            stim_info, visual_paradigm_name=visual_paradigm_name, exp_place=exp_place
-        )
-
-    elif visual_paradigm_name == "sweeploom":
-        stim_info, stim_type = sorting_trial_info(
-            stim_info, visual_paradigm_name=visual_paradigm_name, exp_place="VCCball"
-        )
-
-    elif visual_paradigm_name == "coherence" or visual_paradigm_name.endswith(
-        "densities"
-    ):
-        stim_info, stim_type = sorting_trial_info(
-            stim_info, visual_paradigm_name=visual_paradigm_name, exp_place=exp_place
-        )
-    else:
-        warnings.warn("stimulus paradigm can not be recognised")
-        return
-
+    stim_info, stim_type = sorting_trial_info(stim_info, visual_paradigm_name=visual_paradigm_name, exp_place=exp_place)
+    
     stimulus_timestamp = stim_info["ts"].to_numpy()
     if fictrac_posthoc_analysis:
         stim_onset, isi_onset = analyse_led_signal(thisDir, json_file, stim_info)
-        if visual_paradigm_name == "gratings" or visual_paradigm_name == "sweeploom":
+        if visual_paradigm_name == "gratings" or visual_paradigm_name == "sweeploom" or visual_paradigm_name == "conflict":
             stim_info["stim_onset"] = stim_onset
         else:
             transition_onset = np.ones((len(stim_onset) + len(isi_onset),), dtype=int)
@@ -585,7 +569,7 @@ def main(thisDir, json_file):
     elif (
         visual_paradigm_name == "coherence"
         or visual_paradigm_name.endswith("densities")
-        or visual_paradigm_name == "gratings"
+        or visual_paradigm_name == "gratings" or visual_paradigm_name == "conflict"
     ):
         # While duration consists of more than two int, use the largest one to set analysis window
         if analysis_methods.get("analysis_window") == None:
@@ -649,11 +633,15 @@ def main(thisDir, json_file):
             visual_paradigm_name == "gratings"
             or visual_paradigm_name == "sweeploom"
             or visual_paradigm_name.endswith("sities")
+            or visual_paradigm_name == "conflict"
         ):
             stim_to_analyse = stim_info["stim_onset"]
-            ISI_duration = np.repeat(
-                analysis_methods.get("interval_duration"), stim_to_analyse.shape[0]
-            )
+            if type(analysis_methods.get("interval_duration")) == list:
+                ISI_duration = stim_info["ISI1"].values
+            else:
+                ISI_duration = np.repeat(
+                    analysis_methods.get("interval_duration"), stim_to_analyse.shape[0]
+                )
             preStim_ISI_duration = np.append(
                 analysis_methods.get("prestim_duration"), ISI_duration[:-1]
             )
@@ -946,7 +934,8 @@ if __name__ == "__main__":
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24064\240803\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24036\240801\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
-    thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22056/220905/densities"
+    #thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22056/220905/densities"
+    thisDir = r"C:\Users\neuroLaptop\Documents\GN25040\250106\speed\session1"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
