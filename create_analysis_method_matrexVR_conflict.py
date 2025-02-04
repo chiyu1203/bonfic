@@ -11,14 +11,14 @@ analysis_methods = {
     "fictrac_posthoc_analysis": True,
     "use_led_to_align_stimulus_timing": True,
     "align_with_isi_onset": False,
-    "mark_jump_as_nan": True,
+    "mark_jump_as_nan": False,
     "active_trials_only": True,
     "filtering_method": "sg_filter",
     "plotting_tbt_overview": True,
     "plotting_trajectory": False,
     "plotting_event_related_trajectory": False,
-    "plotting_deceleration_accerleration": False,
-    "plotting_optomotor_response": True,
+    "plotting_position_dependant_fixation": True,
+    "plotting_optomotor_response": False,
     "load_experiment_condition_from_database": True,
     "select_animals_by_condition": True,
     "analysis_by_stimulus_type": False,
@@ -26,7 +26,7 @@ analysis_methods = {
     "camera_fps": 100,
     "trackball_radius": 50,
     "monitor_fps": 60,
-    "stim_duration":[
+    "stim_duration": [
         8,
         12,
         25,
@@ -35,6 +35,7 @@ analysis_methods = {
         45,
         50,
     ],
+    "analysis_window": [-5, 30],
     "prestim_duration": 300,
 }  # plue value representing clockwise, counterclockwise is minus, then the rest is coherence leve
 json_string = json.dumps(analysis_methods, indent=1)

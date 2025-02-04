@@ -461,7 +461,10 @@ def main(thisDir, json_file):
         tem_df_this_exp = np.load(f)
     elif temperature_data_options == None:
         print("Temperature is not recorded in this experiment.")
-    elif temperature_data_options.lower() == "el_usb" or temperature_data_options == "DL220THP":
+    elif (
+        temperature_data_options.lower() == "el_usb"
+        or temperature_data_options == "DL220THP"
+    ):
         if temperature_data_options.lower() == "el_usb":
             temperature_pattern = "temperature_humidity*.txt"
         if temperature_data_options == "DL220THP":
@@ -523,12 +526,18 @@ def main(thisDir, json_file):
 
     ##Firstly, load stimulus information
     stim_info = pd.read_csv(csv_file_directory)
-    stim_info, stim_type = sorting_trial_info(stim_info, visual_paradigm_name=visual_paradigm_name, exp_place=exp_place)
-    
+    stim_info, stim_type = sorting_trial_info(
+        stim_info, visual_paradigm_name=visual_paradigm_name, exp_place=exp_place
+    )
+
     stimulus_timestamp = stim_info["ts"].to_numpy()
     if fictrac_posthoc_analysis:
         stim_onset, isi_onset = analyse_led_signal(thisDir, json_file, stim_info)
-        if visual_paradigm_name == "gratings" or visual_paradigm_name == "sweeploom" or visual_paradigm_name == "conflict":
+        if (
+            visual_paradigm_name == "gratings"
+            or visual_paradigm_name == "sweeploom"
+            or visual_paradigm_name == "conflict"
+        ):
             stim_info["stim_onset"] = stim_onset
         else:
             transition_onset = np.ones((len(stim_onset) + len(isi_onset),), dtype=int)
@@ -569,7 +578,8 @@ def main(thisDir, json_file):
     elif (
         visual_paradigm_name == "coherence"
         or visual_paradigm_name.endswith("densities")
-        or visual_paradigm_name == "gratings" or visual_paradigm_name == "conflict"
+        or visual_paradigm_name == "gratings"
+        or visual_paradigm_name == "conflict"
     ):
         # While duration consists of more than two int, use the largest one to set analysis window
         if analysis_methods.get("analysis_window") == None:
@@ -760,6 +770,87 @@ def main(thisDir, json_file):
         if save_output == True:
             fig1.savefig(Path(thisDir) / plot_name)
         plt.show()
+    if analysis_methods.get("plotting_position_dependant_fixation") == True:
+        COL = MplColorHelper(colormap_name, 0, len(stim_type))
+        colormap = np.array(["k", "r", "b", "g", "y", "m", "c", "k"])
+        fig5, (ax1, ax2, ax3) = plt.subplots(
+            nrows=1, ncols=3, figsize=(18, 7), tight_layout=True
+        )
+        f_count = 0
+        s_count = 0
+        m_count = 0
+        for i in range(len(stim_type)):
+            this_type_stim = stim_type[i]
+            this_response = np.diff(
+                cum_yaw_rotation[summary_df["stim_type"] == this_type_stim, :]
+            )
+            time_points = np.arange(this_response.shape[1])
+            time_points_b = np.tile(time_points, (this_response.shape[0], 1))
+
+            if this_type_stim.endswith("fast"):
+                ax1.plot(
+                    np.mean(time_points_b, axis=0),
+                    np.mean(this_response, axis=0),
+                    color=colormap[f_count],
+                    alpha=0.2,
+                )
+                f_count += 1
+            elif this_type_stim.endswith("slow"):
+                ax3.plot(
+                    np.mean(time_points_b, axis=0),
+                    np.mean(this_response, axis=0),
+                    color=colormap[s_count],
+                    alpha=0.2,
+                )
+                s_count += 1
+            else:
+                ax2.plot(
+                    np.mean(time_points_b, axis=0),
+                    np.mean(this_response, axis=0),
+                    color=colormap[m_count],
+                    alpha=0.2,
+                )
+                m_count += 1
+        ax1.axvline(
+            x=init_frame,
+            color="black",
+            linestyle="--",
+            label="Stimulus Starts",
+        )
+        ax1.axvline(
+            x=init_frame + camera_fps * stim_duration[0],
+            color="black",
+            linestyle="--",
+            label="Stimulus Ends",
+        )
+        ax2.axvline(
+            x=init_frame,
+            color="black",
+            linestyle="--",
+            label="Stimulus Starts",
+        )
+        ax2.axvline(
+            x=init_frame + camera_fps * stim_duration[1],
+            color="black",
+            linestyle="--",
+            label="Stimulus Ends",
+        )
+        ax3.axvline(
+            x=init_frame,
+            color="black",
+            linestyle="--",
+            label="Stimulus Starts",
+        )
+        ax3.axvline(
+            x=init_frame + camera_fps * stim_duration[2],
+            color="black",
+            linestyle="--",
+            label="Stimulus Ends",
+        )
+    plot_name = f"conflict_analysis_overview.png"
+    if save_output == True:
+        fig5.savefig(Path(thisDir) / plot_name)
+    plt.show()
 
     if analysis_methods.get("plotting_optomotor_response") == True:
         COL = MplColorHelper(colormap_name, 0, len(stim_type))
@@ -934,8 +1025,11 @@ if __name__ == "__main__":
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24064\240803\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24036\240801\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
-    #thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22056/220905/densities"
-    thisDir = r"C:\Users\neuroLaptop\Documents\GN25040\250106\speed\session1"
+    # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22056/220905/densities"
+    # thisDir = r"C:\Users\neuroLaptop\Documents\GN25040\250106\speed\session1"
+    thisDir = (
+        r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN25035\250106\speed\session1"
+    )
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
