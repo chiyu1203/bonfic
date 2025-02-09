@@ -1,5 +1,6 @@
 import os, fnmatch, sys, time, json, cv2, warnings
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 
@@ -53,6 +54,9 @@ def hardcode_customised_thresholds(on_thresholds, off_thresholds, animal_id):
     elif animal_id == "GN24095":
         on_thresholds.append(410000)
         off_thresholds.append(410000)
+    elif animal_id == "GN24136":
+        on_thresholds.append(320000)
+        off_thresholds.append(320000)
     return on_thresholds, off_thresholds
 
 
@@ -133,11 +137,10 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods):
         min_stim = min(stim_duration)
     else:
         min_stim = stim_duration
-    min_duration = min_stim + min_isi
     pass_threshold = arr > on_threshold
     pass_threshold_index = np.where(pass_threshold)[0]
     up_phase = np.append(
-        np.where(pass_threshold)[0][0],
+        pass_threshold_index[0],
         pass_threshold_index[1:][
             np.diff(pass_threshold_index) > min_stim * 0.8 * sample_rate
         ],
@@ -147,7 +150,7 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods):
     pass_threshold = off_threshold > arr
     pass_threshold_index = np.where(pass_threshold)[0]
     down_phase = np.append(
-        np.where(pass_threshold)[0][0],
+        pass_threshold_index[0],
         pass_threshold_index[1:][
             np.diff(pass_threshold_index) > min_isi * 0.8 * sample_rate
         ],
@@ -269,7 +272,11 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         print(f"multiple led files {led_files} were found. They came from bonsai")
         std_weight = 100
         for i in range(len(led_files)):
-            arr = np.genfromtxt(led_files[i], delimiter=",")
+            if int(animal_id.split("N")[1]) > 24116:
+                tmp = pd.read_csv(led_files[i], delimiter=",", header=0, index_col=None)
+                arr = tmp["Value"].values
+            else:
+                arr = np.genfromtxt(led_files[i], delimiter=",")
             # arr = np.genfromtxt(led_files[i], delimiter=",", dtype=int)
             if arr.ndim == 2:
                 arr = arr[:, 0]
@@ -311,6 +318,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
                     "GN24090",
                     "GN24095",
                     "GN24102",
+                    "GN24136",
                 ]:
                     on_thresholds, off_thresholds = hardcode_customised_thresholds(
                         on_thresholds, off_thresholds, animal_id
@@ -354,14 +362,12 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         )
         ax.scatter(np.arange(arr.shape[0]), arr)
         ax.axhline(y=on_thresholds[i], color="red", linestyle="--", label="Threshold")
-        # fig.show()
-
+        fig.show()
         b2w, w2b = detect_transition(
             led_value[i], on_thresholds[i], off_thresholds[i], analysis_methods
         )
         ax1.scatter(np.arange(b2w.shape[0] - 1), np.diff(b2w), c="b")
         ax1.scatter(np.arange(w2b.shape[0] - 1), np.diff(w2b), c="r")
-        plt.show()
         """hardcode here for the pilot experiment due to sync path for 0 coherence stimulus is programmed into the wrong colour"""
         if exp_date in ["2024-07-19", "2024-07-17"]:
             b2w, w2b = fix_broken_ttl(b2w, w2b)
@@ -380,7 +386,6 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         ]:
             b2w = fill_dropframe_ttl(b2w, stim_info, analysis_methods)
             w2b = fill_dropframe_ttl(w2b, stim_info, analysis_methods)
-
         b2w = b2w[: trial_num + 1]
         w2b = w2b[:trial_num]
 
