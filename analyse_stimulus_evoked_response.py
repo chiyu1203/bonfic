@@ -66,7 +66,7 @@ def analysis_stim_evoked_response_combo(
         init_frame,
         end_frame,
     ) = extract_stim_locked_data(
-        stim_to_analyse, yaw_angular_velocity, analysis_window, camera_fps
+        stim_to_analyse, yaw_angular_velocity[:, 0], analysis_window, camera_fps
     )
     (
         travel_distance_tbt,
@@ -74,7 +74,7 @@ def analysis_stim_evoked_response_combo(
         _,
     ) = extract_stim_locked_data(
         stim_to_analyse,
-        travel_distance_fbf,
+        travel_distance_fbf[:, 0],
         analysis_window,
         camera_fps,
     )
@@ -113,13 +113,13 @@ def analysis_stim_evoked_response_combo(
         yaw_rotation_tbt, init_frame, camera_fps, isi_response_def
     )
     cum_travel_distance = np.nancumsum(travel_distance_tbt, axis=1)
-    travel_distance_ISI = cum_travel_distance[:, init_frame, 0]
+    travel_distance_ISI = cum_travel_distance[:, init_frame]
     travel_distance_prior_stim = (
-        cum_travel_distance[:, init_frame, 0]
-        - cum_travel_distance[:, isi_response_def * camera_fps, 0]
+        cum_travel_distance[:, init_frame]
+        - cum_travel_distance[:, isi_response_def * camera_fps]
     )  ##remove the initial five sec during isi
     travel_distance_during_stim = (
-        cum_travel_distance[:, end_frame, 0] - travel_distance_ISI
+        cum_travel_distance[:, end_frame] - travel_distance_ISI
     )
 
     summary_list = {
@@ -135,9 +135,9 @@ def analysis_stim_evoked_response_combo(
     summary_df = pd.DataFrame(summary_list)
     return (
         summary_df,
-        cum_travel_distance[:, :, 0],
-        velocity[:, :, 0],
-        yaw_rotation_tbt[:, :, 0],
+        cum_travel_distance,
+        velocity,
+        yaw_rotation_tbt,
         init_frame,
         end_frame,
     )
@@ -250,6 +250,10 @@ def extract_stim_locked_data(
     init_frame = init_time * camera_fps
     end_frame = analysis_window[1] * camera_fps
     index_points = generate_index_points(stim_to_analyse, analysis_window, camera_fps)
+    if index_points.max() > len(data):
+        print("index points exceed the length of the data, fill with nan in the end")
+        nan_array = np.full((index_points.max() - len(data) + 10,), np.nan)
+        data = np.hstack((data, nan_array))
     stim_locked_data = data[index_points]
     return stim_locked_data, init_frame, end_frame
 
@@ -269,11 +273,11 @@ def probes_optomoro_index(yaw_rotation_tbt, init_frame, camera_fps, isi_response
         this_end = init_frame + analysis_length * camera_fps
         for i in range(0, yaw_rotation_tbt.shape[0]):
             opto_all_trials[i, j] = optomotor_response_idx(
-                yaw_rotation_tbt[i, init_frame:this_end, 0]
+                yaw_rotation_tbt[i, init_frame:this_end]
             )
             if j == 0:
                 opto_all_isi[i, j] = optomotor_response_idx(
-                    yaw_rotation_tbt[i, isi_start_frame:init_frame, 0]
+                    yaw_rotation_tbt[i, isi_start_frame:init_frame]
                 )
     return opto_all_trials, opto_all_isi
 
@@ -456,50 +460,56 @@ def main(thisDir, json_file):
         exp_time = exp_date + " " + exp_hour
         test_dt = pd.to_datetime(exp_time, format="%Y-%m-%d %H_%M_%S")
     tem_df_this_exp = []
-    if this_temp_directory and overwrite_curated_dataset == False:
-        f = gzip.GzipFile(this_temp_directory, "r")
-        tem_df_this_exp = np.load(f)
-    elif temperature_data_options == None:
+    if temperature_data_options == None:
         print("Temperature is not recorded in this experiment.")
-    elif (
-        temperature_data_options.lower() == "el_usb"
-        or temperature_data_options == "DL220THP"
-    ):
-        if temperature_data_options.lower() == "el_usb":
-            temperature_pattern = "temperature_humidity*.txt"
-        if temperature_data_options == "DL220THP":
-            temperature_pattern = "DL220*.csv"
-        this_temp_directory = find_file(thisDir, temperature_pattern)
-        try:
-            tem_df = load_temperature_data(txt_path=this_temp_directory)
-            start_time_tem = find_nearest(tem_df.index, test_dt)
-            print(
-                tem_df[tem_df.index == start_time_tem]
-            )  # find the start of EL-USB data that might be used for further data analysis. For example, oversampling to align with existing data size
-            tem_df_after_exp = tem_df[tem_df.index > start_time_tem]
-            if len(tem_df_after_exp) > 0:
-                frequency_milisecond = int(1000 / camera_fps)
-                tem_df_after_exp = tem_df_after_exp.resample(
-                    f"{frequency_milisecond}L"
-                ).interpolate()
-                tem_df_this_exp = tem_df_after_exp[: df.shape[0]].values[:, 0:2]
-                if save_output == True:
-                    np_file_name = Path(thisDir) / "temperature_humidity.npy.gz"
-                    f = gzip.GzipFile(np_file_name, "w")
-                    np.save(file=f, arr=tem_df_this_exp)
-                    f.close()
-                else:
-                    print("Nothing is saved in the debug mode. Move to the next animal")
-            else:
-                print("Unable to find the corresponding time stamp")
-        except:
-            print("raw temperature file is not found")
-    elif temperature_data_options.lower() == "bonsai":
-        print("work in progress. Get data from one of the bonsai file")
     else:
-        print(
-            f"Unable to find a reasonable option: {temperature_data_options} to process temperature data"
-        )
+        if this_temp_directory and overwrite_curated_dataset == False:
+            f = gzip.GzipFile(this_temp_directory, "r")
+            tem_df_this_exp = np.load(f)
+        ### re-load temerature data if the user wants to overwrite the curated dataset or if temperature data is not available
+        elif temperature_data_options.lower().startswith("bon"):
+            temperature_pattern = "lux*.csv"
+            led_files = find_file(thisDir, temperature_pattern)
+            tmp = pd.read_csv(led_files, delimiter=",", header=0, index_col=None)
+            if "Temperature" in tmp.columns:
+                tem_df_this_exp = np.column_stack(
+                    (
+                        tmp["Temperature"].values,
+                        tmp["Humidity"].values,
+                    )
+                )
+            else:
+                print("work in progress. Needs to organise this pandas dataframe")
+        else:
+            if temperature_data_options.lower() == "el_usb":
+                temperature_pattern = "temperature_humidity*.txt"
+            if temperature_data_options == "DL220THP":
+                temperature_pattern = "DL220*.csv"
+            this_temp_directory = find_file(thisDir, temperature_pattern)
+            try:
+                tem_df = load_temperature_data(txt_path=this_temp_directory)
+                start_time_tem = find_nearest(tem_df.index, test_dt)
+                print(
+                    tem_df[tem_df.index == start_time_tem]
+                )  # find the start of EL-USB data that might be used for further data analysis. For example, oversampling to align with existing data size
+                tem_df_after_exp = tem_df[tem_df.index > start_time_tem]
+                if len(tem_df_after_exp) > 0:
+                    frequency_milisecond = int(1000 / camera_fps)
+                    tem_df_after_exp = tem_df_after_exp.resample(
+                        f"{frequency_milisecond}L"
+                    ).interpolate()
+                    tem_df_this_exp = tem_df_after_exp[: df.shape[0]].values[:, 0:2]
+                else:
+                    print("Unable to find the corresponding time stamp")
+            except:
+                print("raw temperature file is not found")
+        if save_output == True and len(tem_df_this_exp) > 0:
+            np_file_name = Path(thisDir) / "temperature_humidity.npy.gz"
+            f = gzip.GzipFile(np_file_name, "w")
+            np.save(file=f, arr=tem_df_this_exp)
+            f.close()
+        else:
+            print("Nothing is saved in the debug mode. Move to the next animal")
 
     ##here to start analying stimulus-evoked response.
     ## if the tracking data is logged on bonsai (come from fictrac realtime). The file name is tracking_events...
@@ -526,10 +536,11 @@ def main(thisDir, json_file):
 
     ##Firstly, load stimulus information
     stim_info = pd.read_csv(csv_file_directory)
+    if file_name == "lux4_2024-12-09T12_02_03":
+        stim_info = stim_info.iloc[:336]
     stim_info, stim_type = sorting_trial_info(
         stim_info, visual_paradigm_name=visual_paradigm_name, exp_place=exp_place
     )
-
     stimulus_timestamp = stim_info["ts"].to_numpy()
     if fictrac_posthoc_analysis:
         stim_onset, isi_onset = analyse_led_signal(thisDir, json_file, stim_info)
@@ -847,10 +858,10 @@ def main(thisDir, json_file):
             linestyle="--",
             label="Stimulus Ends",
         )
-    plot_name = f"conflict_analysis_overview.png"
-    if save_output == True:
-        fig5.savefig(Path(thisDir) / plot_name)
-    plt.show()
+        plot_name = f"conflict_analysis_overview.png"
+        if save_output == True:
+            fig5.savefig(Path(thisDir) / plot_name)
+        plt.show()
 
     if analysis_methods.get("plotting_optomotor_response") == True:
         COL = MplColorHelper(colormap_name, 0, len(stim_type))
@@ -1023,13 +1034,17 @@ if __name__ == "__main__":
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24098\240810\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24089\240810\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24064\240803\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24036\240801\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24133\241210\coherence\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24126\241209\coherence\session1"
+    # thisDir = "Z:\\DATA\\experiment_trackball_Optomotor\\MatrexVR\\GN24133\\241210\\coherence\\session1"
+    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24136\241210\coherence\session1"
+    thisDir = r"Z:\\DATA\\experiment_trackball_Optomotor\\MatrexVR\\GN24124\\241209\\coherence\\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22056/220905/densities"
-    # thisDir = r"C:\Users\neuroLaptop\Documents\GN25040\250106\speed\session1"
-    thisDir = (
-        r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN25035\250106\speed\session1"
-    )
+    # thisDir = r"C:\Users\neuroLaptop\Documents\GN25040\250106\conflict\session1"
+    # thisDir = (
+    #     r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN25035\250106\conflict\session1"
+    # )
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
