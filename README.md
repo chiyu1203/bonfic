@@ -4,7 +4,7 @@
 
 we try to keep the temperature between 30-32 degree during recording. This is meant to avoid introducing new variables into the behavioural matrics.
 
-However, the setup does not let us to keep the temperature precise, so we still need to record the fluctuation of temperature. In addition, LED panels can heat up the matrexVR setup up to 39 degree. 
+However, the setup does not let us to keep the temperature precise, so we still need to record the fluctuation of temperature. In Room745, when running bonsai-based experiment, the temperature is recored with SHT45 Temp+Hum module. when running Unity-based program, the temperature is recorded with DL220THP (or EL-USB-2). Note: LED panels can heat up the matrexVR setup up to 39 degree but monitors only heat up the set until 32 degree max (usually around 28 degree)
 
 In the future, let's try to push this fluctuation only 1 degree differences
 
@@ -15,6 +15,8 @@ To raise the temperature on, keep the radiator on at level 5, turn on the air co
 Turn on this computer, as monitors do contribute to a lot of heat to the setup
 
 It takes around 3 hours to raise temperature from 27 degree to 30 degree so start this process early. The monitor will heat up the setup so eventually the setup will be around 32 degree.
+
+Set up dehumitilifier overnight
 
 ## Animal preparation: 
 
@@ -30,7 +32,7 @@ For ephys, we used a 3D-printed headbar and for behaviours, we used needles. To 
 
 Then use a sharp thing to place the red UHU glue and stick it on the animal.
 
-Then apply blue UHU glue on the holes of the headbar (or at the edge of needles) and use shape thing to make sure the glue cover all edges. Shine the animal with UV light for 30 seconds from multiple angle.
+Then apply blue UHU glue on the holes of the headbar (or at the edge of needles) and use sharp thing to make sure the glue cover all edges. Shine the animal with UV light for 30 seconds from multiple angle.
 
 (There is a small ball you can use while tethering the animal before the stage is available, just put the ball under a tethered animal, the animal shall climb it due to its instinct. 
 
@@ -38,16 +40,17 @@ But dont start tethering animals too early because even if you use the ball to k
 
 ## Lighting: 
 
-switch on extension located at the bottom of the rig. This will turn on both IR lights and OpenEphys DAQ. 
+switch on extension located behind the rig. This will turn on both IR lights and OpenEphys DAQ. 
 
-These light create some noises so they are wrapped with tin foil and connect to ground bus.
+These light create some noises so they are wrapped with tin foil.
 
 There are two ways to run the experiment, using online fictrac or offline fictrac. Online fictrac is essential for closed-loop experiment. 
 
 However, due to some potential incompatability issue between AMD CPU and OpenCL, we drop a lot of frames when doing online fictrac analysis and saving frames into video 
 
-(On average, 40% of the frame are dropped at 100Hz those videos can hardly be backtrack), so highly recommend to use bonsai to save videos when online fictrac is not necessary.
+(On average, 40% of the frame are dropped at 100Hz those videos can hardly be backtrack), so highly recommend to use bonsai to save videos when online fictrac is not necessary. When using online fictrac, it would be great to set up multi-camera 
 
+filming so that cameras can save the video data
 
 ## Running the experiment (online fictrac):
 
@@ -85,6 +88,8 @@ Press **Enter** to start the fictrac on the command prompt
 
 Press **F** to start fictrac module
 
+Press **R** to start recording
+
 Press **S** to start stimulus
 
 
@@ -103,7 +108,7 @@ Close the workflow (re-open the workflow if you want to continue with the next t
 ---------------------------------------------------------------------------------------------------------------------------------
 The following command is used when you need to do posthoc analysis for led detection and fictrac, which means we only need to deliver stimuli and film the animal
 
-Open Bonsai workflows (for example **rdk_3coherence_1hr_posthoc** and exploration workflow: **loom and gratings manual trigger**)
+Open Bonsai workflows (for example **rdk_3coherence_random_duration_336trials** and exploration workflow: **stimulus_toolkits**)
 
 Prepare the animal
 
@@ -111,9 +116,7 @@ Add optical glue to the animal and wait for the glue to dry out
 
 For ephys: inserting reference pin into the locust brain
 
-Start the bonsai workflow (for behavioural only: **rdk_3coherence_1hr_posthoc**; for ephys: **loom and gratings manual trigger**) 
-
-Open Ephys GUI (For ephys: make sure to downgrade the USB driver first)
+Open Ephys GUI
 
 Move the animal from the tethering stage to the ephys rig
 
@@ -123,9 +126,7 @@ Move the probe into the rig and stick the reference pins together. Attaching the
 
 Go deeper every 50um and deliver visual stimuli to find a good location with the exploration workflow
 
-Closed the front cloth, and turn off room light (For ephys: turn off micromanipulator, remove binoculars and open **rdk_3coherence_1hr_posthoc**)
-
-Start the workflow of the **rdk_3coherence_1hr_posthoc**
+Closed the front cloth, and turn off room light (For ephys: turn off amd unplug micromanipulator, remove binoculars and open **rdk_3coherence_random_duration_336trials**)
 
 Press **S** to start stimulus
 
@@ -133,13 +134,11 @@ press **C** to start the camera trigger (if using arduino trigger basler camera)
 
 Starting Ephys recording
 
-Plug in the barcode thing.
-
 At the end of the experiment:
 
 Stop Ephys recording (Optional)
 
-Pressing D to stop arduino first
+Pressing **D** to stop arduino first (note that turning on LinLab GUI will automatically turn on the camera trigger)
 
 Pressing Stop button to leave Bonsai GUI
 
@@ -160,6 +159,13 @@ Then open a jupyter notebook called **fictrac_batch_analysis**
 Run the first 3 cells to start batch processing of fictrac offline analysis
 
 For an one-hour recording, it takes around 10 mins to finish the posthoc analysis
+
+if not using the notebook, then just update the video directory in the config file and call
+
+```
+fictrac config_zball_camera1_9618_500x520.txt
+```
+
 
 ### LED detection
 
@@ -239,7 +245,7 @@ Therefore, each project (or each experiment) has its own json file. Below explai
 
     "overwrite_curated_dataset": whether to overwrite the existing pickle file or not, which is generated from fictrac. If True, then the programme will overwrite the pickle file
 
-    "debug_mode": whether to save any output during data analysis. If True, then do not save any output
+    "save_output": whether to save any output during data analysis. If True, then save any output
     
     "fictrac_posthoc_analysis": whether the fictrac data comes from online tracking or posthoc analysis. If True, then entering the analysis pipeline for posthoc analysis.
     
@@ -247,6 +253,10 @@ Therefore, each project (or each experiment) has its own json file. Below explai
     
     "align_with_isi_onset": whether to use align the stimulus-evoked response based on stimulus onset or ISI onset. If True, then aligning the data based on ISI onset (this only works with Bonsai projects where ISI is logged)
     
+    "mark_jump_as_nan": whether to use fft to identify jumping event in fictrac data and mark the event as nan
+
+    "active_trials_only":  work in progress (to include walking trials)
+
     "filtering_method": what kind of filter to apply for tracking animals
     
     "plotting_tbt_overview": whether to plot a heat map of animal's velocity trial by trial and two histograms of animals travel distance and optomotor index.
@@ -256,6 +266,8 @@ Therefore, each project (or each experiment) has its own json file. Below explai
     "plotting_event_related_trajectory": whether to plot a heat map of animal's trajectory after the stimulus onset
     
     "plotting_deceleration_accerleration": whether to plot the average deceleration and accerleration onset of the animals (this is still under construction)
+
+    "plotting_position_dependant_fixation": whether to plot animal's angular velocity in response time. This is used in conflict experiment
     
     "plotting_optomotor_response": whether to plot the animal's mean optomotor index across stimulus type and the trajectory of yaw rotation vector trial by trial.
     
