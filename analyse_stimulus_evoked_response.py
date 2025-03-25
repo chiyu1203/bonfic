@@ -141,6 +141,28 @@ def analysis_stim_evoked_response_combo(
         init_frame,
         end_frame,
     )
+def define_analysis_window(stim_duration,interval_duration):
+    if type(interval_duration) == list and type(stim_duration) == list:
+                analysis_window = [
+                    min(interval_duration) * -1,
+                    max(stim_duration) + min(interval_duration),
+                ]
+    elif type(interval_duration) == list:
+                analysis_window = [
+                    min(interval_duration) * -1,
+                    stim_duration + min(interval_duration),
+                ]
+    elif type(stim_duration) == list:
+                analysis_window = [
+                    interval_duration * -1,
+                    max(stim_duration) + interval_duration,
+                ]
+    else:
+                analysis_window = [
+                    interval_duration * -1,
+                    stim_duration + interval_duration,
+                ]
+    return analysis_window
 
 
 def deceleration_detection(v_array=[], *args):
@@ -375,7 +397,7 @@ def main(thisDir, json_file):
     monitor_fps = analysis_methods.get("monitor_fps")
     camera_fps = analysis_methods.get("camera_fps")
     stim_duration = analysis_methods.get("stim_duration")
-    interval_duration = analysis_methods.get("interval_duration")
+    interval_duration= analysis_methods.get("interval_duration")
     visual_paradigm_name = analysis_methods.get("experiment_name")
     fictrac_posthoc_analysis = analysis_methods.get("fictrac_posthoc_analysis")
     align_with_isi_onset = analysis_methods.get("align_with_isi_onset")
@@ -392,7 +414,6 @@ def main(thisDir, json_file):
     sm = cm.ScalarMappable(cmap=colormap_name)
     running_speed_threshold = 50
     turning_threshold = 0.33
-
     # Here to allocate files
     pd_pattern = "lux*.csv"
     this_PD_directory = find_file(thisDir, pd_pattern)
@@ -469,7 +490,8 @@ def main(thisDir, json_file):
         ### re-load temerature data if the user wants to overwrite the curated dataset or if temperature data is not available
         elif temperature_data_options.lower().startswith("bon"):
             temperature_pattern = "lux*.csv"
-            led_files = find_file(thisDir, temperature_pattern)
+            termperature_pattern_meta="meta*.csv"
+            led_files = find_file(thisDir, temperature_pattern,termperature_pattern_meta)
             tmp = pd.read_csv(led_files, delimiter=",", header=0, index_col=None)
             if "Temperature" in tmp.columns:
                 tem_df_this_exp = np.column_stack(
@@ -592,28 +614,10 @@ def main(thisDir, json_file):
         or visual_paradigm_name == "gratings"
         or visual_paradigm_name == "conflict"
     ):
+        # Use analysis window to slice recordings into sections centered the onset of the stimulus. If analysis window is not defiend, then use interval_duration and stim duration to construct that.
         # While duration consists of more than two int, use the largest one to set analysis window
         if analysis_methods.get("analysis_window") == None:
-            if type(interval_duration) == list and type(stim_duration) == list:
-                analysis_window = [
-                    min(interval_duration) * -1,
-                    max(stim_duration) + min(interval_duration),
-                ]
-            elif type(interval_duration) == list:
-                analysis_window = [
-                    min(interval_duration) * -1,
-                    stim_duration + min(interval_duration),
-                ]
-            elif type(stim_duration) == list:
-                analysis_window = [
-                    interval_duration * -1,
-                    max(stim_duration) + interval_duration,
-                ]
-            else:
-                analysis_window = [
-                    interval_duration * -1,
-                    stim_duration + interval_duration,
-                ]
+            analysis_window=define_analysis_window(stim_duration,interval_duration)
         else:
             analysis_window = analysis_methods.get("analysis_window")
     else:
@@ -621,34 +625,23 @@ def main(thisDir, json_file):
             "visual paradigm name does not match with available options. Please check"
         )
         return
-
+    log_stim_ISI_duration=True
     if align_with_isi_onset:
-        if (
-            visual_paradigm_name == "gratings"
-            or visual_paradigm_name == "sweeploom"
-            or visual_paradigm_name.endswith("sities")
-        ):
-            print(
-                "not recommended to align with ISI onset due to the design of workflow does not log the onset of ISI"
-            )
-            return None
-        else:
-            stim_to_analyse = stim_info.loc[::2, "stim_onset"]
-            if type(interval_duration) == list:
-                interval_duration = max(interval_duration)
-            analysis_window = [
-                interval_duration * -1,
-                interval_duration * 2,
-            ]
-            ISI_duration = np.array(
+        stim_to_analyse = stim_info.loc[::2, "stim_onset"]
+        if type(interval_duration) == list:
+                analysis_window=define_analysis_window(stim_duration,interval_duration)
+        ISI_duration = np.array(
                 stim_info["Duration"][stim_info.loc[1::2, "stim_onset"].index]
             )
         optomotor_range = (
             1  # this is used to analyse the first 5 second response from the ISI
         )
-        preStim_ISI_duration = np.append(
-            analysis_methods.get("prestim_duration"), ISI_duration[:-1]
-        )
+        if log_stim_ISI_duration:
+            preStim_ISI_duration = np.append(
+                analysis_methods.get("prestim_duration"), ISI_duration[:-1]
+            )
+        else:
+            preStim_ISI_duration=stim_info
     else:
         if (
             visual_paradigm_name == "gratings"
@@ -668,9 +661,12 @@ def main(thisDir, json_file):
             )
         else:
             stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
-            preStim_ISI_duration = np.array(
-                stim_info["Duration"][stim_info.loc[::2, "stim_onset"].index]
-            )
+            if log_stim_ISI_duration:
+                preStim_ISI_duration = np.array(
+                    stim_info["Duration"][stim_info.loc[::2, "stim_onset"].index]
+                )
+            else:
+                preStim_ISI_duration=stim_info
     stim_name_arr = np.array(stim_info["stim_type"][stim_to_analyse.index])
     present_duration_arr = np.array(stim_info["Duration"][stim_to_analyse.index])
 
@@ -1038,7 +1034,8 @@ if __name__ == "__main__":
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24126\241209\coherence\session1"
     # thisDir = "Z:\\DATA\\experiment_trackball_Optomotor\\MatrexVR\\GN24133\\241210\\coherence\\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24136\241210\coherence\session1"
-    thisDir = r"Z:\\DATA\\experiment_trackball_Optomotor\\MatrexVR\\GN24124\\241209\\coherence\\session1"
+    #thisDir = r"Z:\\DATA\\experiment_trackball_Optomotor\\MatrexVR\\GN24124\\241209\\coherence\\session1"
+    thisDir = r"C:\Users\neuroLaptop\Documents\GN25006\250312\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22056/220905/densities"
     # thisDir = r"C:\Users\neuroLaptop\Documents\GN25040\250106\conflict\session1"
