@@ -492,16 +492,17 @@ def main(thisDir, json_file):
             temperature_pattern = "lux*.csv"
             termperature_pattern_meta="meta*.csv"
             led_files = find_file(thisDir, temperature_pattern,termperature_pattern_meta)
-            tmp = pd.read_csv(led_files, delimiter=",", header=0, index_col=None)
-            if "Temperature" in tmp.columns:
-                tem_df_this_exp = np.column_stack(
-                    (
-                        tmp["Temperature"].values,
-                        tmp["Humidity"].values,
+            if led_files!=None:
+                tmp = pd.read_csv(led_files, delimiter=",", header=0, index_col=None)
+                if "Temperature" in tmp.columns:
+                    tem_df_this_exp = np.column_stack(
+                        (
+                            tmp["Temperature"].values,
+                            tmp["Humidity"].values,
+                        )
                     )
-                )
-            else:
-                print("work in progress. Needs to organise this pandas dataframe")
+                else:
+                    print("work in progress. Needs to organise this pandas dataframe")
         else:
             if temperature_data_options.lower() == "el_usb":
                 temperature_pattern = "temperature_humidity*.txt"
@@ -558,8 +559,8 @@ def main(thisDir, json_file):
 
     ##Firstly, load stimulus information
     stim_info = pd.read_csv(csv_file_directory)
-    if file_name == "lux4_2024-12-09T12_02_03":
-        stim_info = stim_info.iloc[:336]
+    # if file_name == "lux4_2024-12-09T12_02_03":
+    #     stim_info = stim_info.iloc[:336]
     stim_info, stim_type = sorting_trial_info(
         stim_info, visual_paradigm_name=visual_paradigm_name, exp_place=exp_place
     )
@@ -1035,7 +1036,8 @@ if __name__ == "__main__":
     # thisDir = "Z:\\DATA\\experiment_trackball_Optomotor\\MatrexVR\\GN24133\\241210\\coherence\\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24136\241210\coherence\session1"
     #thisDir = r"Z:\\DATA\\experiment_trackball_Optomotor\\MatrexVR\\GN24124\\241209\\coherence\\session1"
-    thisDir = r"C:\Users\neuroLaptop\Documents\GN25006\250312\coherence\session1"
+    #thisDir = r"C:\Users\neuroLaptop\Documents\GN25006\250312\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25009\250403\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22056/220905/densities"
     # thisDir = r"C:\Users\neuroLaptop\Documents\GN25040\250106\conflict\session1"
