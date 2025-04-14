@@ -3,13 +3,19 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
+from datetime import datetime
 
 current_working_directory = Path.cwd()
 parent_dir = current_working_directory.resolve().parents[0]
 sys.path.insert(0, str(parent_dir) + "\\utilities")
 from useful_tools import find_file, find_file_multiple_patterns
 
+def string2datetime(date_time):
+    #format = 'YYYY-MM-DD_HH_MM_SS'
+    format = "%Y-%m-%d_%H_%M_%S"
+    datetime_str = datetime.strptime(date_time, format)
 
+    return datetime_str
 def hardcode_customised_thresholds(on_thresholds, off_thresholds, animal_id):
     if animal_id == "GN24032":
         on_thresholds.append(198450)
@@ -242,6 +248,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
     trial_pattern = "trial*.csv"
     this_trial_info = find_file(thisDir, trial_pattern)
     [exp_date, exp_hour] = this_trial_info.stem.split("events")[1].split("T")
+    exp_datetime = string2datetime(f"{exp_date}_{exp_hour}")
     exp_place = this_trial_info.parts[-6]
 
     video_pattern = "*.avi"
@@ -274,7 +281,10 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         for i in range(len(led_files)):
             if int(animal_id.split("N")[1]) > 24116:
                 tmp = pd.read_csv(led_files[i], delimiter=",", header=0, index_col=None)
-                arr = tmp["Value"].values
+                if "Value" in tmp.columns:
+                    arr = tmp["Value"].values
+                elif tmp.shape[1] == 1:
+                    arr = tmp.iloc[:, 0].values
             else:
                 arr = np.genfromtxt(led_files[i], delimiter=",")
             # arr = np.genfromtxt(led_files[i], delimiter=",", dtype=int)
@@ -398,8 +408,13 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         stim_onset_frame = b2w[: len(w2b)]
         isi_onset_frame = w2b
     else:
-        stim_onset_frame = w2b
-        isi_onset_frame = b2w[: len(w2b)]
+        sync_change_date=datetime(2025, 4, 1, 12, 0, 0)
+        if exp_datetime>sync_change_date:
+            stim_onset_frame = b2w[: len(w2b)]
+            isi_onset_frame = w2b
+        else:
+            stim_onset_frame = w2b
+            isi_onset_frame = b2w[: len(w2b)]
     return stim_onset_frame, isi_onset_frame
 
 
