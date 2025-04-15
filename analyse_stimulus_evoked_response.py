@@ -562,8 +562,7 @@ def main(thisDir, json_file):
     # if file_name == "lux4_2024-12-09T12_02_03":
     #     stim_info = stim_info.iloc[:336]
     stim_info, stim_type = sorting_trial_info(
-        stim_info, visual_paradigm_name=visual_paradigm_name, exp_place=exp_place
-    )
+        stim_info, analysis_methods,exp_date)
     stimulus_timestamp = stim_info["ts"].to_numpy()
     if fictrac_posthoc_analysis:
         stim_onset, isi_onset = analyse_led_signal(thisDir, json_file, stim_info)
@@ -1037,7 +1036,8 @@ if __name__ == "__main__":
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24136\241210\coherence\session1"
     #thisDir = r"Z:\\DATA\\experiment_trackball_Optomotor\\MatrexVR\\GN24124\\241209\\coherence\\session1"
     #thisDir = r"C:\Users\neuroLaptop\Documents\GN25006\250312\coherence\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25009\250403\coherence\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25009\250403\coherence\session1"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25007\250319\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22056/220905/densities"
     # thisDir = r"C:\Users\neuroLaptop\Documents\GN25040\250106\conflict\session1"
