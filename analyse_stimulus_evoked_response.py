@@ -24,7 +24,7 @@ current_working_directory = Path.cwd()
 parent_dir = current_working_directory.resolve().parents[0]
 sys.path.insert(0, str(parent_dir) + "\\utilities")
 from useful_tools import find_file, find_nearest, calculate_fft
-from data_cleaning import sorting_trial_info, load_temperature_data
+from data_cleaning import sorting_trial_info, load_temperature_data,euclidean_distance
 
 
 class MplColorHelper:
@@ -437,9 +437,12 @@ def main(thisDir, json_file):
     yaw_angular_velocity = (
         df.loc[:, ["delta rotation vector lab z"]].values / camera_fps
     )  # unit is radian/s
-    travel_distance_fbf = np.sqrt(
-        np.add(np.square(np.diff(x_all, axis=0)), np.square(np.diff(y_all, axis=0)))
-    )
+    # travel_distance_fbf = np.sqrt(
+    #     np.add(np.square(np.diff(x_all, axis=0)), np.square(np.diff(y_all, axis=0)))
+    # )
+    travel_distance_fbf = euclean_distance(x_all,y_all)
+
+    
     if mark_jump_as_nan:
         events = extract_events(travel_distance_fbf, min_length=20)
         ##use fft to classify trials where animals jump. So far this method can be used to detect some obvious jumps but there might be some miss detecting
