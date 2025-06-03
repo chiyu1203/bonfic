@@ -283,7 +283,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
                 tmp = pd.read_csv(led_files[i], delimiter=",", header=0, index_col=None)
                 if "Value" in tmp.columns:
                     arr = tmp["Value"].values
-                elif tmp.shape[1] == 1:
+                elif tmp.shape[1] == 1 or tmp.shape[1] == 2:
                     arr = tmp.iloc[:, 0].values
             else:
                 arr = np.genfromtxt(led_files[i], delimiter=",")
@@ -328,7 +328,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
                     "GN24090",
                     "GN24095",
                     "GN24102",
-                    "GN24136",
+                    "GN24136"
                 ]:
                     on_thresholds, off_thresholds = hardcode_customised_thresholds(
                         on_thresholds, off_thresholds, animal_id

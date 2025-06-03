@@ -109,7 +109,7 @@ def analysis_stim_evoked_response_combo(
     #######Note: opto_index_isi and travel_distance is defined based on responses during the 5 sec window prior the stimulus;
     ####### whereas the summarised jaw, velocity arrays include values starting from minimal length of ISI prior to the stimulus
     velocity = travel_distance_tbt * camera_fps  # over 1.0 is probably a jump
-    opto_all_trials, opto_all_isi = probes_optomoro_index(
+    opto_all_trials, opto_all_isi = probes_optomotor_index(
         yaw_rotation_tbt, init_frame, camera_fps, isi_response_def
     )
     cum_travel_distance = np.nancumsum(travel_distance_tbt, axis=1)
@@ -280,7 +280,7 @@ def extract_stim_locked_data(
     return stim_locked_data, init_frame, end_frame
 
 
-def probes_optomoro_index(yaw_rotation_tbt, init_frame, camera_fps, isi_response_def=5):
+def probes_optomotor_index(yaw_rotation_tbt, init_frame, camera_fps, isi_response_def=5):
     sec_thres_min = 5
     sec_thres_max = 30
     sec_steps = 5
@@ -440,7 +440,8 @@ def main(thisDir, json_file):
     # travel_distance_fbf = np.sqrt(
     #     np.add(np.square(np.diff(x_all, axis=0)), np.square(np.diff(y_all, axis=0)))
     # )
-    travel_distance_fbf = euclean_distance(x_all,y_all)
+    # np.sqrt(np.add(np.square(np.diff(X)), np.square(np.diff(Y))))
+    travel_distance_fbf = np.transpose(euclidean_distance(np.transpose(x_all),np.transpose(y_all)))
 
     
     if mark_jump_as_nan:
@@ -568,7 +569,7 @@ def main(thisDir, json_file):
         stim_info, analysis_methods,exp_date)
     stimulus_timestamp = stim_info["ts"].to_numpy()
     if fictrac_posthoc_analysis:
-        stim_onset, isi_onset = analyse_led_signal(thisDir, json_file, stim_info)
+        stim_onset, isi_onset = analyse_led_signal(thisDir, analysis_methods, stim_info)
         if (
             visual_paradigm_name == "gratings"
             or visual_paradigm_name == "sweeploom"
@@ -654,7 +655,7 @@ def main(thisDir, json_file):
         ):
             stim_to_analyse = stim_info["stim_onset"]
             if type(analysis_methods.get("interval_duration")) == list:
-                ISI_duration = stim_info["ISI1"].values
+                ISI_duration = stim_info["ISI"].values
             else:
                 ISI_duration = np.repeat(
                     analysis_methods.get("interval_duration"), stim_to_analyse.shape[0]
@@ -1040,13 +1041,11 @@ if __name__ == "__main__":
     #thisDir = r"Z:\\DATA\\experiment_trackball_Optomotor\\MatrexVR\\GN24124\\241209\\coherence\\session1"
     #thisDir = r"C:\Users\neuroLaptop\Documents\GN25006\250312\coherence\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25009\250403\coherence\session1"
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25007\250319\coherence\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25007\250319\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22056/220905/densities"
-    # thisDir = r"C:\Users\neuroLaptop\Documents\GN25040\250106\conflict\session1"
-    # thisDir = (
-    #     r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN25035\250106\conflict\session1"
-    # )
+    #thisDir = r"C:\Users\neuroLaptop\Documents\GN25040\250106\conflict\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN25026\250106\conflict\session1"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
