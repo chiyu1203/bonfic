@@ -415,8 +415,10 @@ def main(thisDir, json_file):
     running_speed_threshold = 50
     turning_threshold = 0.33
     # Here to allocate files
-    pd_pattern = "lux*.csv"
-    this_PD_directory = find_file(thisDir, pd_pattern)
+    pd_start="meta"
+    #pd_ext = "lux*.csv"
+    pd_ext = f"{pd_start}*.csv"
+    this_PD_directory = find_file(thisDir, pd_ext)
     trial_pattern = "trial*.csv"
     csv_file_directory = find_file(thisDir, trial_pattern)
     tracking_csv_pattern = "tracking_*.csv"
@@ -430,6 +432,8 @@ def main(thisDir, json_file):
     if analysis_methods.get("filtering_method") == "sg_filter":
         x_all = savgol_filter(df.loc[:, ["intergrated x position"]], 71, 3, axis=0)
         y_all = savgol_filter(df.loc[:, ["intergrated y position"]], 71, 3, axis=0)
+    elif analysis_methods.get("filtering_method") == "rolling_median":
+        print("work in progress")
     else:
         x_all = df.loc[:, ["intergrated x position"]]
         y_all = df.loc[:, ["intergrated y position"]]
@@ -471,13 +475,16 @@ def main(thisDir, json_file):
         fig = plt.figure()  # a new figure window
         ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
         ax.scatter(x_all, y_all, c=np.arange(len(y_all)), marker=".", alpha=0.5)
-        # fig.show()
-        plt.show()
+        fig.savefig(thisDir / "trajectory_plot.png")
 
     # Here to load time and temperature data if possible
     if this_PD_directory:
         file_name = this_PD_directory.stem
-        [_, exp_time] = re.split("lux\d_", file_name)
+        if pd_start=='meta':
+            [_, exp_time]=re.split("meta_", file_name)
+        else:
+            [_, exp_time] = re.split(f"{pd_start}\d_", file_name)
+
         [exp_date, exp_hour] = re.split("T", exp_time)
         test_dt = pd.to_datetime(exp_time, format="%Y-%m-%dT%H_%M_%S")
     else:
@@ -485,7 +492,7 @@ def main(thisDir, json_file):
         exp_time = exp_date + " " + exp_hour
         test_dt = pd.to_datetime(exp_time, format="%Y-%m-%d %H_%M_%S")
     tem_df_this_exp = []
-    if temperature_data_options == None:
+    if temperature_data_options == None or temperature_data_options.lower() == "trial":# this means temperature data is stored in the trial file
         print("Temperature is not recorded in this experiment.")
     else:
         if this_temp_directory and overwrite_curated_dataset == False:
@@ -574,8 +581,22 @@ def main(thisDir, json_file):
             visual_paradigm_name == "gratings"
             or visual_paradigm_name == "sweeploom"
             or visual_paradigm_name == "conflict"
+            or visual_paradigm_name == "looming"
+            or visual_paradigm_name == "sweeping" 
         ):
-            stim_info["stim_onset"] = stim_onset
+            if stim_info['PreMovDuration'].unique()!=0:
+                if stim_onset.shape[0]%2==1:
+                    stim_onset=stim_onset[:-1]
+                if isi_onset.shape[0]%2==1:
+                    isi_onset=isi_onset[:-1]
+
+                stim_appearance_onset=stim_onset[::2]
+                stim_motion_stop_onset=stim_onset[1::2]
+                stim_onset=isi_onset[::2]
+                isi_onset=isi_onset[1::2]
+                stim_info["stim_onset"] = stim_onset
+            else:
+                stim_info["stim_onset"] = stim_onset
         else:
             transition_onset = np.ones((len(stim_onset) + len(isi_onset),), dtype=int)
             transition_onset[1::2] = stim_onset
@@ -617,6 +638,8 @@ def main(thisDir, json_file):
         or visual_paradigm_name.endswith("densities")
         or visual_paradigm_name == "gratings"
         or visual_paradigm_name == "conflict"
+        or visual_paradigm_name == "looming"
+        or visual_paradigm_name == "sweeping" 
     ):
         # Use analysis window to slice recordings into sections centered the onset of the stimulus. If analysis window is not defiend, then use interval_duration and stim duration to construct that.
         # While duration consists of more than two int, use the largest one to set analysis window
@@ -652,10 +675,15 @@ def main(thisDir, json_file):
             or visual_paradigm_name == "sweeploom"
             or visual_paradigm_name.endswith("sities")
             or visual_paradigm_name == "conflict"
+            or visual_paradigm_name == "looming"
+            or visual_paradigm_name == "sweeping" 
         ):
             stim_to_analyse = stim_info["stim_onset"]
-            if type(analysis_methods.get("interval_duration")) == list:
+            if type(analysis_methods.get("interval_duration")) == list and np.unique(stim_info["ISI"].values)>0:
                 ISI_duration = stim_info["ISI"].values
+            elif np.unique(stim_info["ISI"].values)<0:
+                ISI_duration=np.round((stim_appearance_onset[1:]-isi_onset[:-1])/camera_fps)
+                ISI_duration=np.append(ISI_duration, np.nan)
             else:
                 ISI_duration = np.repeat(
                     analysis_methods.get("interval_duration"), stim_to_analyse.shape[0]
@@ -748,12 +776,17 @@ def main(thisDir, json_file):
             linestyle="--",
             label="Stimulus Starts",
         )
-        ax2.axvline(
-            x=end_frame,
-            color="white",
-            linestyle="--",
-            label="Stimulus Ends",
-        )
+        if type(stim_duration) == list and align_with_isi_onset==False:
+            pass
+        elif align_with_isi_onset==True:
+            pass
+        else:
+            ax2.axvline(
+                x=end_frame,
+                color="white",
+                linestyle="--",
+                label="Stimulus Ends",
+            )
         if type(stim_duration) == list:
             frame_difference = (max(stim_duration) - min(stim_duration)) * camera_fps
             shortest_stim_end_frame = end_frame - frame_difference
@@ -1045,7 +1078,10 @@ if __name__ == "__main__":
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23016\230328\densities"
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22056/220905/densities"
     #thisDir = r"C:\Users\neuroLaptop\Documents\GN25040\250106\conflict\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN25026\250106\conflict\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN25026\250106\conflict\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\looming\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25101\250917\looming\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\coherence\session1"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()

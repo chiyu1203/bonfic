@@ -130,7 +130,7 @@ def edge_detector(inp):
     return np.arange(len(inp) - 1)[~inp[:-1] & inp[1:]]
 
 
-def detect_transition(arr, on_threshold, off_threshold, analysis_methods):
+def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_info=None):
     sample_rate = analysis_methods.get("camera_fps")
     pre_stim_interval = analysis_methods.get("prestim_duration")
     interval_duration = analysis_methods.get("interval_duration")
@@ -155,12 +155,21 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods):
 
     pass_threshold = off_threshold > arr
     pass_threshold_index = np.where(pass_threshold)[0]
-    down_phase = np.append(
-        pass_threshold_index[0],
-        pass_threshold_index[1:][
-            np.diff(pass_threshold_index) > min_isi * 0.8 * sample_rate
-        ],
-    )
+    if stim_info['PreMovDuration'].unique()!=0 and 'PreMovDuration' in stim_info.columns:
+
+        down_phase = np.append(
+            pass_threshold_index[0],
+            pass_threshold_index[1:][
+                np.diff(pass_threshold_index) > stim_info['PreMovDuration'].unique() * 0.8 * sample_rate
+            ],
+        )
+    else:
+        down_phase = np.append(
+            pass_threshold_index[0],
+            pass_threshold_index[1:][
+                np.diff(pass_threshold_index) > min_isi * 0.8 * sample_rate
+            ],
+        )
     w2b = down_phase[down_phase > sample_rate * (pre_stim_interval - 20)]
 
     return b2w, w2b
@@ -238,6 +247,8 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         visual_paradigm_name == "gratings"
         or visual_paradigm_name == "sloom"
         or visual_paradigm_name == "conflict"
+        or visual_paradigm_name == "looming"
+        or visual_paradigm_name == "sweeping"        
     ):
         trial_num = stim_info.shape[0]
     else:
@@ -257,7 +268,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
     # output_file_name = file_name + "_timestamp.csv"
 
     # Load videos
-    led_pattern = ["*sync_pulse.csv", "*LED.csv", "lux*.csv"]
+    led_pattern = ["*sync_pulse.csv", "*LED.csv", "lux*.csv","meta*.csv"]
     led_files = find_file_multiple_patterns(thisDir, led_pattern)
     if led_files is None:
         return print("led file is not found")
@@ -284,7 +295,10 @@ def analyse_led_signal(thisDir, json_file, stim_info):
                 if "Value" in tmp.columns:
                     arr = tmp["Value"].values
                 elif tmp.shape[1] == 1 or tmp.shape[1] == 2:
-                    arr = tmp.iloc[:, 0].values
+                    if exp_place=='Zball':
+                        arr = tmp.iloc[:, 1].values        
+                    else:
+                        arr = tmp.iloc[:, 0].values
             else:
                 arr = np.genfromtxt(led_files[i], delimiter=",")
             # arr = np.genfromtxt(led_files[i], delimiter=",", dtype=int)
@@ -374,8 +388,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         ax.axhline(y=on_thresholds[i], color="red", linestyle="--", label="Threshold")
         fig.show()
         b2w, w2b = detect_transition(
-            led_value[i], on_thresholds[i], off_thresholds[i], analysis_methods
-        )
+            led_value[i], on_thresholds[i], off_thresholds[i], analysis_methods,stim_info)
         ax1.scatter(np.arange(b2w.shape[0] - 1), np.diff(b2w), c="b")
         ax1.scatter(np.arange(w2b.shape[0] - 1), np.diff(w2b), c="r")
         """hardcode here for the pilot experiment due to sync path for 0 coherence stimulus is programmed into the wrong colour"""
@@ -396,8 +409,11 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         ]:
             b2w = fill_dropframe_ttl(b2w, stim_info, analysis_methods)
             w2b = fill_dropframe_ttl(w2b, stim_info, analysis_methods)
-        b2w = b2w[: trial_num + 1]
-        w2b = w2b[:trial_num]
+        if stim_info['PreMovDuration'].unique()!=0 and 'PreMovDuration' in stim_info.columns:
+            pass    
+        else:
+            b2w = b2w[: trial_num + 1]
+            w2b = w2b[:trial_num]
 
     ## this probably means the same as dict fictrac_posthoc_analysis, if fictrac_vidLog exists, then probably do not posthoc analysis
     if fictrac_vidLog:
