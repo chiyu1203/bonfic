@@ -1,6 +1,6 @@
 {
     "exp_place": "Zball",
-    "experiment_name": "looming",
+    "experiment_name": "coherence",
     "temperature_data_options": "trial",
     "overwrite_curated_dataset": true,
     "graph_colour_code": [
@@ -33,17 +33,16 @@
     "camera_fps": 100,
     "trackball_radius": 50,
     "monitor_fps": 144,
-    "prestim_duration": 60,
+    "prestim_duration": 180,
     "stim_duration": [
-        1,
-        4,
-        8,
-        16
+        5,
+        25,
+        50
     ],
     "interval_duration": [
         5,
-        10,
-        15
+        25,
+        50
     ],
     "analysis_window": [
         -15,

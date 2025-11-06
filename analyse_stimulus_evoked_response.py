@@ -385,7 +385,8 @@ def optomotor_response_idx(ev_dat):
 
 
 def main(thisDir, json_file):
-    thisDir = Path(thisDir)
+    if type(thisDir)==str:
+        thisDir = Path(thisDir)
     # Figuring out path and directory
     if isinstance(json_file, dict):
         analysis_methods = json_file
@@ -538,7 +539,7 @@ def main(thisDir, json_file):
             except:
                 print("raw temperature file is not found")
         if save_output == True and len(tem_df_this_exp) > 0:
-            np_file_name = Path(thisDir) / "temperature_humidity.npy.gz"
+            np_file_name = thisDir / "temperature_humidity.npy.gz"
             f = gzip.GzipFile(np_file_name, "w")
             np.save(file=f, arr=tem_df_this_exp)
             f.close()
@@ -569,6 +570,26 @@ def main(thisDir, json_file):
         tracking_info["value"] = pd.to_numeric(tracking_info["value"])
 
     ##Firstly, load stimulus information
+    # if temperature_data_options.lower() == "trial" and exp_place.lower()=='zball':
+    #     if visual_paradigm_name=='coherence':
+    #         skip_row_in_trial=19
+    #     elif visual_paradigm_name=='gratings':
+    #         if exp_date=='2025-11-02':
+    #             skip_row_in_trial=23
+    #         elif exp_date=='2025-11-01':
+    #             skip_row_in_trial=22
+    #     elif visual_paradigm_name=='looming':
+    #         skip_row_in_trial=22
+    #     elif visual_paradigm_name=='sweeping':
+    #         if exp_date=='2025-11-02':
+    #             skip_row_in_trial=19
+    #         elif exp_date=='2025-11-01':
+    #             skip_row_in_trial=22
+    #     header_in_trial=None
+    # else:
+    #     skip_row_in_trial=None
+    #     header_in_trial=0
+    #stim_info = pd.read_csv(csv_file_directory,header=header_in_trial,skiprows=skip_row_in_trial)
     stim_info = pd.read_csv(csv_file_directory)
     # if file_name == "lux4_2024-12-09T12_02_03":
     #     stim_info = stim_info.iloc[:336]
@@ -800,11 +821,11 @@ def main(thisDir, json_file):
         else:
             xticks = [init_frame, end_frame]
             xticklabels = ["0", str(stim_duration)]
-        ax2.set(
-            xticks=xticks,
-            xticklabels=xticklabels,
-            xlabel="Time (s)",
-        )
+        # ax2.set(
+        #     xticks=xticks,
+        #     xticklabels=xticklabels,
+        #     xlabel="Time (s)",
+        # )
         # ax2.set_xticks([init_frame])
         # ax2.set_xticklabels(["0"])
         ax2.set_xlabel("Time (s)")
@@ -812,7 +833,7 @@ def main(thisDir, json_file):
         ax2.set_title("stimulus evoked velocity preview")
         plot_name = "optomotor_overview.png"
         if save_output == True:
-            fig1.savefig(Path(thisDir) / plot_name)
+            fig1.savefig(thisDir / plot_name)
         plt.show()
     if analysis_methods.get("plotting_position_dependant_fixation") == True:
         COL = MplColorHelper(colormap_name, 0, len(stim_type))
@@ -893,7 +914,7 @@ def main(thisDir, json_file):
         )
         plot_name = f"conflict_analysis_overview.png"
         if save_output == True:
-            fig5.savefig(Path(thisDir) / plot_name)
+            fig5.savefig(thisDir / plot_name)
         plt.show()
 
     if analysis_methods.get("plotting_optomotor_response") == True:
@@ -980,7 +1001,7 @@ def main(thisDir, json_file):
 
         plot_name = f"optomotor_analysis_until{(optomotor_range+1)*5}s.png"
         if save_output == True:
-            fig2.savefig(Path(thisDir) / plot_name)
+            fig2.savefig(thisDir / plot_name)
         plt.show()
 
     if analysis_methods.get("plotting_deceleration_accerleration") == True:
@@ -1035,16 +1056,16 @@ def main(thisDir, json_file):
         )  # this normalise the recovery duration from the first deceleration
 
     if save_output == True and overwrite_curated_dataset == True:
-        summary_file_name = Path(thisDir) / "behavioural_summary.pickle"
+        summary_file_name = thisDir / "behavioural_summary.pickle"
         summary_df.to_pickle(summary_file_name)
         # data_dict = summary_df.to_dict()
         data_dict = {name: col.values for name, col in summary_df.items()}
-        summary_file_name = Path(thisDir) / "behavioural_summary.mat"
+        summary_file_name = thisDir / "behavioural_summary.mat"
         savemat(summary_file_name, data_dict)
-        velocity_file_name = Path(thisDir) / "velocity_tbt.npy"
+        velocity_file_name = thisDir / "velocity_tbt.npy"
         with open(velocity_file_name, "wb") as f:
             np.save(f, velocity_arr)
-        file_name = Path(thisDir) / "angular_velocity_tbt.npy"
+        file_name = thisDir / "angular_velocity_tbt.npy"
         with open(file_name, "wb") as f:
             np.save(f, yaw_rotation_tbt)
         print("Nothing is saved in the debug mode. Move to the next animal")
@@ -1081,7 +1102,10 @@ if __name__ == "__main__":
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN25026\250106\conflict\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\looming\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25101\250917\looming\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\coherence\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\coherence\session1"
+    thisDir = r"Y:\GN25051\251101\coherence\session1"
+    #thisDir = r"Y:\GN25052\251102\coherence\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\sweeping\session1"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()

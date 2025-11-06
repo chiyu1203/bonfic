@@ -155,23 +155,24 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_in
 
     pass_threshold = off_threshold > arr
     pass_threshold_index = np.where(pass_threshold)[0]
-    if stim_info['PreMovDuration'].unique()!=0 and 'PreMovDuration' in stim_info.columns:
-
-        down_phase = np.append(
-            pass_threshold_index[0],
-            pass_threshold_index[1:][
-                np.diff(pass_threshold_index) > stim_info['PreMovDuration'].unique() * 0.8 * sample_rate
-            ],
-        )
-    else:
-        down_phase = np.append(
-            pass_threshold_index[0],
-            pass_threshold_index[1:][
-                np.diff(pass_threshold_index) > min_isi * 0.8 * sample_rate
-            ],
-        )
-    w2b = down_phase[down_phase > sample_rate * (pre_stim_interval - 20)]
-
+    if 'PreMovDuration' in stim_info.columns:
+        if stim_info['PreMovDuration'].unique()!=0:
+            # down_phase = np.append(
+            #     pass_threshold_index[0],
+            #     pass_threshold_index[1:][
+            #         np.diff(pass_threshold_index) > stim_info['PreMovDuration'].unique() * 0.8 * sample_rate
+            #     ],
+            # )
+            min_isi=stim_info['PreMovDuration'].unique()
+        else:
+            pass
+    down_phase = np.append(
+        pass_threshold_index[0],
+        pass_threshold_index[1:][
+            np.diff(pass_threshold_index) > min_isi * 0.8 * sample_rate
+        ],
+    )
+    w2b = down_phase[down_phase > sample_rate * (pre_stim_interval-10)]
     return b2w, w2b
     # =arr[transition]>0
     # bright = arr[arr > on_threshold]
@@ -243,6 +244,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
             analysis_methods = json.loads(f.read())
 
     visual_paradigm_name = analysis_methods.get("experiment_name")
+    exp_place = analysis_methods.get("exp_place")
     if (
         visual_paradigm_name == "gratings"
         or visual_paradigm_name == "sloom"
@@ -260,7 +262,6 @@ def analyse_led_signal(thisDir, json_file, stim_info):
     this_trial_info = find_file(thisDir, trial_pattern)
     [exp_date, exp_hour] = this_trial_info.stem.split("events")[1].split("T")
     exp_datetime = string2datetime(f"{exp_date}_{exp_hour}")
-    exp_place = this_trial_info.parts[-6]
 
     video_pattern = "*.avi"
     this_video = find_file(thisDir, video_pattern)
@@ -294,8 +295,8 @@ def analyse_led_signal(thisDir, json_file, stim_info):
                 tmp = pd.read_csv(led_files[i], delimiter=",", header=0, index_col=None)
                 if "Value" in tmp.columns:
                     arr = tmp["Value"].values
-                elif tmp.shape[1] == 1 or tmp.shape[1] == 2:
-                    if exp_place=='Zball':
+                elif tmp.shape[1] <3:
+                    if exp_place=='Zball' and tmp.shape[1] == 2:
                         arr = tmp.iloc[:, 1].values        
                     else:
                         arr = tmp.iloc[:, 0].values
@@ -389,6 +390,8 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         fig.show()
         b2w, w2b = detect_transition(
             led_value[i], on_thresholds[i], off_thresholds[i], analysis_methods,stim_info)
+        if visual_paradigm_name=='coherence' and exp_date=='2025-09-29':
+            w2b=np.delete(w2b, 9)
         ax1.scatter(np.arange(b2w.shape[0] - 1), np.diff(b2w), c="b")
         ax1.scatter(np.arange(w2b.shape[0] - 1), np.diff(w2b), c="r")
         """hardcode here for the pilot experiment due to sync path for 0 coherence stimulus is programmed into the wrong colour"""
@@ -409,10 +412,16 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         ]:
             b2w = fill_dropframe_ttl(b2w, stim_info, analysis_methods)
             w2b = fill_dropframe_ttl(w2b, stim_info, analysis_methods)
-        if stim_info['PreMovDuration'].unique()!=0 and 'PreMovDuration' in stim_info.columns:
-            pass    
-        else:
+        if 'PreMovDuration' in stim_info.columns:
+            if stim_info['PreMovDuration'].unique()!=0:
+                pass
+            else:
+                pass
+        elif w2b[0]<b2w[0]:#25052
             b2w = b2w[: trial_num + 1]
+            w2b = w2b[:trial_num]        
+        elif w2b[0]>b2w[0]:#25051
+            b2w = b2w[1:trial_num + 1]
             w2b = w2b[:trial_num]
 
     ## this probably means the same as dict fictrac_posthoc_analysis, if fictrac_vidLog exists, then probably do not posthoc analysis
