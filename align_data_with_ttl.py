@@ -135,14 +135,22 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_in
     pre_stim_interval = analysis_methods.get("prestim_duration")
     interval_duration = analysis_methods.get("interval_duration")
     stim_duration = analysis_methods.get("stim_duration")
-    if type(interval_duration) == list:
-        min_isi = min(interval_duration)
+    if 'PreMovDuration' in stim_info.columns:
+        if stim_info['PreMovDuration'].unique()!=0:
+            min_isi=stim_info['PreMovDuration'].unique()
+            min_stim=min(min(stim_duration),min(interval_duration))
+        else:
+            min_isi = min(interval_duration)
+            min_stim = min(stim_duration)
     else:
-        min_isi = interval_duration
-    if type(stim_duration) == list:
-        min_stim = min(stim_duration)
-    else:
-        min_stim = stim_duration
+        if type(interval_duration) == list:
+            min_isi = min(interval_duration)
+        else:
+            min_isi = interval_duration
+        if type(stim_duration) == list:
+            min_stim = min(stim_duration)
+        else:
+            min_stim = stim_duration
     pass_threshold = arr > on_threshold
     pass_threshold_index = np.where(pass_threshold)[0]
     up_phase = np.append(
@@ -151,21 +159,10 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_in
             np.diff(pass_threshold_index) > min_stim * 0.8 * sample_rate
         ],
     )
-    b2w = up_phase[up_phase > sample_rate * (pre_stim_interval - 20)]
+    b2w = up_phase[up_phase > sample_rate * (pre_stim_interval - 10)]
 
     pass_threshold = off_threshold > arr
     pass_threshold_index = np.where(pass_threshold)[0]
-    if 'PreMovDuration' in stim_info.columns:
-        if stim_info['PreMovDuration'].unique()!=0:
-            # down_phase = np.append(
-            #     pass_threshold_index[0],
-            #     pass_threshold_index[1:][
-            #         np.diff(pass_threshold_index) > stim_info['PreMovDuration'].unique() * 0.8 * sample_rate
-            #     ],
-            # )
-            min_isi=stim_info['PreMovDuration'].unique()
-        else:
-            pass
     down_phase = np.append(
         pass_threshold_index[0],
         pass_threshold_index[1:][
