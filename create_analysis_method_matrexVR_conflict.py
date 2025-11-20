@@ -22,7 +22,7 @@ analysis_methods = {
     "load_experiment_condition_from_database": True,
     "select_animals_by_condition": True,
     "analysis_by_stimulus_type": False,
-    "optomotor_index_duration": 25,
+    "duration_for_optomotor_index": 25,
     "camera_fps": 100,
     "trackball_radius": 50,
     "monitor_fps": 60,

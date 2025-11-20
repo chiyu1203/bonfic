@@ -20,12 +20,17 @@ analysis_methods = {
     "load_experiment_condition_from_database": True,
     "select_animals_by_condition": True,
     "analysis_by_stimulus_type": False,
+    "duration_for_optomotor_index":0,
     "camera_fps": 144,
     "trackball_radius": 40,
     "monitor_fps": 144,
     "stim_duration": 4,
     "interval_duration": 5,
     "prestim_duration": 60,
+    "analysis_window": [
+        -1,
+        8
+    ],
     "stim_type": [
         "c2b_f_sloom",
         "c2b_s_sloom",

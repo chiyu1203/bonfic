@@ -1,6 +1,6 @@
 {
  "exp_place": "Zball",
- "experiment_name": "looming",
+ "experiment_name": "sweeping",
  "temperature_data_options": "trial",
  "overwrite_curated_dataset": true,
  "graph_colour_code": [
@@ -25,27 +25,25 @@
  "plotting_event_related_trajectory": true,
  "plotting_deceleration_accerleration": false,
  "plotting_position_dependant_fixation": false,
- "plotting_optomotor_response": false,
+ "plotting_optomotor_response": true,
  "load_experiment_condition_from_database": true,
  "select_animals_by_condition": false,
  "analysis_by_stimulus_type": true,
- "optomotor_index_duration": 1,
+ "duration_for_optomotor_index": 5,
  "camera_fps": 100,
  "trackball_radius": 50,
  "monitor_fps": 144,
- "prestim_duration": 60,
+ "prestim_duration": 185,
  "stim_duration": [
-  1,
-  4,
-  16
+  8
  ],
  "interval_duration": [
-  20,
-  25,
-  30
+  10,
+  15,
+  20
  ],
  "analysis_window": [
   -2,
-  16
+  8
  ]
 }
