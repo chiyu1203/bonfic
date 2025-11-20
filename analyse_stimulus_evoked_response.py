@@ -16,6 +16,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib import cm
+import matplotlib.transforms as mt
 from pathlib import Path
 from align_data_with_ttl import analyse_led_signal
 
@@ -62,19 +63,12 @@ def analysis_stim_evoked_response_combo(
     analysis_methods,
     stimulus_info
 ):
-    isi_response_def=5
-    (
-        yaw_rotation_tbt,
-        init_frame,
-        end_frame,
-    ) = extract_stim_locked_data(
+    init_frame = abs(analysis_window[0]) * camera_fps
+    end_frame = analysis_window[1] * camera_fps
+    yaw_rotation_tbt = extract_stim_locked_data(
         stim_to_analyse, yaw_angular_velocity[:, 0], analysis_window, camera_fps
     )
-    (
-        travel_distance_tbt,
-        _,
-        _,
-    ) = extract_stim_locked_data(
+    travel_distance_tbt= extract_stim_locked_data(
         stim_to_analyse,
         travel_distance_fbf[:, 0],
         analysis_window,
@@ -88,21 +82,13 @@ def analysis_stim_evoked_response_combo(
             temp_tbt=stimulus_info['temperature'][1::2].values
             humid_tbt=stimulus_info['humidity'][1::2].values
     elif len(tem_df_this_exp) > 0:
-        (
-            temp_tbt,
-            _,
-            _,
-        ) = extract_stim_locked_data(
+        temp_tbt= extract_stim_locked_data(
             stim_to_analyse,
             tem_df_this_exp[:, 0],
             analysis_window,
             camera_fps,
         )
-        (
-            humid_tbt,
-            _,
-            _,
-        ) = extract_stim_locked_data(
+        humid_tbt= extract_stim_locked_data(
             stim_to_analyse,
             tem_df_this_exp[:, 1],
             analysis_window,
@@ -120,21 +106,27 @@ def analysis_stim_evoked_response_combo(
     ####### whereas the summarised jaw, velocity arrays include values starting from minimal length of ISI prior to the stimulus
     velocity = travel_distance_tbt * camera_fps  # over 1.0 is probably a jump
     cum_travel_distance = np.nancumsum(travel_distance_tbt, axis=1)
-    travel_distance_ISI = cum_travel_distance[:, init_frame]
-    travel_distance_prior_stim = (
-        cum_travel_distance[:, init_frame]
-        - cum_travel_distance[:, isi_response_def * camera_fps]
-    )  ##remove the initial five sec during isi
+    shortened_isi=5 ##set an arbitrary time window prior to the onset of stimulus for the response to ISI. This arbitary window is needed because the duration of ISI is not stored in the dataset.
+    #And then the minimal length of ISI used is usually 5 sec. Therefore, setting this duration to 5 should not cover the previous trial.
+    ## Note: if the first element in the time window is shorter than this 5 sec, then just use how long it is set in the time window
+    if shortened_isi*camera_fps<init_frame:
+        travel_distance_prior_stim = (
+            cum_travel_distance[:, init_frame]
+            - cum_travel_distance[:, shortened_isi * camera_fps]
+        )  ##remove the initial five sec during isi
+    else:
+        travel_distance_prior_stim = cum_travel_distance[:, init_frame]##this calculate the travel distance fro frame 0 to the start of the stimulus onset
+        shortened_isi=abs(analysis_window[0])
     travel_distance_during_stim = (
-        cum_travel_distance[:, end_frame] - travel_distance_ISI
+        cum_travel_distance[:, end_frame] - cum_travel_distance[:, init_frame]
     )
-    if optomotor_range>0:
+    if optomotor_range>=0:
         opto_all_trials, opto_all_isi = probes_optomotor_index(
-        yaw_rotation_tbt, init_frame, camera_fps, isi_response_def
+        yaw_rotation_tbt, init_frame,end_frame,camera_fps, shortened_isi
     )
         summary_list = {
-            "opto_index_isi": opto_all_isi[:, 0],
-            "opto_index": opto_all_trials[:, optomotor_range],
+            "opto_index_isi": opto_all_isi,
+            "opto_index": opto_all_trials,
             "travel_distance_isi": travel_distance_prior_stim,
             "travel_distance": travel_distance_during_stim,
             "stim_index": stim_to_analyse.index,
@@ -285,40 +277,27 @@ def extract_stim_locked_data(
     camera_fps,
 ):
     # print(f"plotting data from {analysis_window[0]} to {analysis_window[1]}")
-
-    init_time = abs(analysis_window[0])
-    init_frame = init_time * camera_fps
-    end_frame = analysis_window[1] * camera_fps
     index_points = generate_index_points(stim_to_analyse, analysis_window, camera_fps)
     if index_points.max() > len(data):
         print("index points exceed the length of the data, fill with nan in the end")
         nan_array = np.full((index_points.max() - len(data) + 10,), np.nan)
         data = np.hstack((data, nan_array))
     stim_locked_data = data[index_points]
-    return stim_locked_data, init_frame, end_frame
+    return stim_locked_data
 
 
-def probes_optomotor_index(yaw_rotation_tbt, init_frame, camera_fps, isi_response_def=5):
-    sec_thres_min = 5
-    sec_thres_max = 30
-    sec_steps = 5
-    ## limit the analysis of ISI response in 5 sec prior to the stimulus presentation.
-    isi_start_frame = init_frame - camera_fps * isi_response_def
-    opto_all_trials = np.ones((yaw_rotation_tbt.shape[0], 5))
-    opto_all_isi = np.ones((yaw_rotation_tbt.shape[0], 1))
-
+def probes_optomotor_index(yaw_rotation_tbt, init_frame,end_frame, camera_fps, shortened_isi):
+    isi_frame = init_frame - camera_fps * shortened_isi
+    opto_all_trials = np.ones((yaw_rotation_tbt.shape[0]))
+    opto_all_isi = np.ones((yaw_rotation_tbt.shape[0]))
     ## when quantifying optomotor response, we focus on only stimulus onset so using init_frame:end_frame
-    # this is a function to systematically calculate optomotor index based on jaw rotation vector
-    for j, analysis_length in enumerate(range(sec_thres_min, sec_thres_max, sec_steps)):
-        this_end = init_frame + analysis_length * camera_fps
-        for i in range(0, yaw_rotation_tbt.shape[0]):
-            opto_all_trials[i, j] = optomotor_response_idx(
-                yaw_rotation_tbt[i, init_frame:this_end]
-            )
-            if j == 0:
-                opto_all_isi[i, j] = optomotor_response_idx(
-                    yaw_rotation_tbt[i, isi_start_frame:init_frame]
-                )
+    for i in range(0, yaw_rotation_tbt.shape[0]):
+        opto_all_trials[i] = optomotor_response_idx(
+            yaw_rotation_tbt[i, init_frame:end_frame]
+        )
+        opto_all_isi[i] = optomotor_response_idx(
+            yaw_rotation_tbt[i, isi_frame:init_frame]
+        )
     return opto_all_trials, opto_all_isi
 
 
@@ -425,8 +404,11 @@ def main(thisDir, json_file):
     overwrite_curated_dataset = analysis_methods.get("overwrite_curated_dataset")
     mark_jump_as_nan = analysis_methods.get("mark_jump_as_nan", False)
     save_output = analysis_methods.get("save_output")
+    duration_for_optomotor_index=analysis_methods.get("duration_for_optomotor_index",0)
+    ###Think about whether to specify which rotational axis to calculate optomotor index
+    ###Maybe ensure velocity can go negative, which indicates animals move backward
     optomotor_range = (
-        int(analysis_methods.get("optomotor_index_duration") / 5) - 1
+        int(duration_for_optomotor_index / 5) - 1
     )  # minus 1 because index start from 0
     # Here to set some environmental variables
     colormap_name = "coolwarm"
@@ -496,7 +478,7 @@ def main(thisDir, json_file):
         ax.scatter(x_all, y_all, c=np.arange(len(y_all)), marker=".", alpha=0.5)
         fig.savefig(thisDir / "trajectory_plot.png")
 
-    # Here to load time and temperature data if possible
+    # Here to load time based on one of the files created by bonsai such as PD file or events files
     if this_PD_directory:
         file_name = this_PD_directory.stem
         if pd_start=='meta':
@@ -510,6 +492,7 @@ def main(thisDir, json_file):
         [exp_date, exp_hour] = csv_file_directory.stem.split("events")[1].split("T")
         exp_time = exp_date + " " + exp_hour
         test_dt = pd.to_datetime(exp_time, format="%Y-%m-%d %H_%M_%S")
+    # Here to load temperature data if possible
     tem_df_this_exp = []
     if temperature_data_options == None: 
         print("Temperature is not recorded in this experiment.")
@@ -589,33 +572,23 @@ def main(thisDir, json_file):
         tracking_info["timestamp"] = tracking_info["timestamp"].astype("float32")
         tracking_info["value"] = pd.to_numeric(tracking_info["value"])
 
-    ##Firstly, load stimulus information
-    # if temperature_data_options.lower() == "trial" and exp_place.lower()=='zball':
-    #     if visual_paradigm_name=='coherence':
-    #         skip_row_in_trial=19
-    #     elif visual_paradigm_name=='gratings':
-    #         if exp_date=='2025-11-02':
-    #             skip_row_in_trial=23
-    #         elif exp_date=='2025-11-01':
-    #             skip_row_in_trial=22
-    #     elif visual_paradigm_name=='looming':
-    #         skip_row_in_trial=22
-    #     elif visual_paradigm_name=='sweeping':
-    #         if exp_date=='2025-11-02':
-    #             skip_row_in_trial=19
-    #         elif exp_date=='2025-11-01':
-    #             skip_row_in_trial=22
-    #     header_in_trial=None
-    # else:
-    #     skip_row_in_trial=None
-    #     header_in_trial=0
-    #stim_info = pd.read_csv(csv_file_directory,header=header_in_trial,skiprows=skip_row_in_trial)
     stim_info = pd.read_csv(csv_file_directory)
     # if file_name == "lux4_2024-12-09T12_02_03":
     #     stim_info = stim_info.iloc[:336]
     stim_info, stim_type = sorting_trial_info(
         stim_info, analysis_methods,exp_date)
     stimulus_timestamp = stim_info["ts"].to_numpy()
+    ### define analysis window
+    # Use analysis window to slice recordings into sections centered the onset of the stimulus. If analysis window is not defiend, then use interval_duration and stim duration to construct that.
+    # While duration consists of more than two int, use the largest one to set analysis window
+    if analysis_methods.get("analysis_window") == None:
+        analysis_window=define_analysis_window(stim_duration,interval_duration)
+    else:
+        analysis_window = analysis_methods.get("analysis_window")
+        if visual_paradigm_name == "sweeploom":
+            presence_duration = 1
+            velocity_threshold = 5
+    ### analyse LED signal to align the onset and offset of stimuli with video frames
     if fictrac_posthoc_analysis:
         stim_onset, isi_onset = analyse_led_signal(thisDir, analysis_methods, stim_info)
         if (
@@ -669,43 +642,14 @@ def main(thisDir, json_file):
         )
         return
     ##probably need to add some function here to deal with the situation when isi_onset_log is True
-
-    if visual_paradigm_name == "sweeploom":
-        analysis_window = [-1, 8]
-        stim_duration = 4
-        presence_duration = 1
-        sweep_duration = 2
-        velocity_threshold = 5
-    elif (
-        visual_paradigm_name == "coherence"
-        or visual_paradigm_name.endswith("densities")
-        or visual_paradigm_name == "gratings"
-        or visual_paradigm_name == "conflict"
-        or visual_paradigm_name == "looming"
-        or visual_paradigm_name == "sweeping" 
-    ):
-        # Use analysis window to slice recordings into sections centered the onset of the stimulus. If analysis window is not defiend, then use interval_duration and stim duration to construct that.
-        # While duration consists of more than two int, use the largest one to set analysis window
-        if analysis_methods.get("analysis_window") == None:
-            analysis_window=define_analysis_window(stim_duration,interval_duration)
-        else:
-            analysis_window = analysis_methods.get("analysis_window")
-    else:
-        print(
-            "visual paradigm name does not match with available options. Please check"
-        )
-        return
-    log_stim_ISI_duration=True
+    
+    log_stim_ISI_duration=True### cam not remember what this option means. Remove it in the next update.
     if align_with_isi_onset:
+        ##this was designed for RDK experiment but it is not yet used
         stim_to_analyse = stim_info.loc[::2, "stim_onset"]
-        if type(interval_duration) == list:
-                analysis_window=define_analysis_window(stim_duration,interval_duration)
         ISI_duration = np.array(
                 stim_info["Duration"][stim_info.loc[1::2, "stim_onset"].index]
             )
-        optomotor_range = (
-            1  # this is used to analyse the first 5 second response from the ISI
-        )
         if log_stim_ISI_duration:
             preStim_ISI_duration = np.append(
                 analysis_methods.get("prestim_duration"), ISI_duration[:-1]
@@ -734,6 +678,7 @@ def main(thisDir, json_file):
             preStim_ISI_duration = np.append(
                 analysis_methods.get("prestim_duration"), ISI_duration[:-1]
             )
+            num_stim=stim_info.shape[0]
         else:
             stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
             if log_stim_ISI_duration:
@@ -742,6 +687,7 @@ def main(thisDir, json_file):
                 )
             else:
                 preStim_ISI_duration=stim_info
+            num_stim=int(stim_info.shape[0]/2)
     stim_name_arr = np.array(stim_info["stim_type"][stim_to_analyse.index])
     present_duration_arr = np.array(stim_info["Duration"][stim_to_analyse.index])
     (
@@ -797,8 +743,8 @@ def main(thisDir, json_file):
         ax4.set_xlabel("travel distance (mm)")
         # ax4.set_ylabel("frequency")
         ax4.set_title("travel distance 5 sec prior to the stimulus")
-
         ## draw subplot2
+        ax2 = plt.subplot(2, 3, (3, 6))
         if analysis_methods.get("analysis_by_stimulus_type") == True:
             velocity_sorted_list = []
             for thisStim in stim_type:
@@ -809,13 +755,29 @@ def main(thisDir, json_file):
                 )
             tmp = np.hstack(velocity_sorted_list)
             velocity_arr = tmp[0, :, :]
-        ax2 = plt.subplot(2, 3, (3, 6))
+            yticks = np.arange(int(num_stim/len(stim_type)/2),num_stim,int(num_stim/len(stim_type)))
+            if type(stim_type[0])==str:
+                yticklabels = [this_stim_type for this_stim_type in stim_type]
+            else:
+                yticklabels = [str(this_stim_type) for this_stim_type in stim_type]
+            ax2.set(
+                yticks=yticks,
+                yticklabels=yticklabels,
+            )
+            for this_y_mark in np.arange(int(num_stim/len(stim_type)),num_stim,int(num_stim/len(stim_type))):
+                ax2.axhline(y=this_y_mark,xmin=0,xmax=velocity_arr.shape[1],linewidth=0.3,color='w')
+            #trans=mt.blended_transform_factory(ax2.transData,ax2.transAxes)
+            #ax2.pylab.gca()
+            #ax2.hlines(y=np.arange(int(num_stim/len(stim_type)),num_stim,int(num_stim/len(stim_type))),xmin=0,xmax=velocity_arr.shape[1],linewidth=10,color='w',transform=trans)
+        else:
+            ax2.set_yticks([])
+            ax2.set_ylabel("Trial#")
+
         pcm = ax2.pcolormesh(velocity_arr, cmap="magma", vmin=0, vmax=100)
         # pcm=ax2.pcolormesh(velocity_tbt, cmap = 'magma') ##sometimes, we dont need a vmax
         ## add colorbar
         fig1.colorbar(pcm)
-        ax2.set_yticks([])
-        ax2.set_ylabel("Trial#")
+
         ## add vertical lines to indicate stimulus onset and offset
         ax2.axvline(
             x=init_frame,
@@ -947,7 +909,7 @@ def main(thisDir, json_file):
         COL = MplColorHelper(colormap_name, 0, len(stim_type))
         # colormap = np.array(["k", "y", "m", "c", "r", "b", "g", "k"])
         fig2, (ax3, ax4) = plt.subplots(
-            nrows=1, ncols=2, figsize=(18, 7), tight_layout=True
+            nrows=1, ncols=2, figsize=(36, 14), tight_layout=True
         )
         for i in range(len(stim_type)):
             this_coherence = stim_type[i]
@@ -995,7 +957,10 @@ def main(thisDir, json_file):
             linestyle="--",
             label="Stimulus Ends",
         )
-        yaw_orientation_limit = 150
+        if visual_paradigm_name=='coherence':
+            yaw_orientation_limit = 150
+        else:
+            yaw_orientation_limit = 5
         y_axis_lim = [yaw_orientation_limit * -1, yaw_orientation_limit]
         # ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
         # if stim duration is a list, plot the max and min values
@@ -1094,7 +1059,11 @@ def main(thisDir, json_file):
         file_name = thisDir / "angular_velocity_tbt.npy"
         with open(file_name, "wb") as f:
             np.save(f, yaw_rotation_tbt)
-        print("Nothing is saved in the debug mode. Move to the next animal")
+        print("Save velocity, angular velocity into array and behavioural summary as dataframe. Move to the next animal")
+        json_string = json.dumps(analysis_methods, indent=1)
+        with open(thisDir / "analysis_methods_dictionary_backup.json", "w") as f:
+            f.write(json_string)
+
     elif overwrite_curated_dataset == False:
         print(f"dont overwrite existing database.")
     else:
@@ -1146,6 +1115,9 @@ if __name__ == "__main__":
     #hisDir = r"Y:\GN25056\251116\coherence\session1"#walking animal
     #thisDir = r"Y:\GN25056\251116\coherence\session2"#walking animal, either animal jump or tracking error
     #thisDir = r"Y:\GN25051\251101\coherence\session1"
+    #thisDir = r"C:\Users\neuroLaptop\Documents\GN25056\251116\coherence\session1"
+    thisDir = r"C:\Users\neuroLaptop\Documents\GN25056\251116\coherence\session2"
+    thisDir = r"C:\Users\neuroLaptop\Documents\GN25056\251116\sweeping\session1"
     #thisDir = r"Y:\GN25052\251102\coherence\session1"#had issue detecting transition onset. prestim lasts 180 sec only. Animal did not move much.
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\sweeping\session1"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
