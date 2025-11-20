@@ -384,13 +384,15 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         )
         ax.scatter(np.arange(arr.shape[0]), arr)
         ax.axhline(y=on_thresholds[i], color="red", linestyle="--", label="Threshold")
-        fig.show()
+
         b2w, w2b = detect_transition(
             led_value[i], on_thresholds[i], off_thresholds[i], analysis_methods,stim_info)
         if visual_paradigm_name=='coherence' and exp_date=='2025-09-29':
             w2b=np.delete(w2b, 9)
         ax1.scatter(np.arange(b2w.shape[0] - 1), np.diff(b2w), c="b")
         ax1.scatter(np.arange(w2b.shape[0] - 1), np.diff(w2b), c="r")
+        plot_name = f"LED_thresholds_and_detected_transitions_{i+1}.png"
+        fig.savefig(thisDir / plot_name)
         """hardcode here for the pilot experiment due to sync path for 0 coherence stimulus is programmed into the wrong colour"""
         if exp_date in ["2024-07-19", "2024-07-17"]:
             b2w, w2b = fix_broken_ttl(b2w, w2b)
@@ -414,11 +416,11 @@ def analyse_led_signal(thisDir, json_file, stim_info):
                 pass
             else:
                 pass
-        elif w2b[0]<b2w[0]:#25052
+        elif w2b[0]<b2w[0]:
             b2w = b2w[: trial_num + 1]
             w2b = w2b[:trial_num]        
-        elif w2b[0]>b2w[0]:#25051
-            b2w = b2w[1:trial_num + 1]
+        elif w2b[0]>b2w[0]:#coherence w2b is prior to ISI; b2w is prior to stimulus w2b-b2w shows stimulus duration b2w[1:]-w2b[:-1] shows ISI duration but b2w[:-1]-w2b[:] in r"Y:\GN25052\251102\coherence\session1" and r"Y:\GN25053\251108\coherence\session1" 
+            b2w = b2w[1:trial_num + 1]## The stimulus selectivity takes 160 secs in full screen. The stimulus selectivity takes 175 secs in single monitor protocol.
             w2b = w2b[:trial_num]
 
     ## this probably means the same as dict fictrac_posthoc_analysis, if fictrac_vidLog exists, then probably do not posthoc analysis

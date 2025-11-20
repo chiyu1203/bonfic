@@ -59,8 +59,10 @@ def analysis_stim_evoked_response_combo(
     analysis_window,
     camera_fps,
     optomotor_range,
-    isi_response_def=5,
+    analysis_methods,
+    stimulus_info
 ):
+    isi_response_def=5
     (
         yaw_rotation_tbt,
         init_frame,
@@ -78,7 +80,14 @@ def analysis_stim_evoked_response_combo(
         analysis_window,
         camera_fps,
     )
-    if len(tem_df_this_exp) > 0:
+    if analysis_methods.get("temperature_data_options").lower() == "trial":
+        if analysis_methods.get("experiment_name").lower() !="coherence":
+            temp_tbt=stimulus_info['temperature'].values
+            humid_tbt=stimulus_info['humidity'].values
+        else:
+            temp_tbt=stimulus_info['temperature'][1::2].values
+            humid_tbt=stimulus_info['humidity'][1::2].values
+    elif len(tem_df_this_exp) > 0:
         (
             temp_tbt,
             _,
@@ -99,19 +108,17 @@ def analysis_stim_evoked_response_combo(
             analysis_window,
             camera_fps,
         )
+        temp_tbt=np.nanmean(temp_tbt, axis=1),
+        humid_tbt=np.nanmean(humid_tbt, axis=1),
     else:
-        # Set zeros when there is no
-        temp_tbt = np.empty((stim_to_analyse.shape[0], 2))
+        temp_tbt = np.empty((stimulus_info.shape[0], 1))
         temp_tbt[:] = np.nan
-        humid_tbt = np.empty((stim_to_analyse.shape[0], 2))
+        humid_tbt = np.empty((stimulus_info.shape[0], 1))
         humid_tbt[:] = np.nan
 
     #######Note: opto_index_isi and travel_distance is defined based on responses during the 5 sec window prior the stimulus;
     ####### whereas the summarised jaw, velocity arrays include values starting from minimal length of ISI prior to the stimulus
     velocity = travel_distance_tbt * camera_fps  # over 1.0 is probably a jump
-    opto_all_trials, opto_all_isi = probes_optomotor_index(
-        yaw_rotation_tbt, init_frame, camera_fps, isi_response_def
-    )
     cum_travel_distance = np.nancumsum(travel_distance_tbt, axis=1)
     travel_distance_ISI = cum_travel_distance[:, init_frame]
     travel_distance_prior_stim = (
@@ -121,18 +128,29 @@ def analysis_stim_evoked_response_combo(
     travel_distance_during_stim = (
         cum_travel_distance[:, end_frame] - travel_distance_ISI
     )
+    if optomotor_range>0:
+        opto_all_trials, opto_all_isi = probes_optomotor_index(
+        yaw_rotation_tbt, init_frame, camera_fps, isi_response_def
+    )
+        summary_list = {
+            "opto_index_isi": opto_all_isi[:, 0],
+            "opto_index": opto_all_trials[:, optomotor_range],
+            "travel_distance_isi": travel_distance_prior_stim,
+            "travel_distance": travel_distance_during_stim,
+            "stim_index": stim_to_analyse.index,
+            "temperature": temp_tbt,
+            "humidity": humid_tbt,
+        }
+    else:
+        summary_list={
+            "travel_distance_isi": travel_distance_prior_stim,
+            "travel_distance": travel_distance_during_stim,
+            "stim_index": stim_to_analyse.index,
+            "temperature": temp_tbt,
+            "humidity":humid_tbt
+        }
 
-    summary_list = {
-        "opto_index_isi": opto_all_isi[:, 0],
-        "opto_index": opto_all_trials[:, optomotor_range],
-        "travel_distance_isi": travel_distance_prior_stim,
-        "travel_distance": travel_distance_during_stim,
-        "stim_index": stim_to_analyse.index,
-        "temperature": np.nanmean(temp_tbt, axis=1),
-        "humidity": np.nanmean(humid_tbt, axis=1),
-    }
-
-    summary_df = pd.DataFrame(summary_list)
+    summary_df = pd.DataFrame(summary_list)  
     return (
         summary_df,
         cum_travel_distance,
@@ -493,8 +511,10 @@ def main(thisDir, json_file):
         exp_time = exp_date + " " + exp_hour
         test_dt = pd.to_datetime(exp_time, format="%Y-%m-%d %H_%M_%S")
     tem_df_this_exp = []
-    if temperature_data_options == None or temperature_data_options.lower() == "trial":# this means temperature data is stored in the trial file
+    if temperature_data_options == None: 
         print("Temperature is not recorded in this experiment.")
+    elif temperature_data_options.lower() == "trial":# this means temperature data is stored together with the trial logging file
+        print("Temperature is recorded together with trial information.")
     else:
         if this_temp_directory and overwrite_curated_dataset == False:
             f = gzip.GzipFile(this_temp_directory, "r")
@@ -615,6 +635,8 @@ def main(thisDir, json_file):
                 stim_motion_stop_onset=stim_onset[1::2]
                 stim_onset=isi_onset[::2]
                 isi_onset=isi_onset[1::2]
+                print("stimulus duration + 0.5 sec")
+                print(isi_onset-stim_onset)
                 stim_info["stim_onset"] = stim_onset
             else:
                 stim_info["stim_onset"] = stim_onset
@@ -722,7 +744,6 @@ def main(thisDir, json_file):
                 preStim_ISI_duration=stim_info
     stim_name_arr = np.array(stim_info["stim_type"][stim_to_analyse.index])
     present_duration_arr = np.array(stim_info["Duration"][stim_to_analyse.index])
-
     (
         summary_df,
         cum_travel_distance,
@@ -738,7 +759,10 @@ def main(thisDir, json_file):
         analysis_window,
         camera_fps,
         optomotor_range,
+        analysis_methods,
+        stim_info
     )
+
     cum_yaw_rotation = np.nancumsum(yaw_rotation_tbt, axis=1)
     # add trial info to summary_df
     summary_df["stim_type"] = stim_name_arr
@@ -751,12 +775,14 @@ def main(thisDir, json_file):
         fig1 = plt.figure(figsize=(18, 7), tight_layout=True)
 
         ax = plt.subplot(231)
-        ax.hist(summary_df["opto_index"].values, bins=20)
+        if "opto_index" in summary_df.columns:
+            ax.hist(summary_df["opto_index"].values, bins=20)
         # ax.set_xlabel("optomotor index")
         ax.set_ylabel("frequency")
         ax.set_title("optomotor response during stimulus presentation")
         ax3 = plt.subplot(234)
-        ax3.hist(summary_df["opto_index_isi"].values, bins=20)
+        if "opto_index_isi" in summary_df.columns:
+            ax3.hist(summary_df["opto_index_isi"].values, bins=20)
         ax3.set_xlabel("optomotor index")
         ax3.set_ylabel("frequency")
         ax3.set_title("optomotor response 5 sec prior to the stimulus")
@@ -1103,8 +1129,24 @@ if __name__ == "__main__":
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\looming\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25101\250917\looming\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\coherence\session1"
-    thisDir = r"Y:\GN25051\251101\coherence\session1"
-    #thisDir = r"Y:\GN25052\251102\coherence\session1"
+    #thisDir = r"Y:\GN25051\251101\looming\session2"# locust loom prestim last 60 sec-only #non-walking session
+    #thisDir = r"Y:\GN25053\251108\looming\session2"# locust loom prestim last 60 sec-only #non-walking session
+    #thisDir = r"Y:\GN25053\251108\looming\session6"# locust loom prestim last 60 sec-only walking session, also showing jumping epochs
+    #thisDir = r"Y:\GN25053\251108\looming\session5"# sequential looming, so the prestim last 60 sec walking session, also showing jumping epochs
+    #thisDir = r"Y:\GN25051\251101\looming\session1"# walking session, also showing jumping epochs
+    #thisDir = r"Y:\GN25053\251108\looming\session1"# walking session, just one or two jumping epochs
+    #thisDir = r"Y:\GN25053\251108\looming\session7"# walking session, also showing jumping epochs
+    #thisDir = r"Y:\GN25052\251102\looming\session1"# walking session, also showing jumping epochs
+    #thisDir = r"Y:\GN25052\251102\sweeping\session1"
+    #thisDir = r"Y:\GN25051\251101\sweeping\session1"
+    #thisDir = r"Y:\GN25053\251108\coherence\session1"##had issue detecting transition onset. prestim lasts 180 sec only. Animal did not move much.
+    #thisDir = r"Y:\GN25054\251109\coherence\session1"#not moving at all
+    #thisDir = r"Y:\GN25055\251115\coherence\session1"#walking animal
+    #thisDir = r"Y:\GN25055\251115\coherence\session2"#walking animal
+    #hisDir = r"Y:\GN25056\251116\coherence\session1"#walking animal
+    #thisDir = r"Y:\GN25056\251116\coherence\session2"#walking animal, either animal jump or tracking error
+    #thisDir = r"Y:\GN25051\251101\coherence\session1"
+    #thisDir = r"Y:\GN25052\251102\coherence\session1"#had issue detecting transition onset. prestim lasts 180 sec only. Animal did not move much.
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\sweeping\session1"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
