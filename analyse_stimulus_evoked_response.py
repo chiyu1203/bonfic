@@ -405,6 +405,7 @@ def main(thisDir, json_file):
     mark_jump_as_nan = analysis_methods.get("mark_jump_as_nan", False)
     save_output = analysis_methods.get("save_output")
     duration_for_optomotor_index=analysis_methods.get("duration_for_optomotor_index",0)
+    yaw_axis=analysis_methods.get("yaw_axis","z").lower()# define which axis to use to examine animal's rotational velocity
     ###Think about whether to specify which rotational axis to calculate optomotor index
     ###Maybe ensure velocity can go negative, which indicates animals move backward
     optomotor_range = (
@@ -438,17 +439,12 @@ def main(thisDir, json_file):
     else:
         x_all = df.loc[:, ["intergrated x position"]]
         y_all = df.loc[:, ["intergrated y position"]]
+    travel_distance_fbf = np.transpose(euclidean_distance(np.transpose(x_all),np.transpose(y_all)))
     ## here write an additional function to classify stationary, moving and total travel distance
     yaw_angular_velocity = (
-        df.loc[:, ["delta rotation vector lab z"]].values / camera_fps
+        df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values
     )  # unit is radian/s
-    # travel_distance_fbf = np.sqrt(
-    #     np.add(np.square(np.diff(x_all, axis=0)), np.square(np.diff(y_all, axis=0)))
-    # )
-    # np.sqrt(np.add(np.square(np.diff(X)), np.square(np.diff(Y))))
-    travel_distance_fbf = np.transpose(euclidean_distance(np.transpose(x_all),np.transpose(y_all)))
 
-    
     if mark_jump_as_nan:
         events = extract_events(travel_distance_fbf, min_length=20)
         ##use fft to classify trials where animals jump. So far this method can be used to detect some obvious jumps but there might be some miss detecting
@@ -958,9 +954,9 @@ def main(thisDir, json_file):
             label="Stimulus Ends",
         )
         if visual_paradigm_name=='coherence':
-            yaw_orientation_limit = 150
+            yaw_orientation_limit = 1.5
         else:
-            yaw_orientation_limit = 5
+            yaw_orientation_limit = 0.05
         y_axis_lim = [yaw_orientation_limit * -1, yaw_orientation_limit]
         # ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
         # if stim duration is a list, plot the max and min values

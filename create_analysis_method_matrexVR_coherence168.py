@@ -24,6 +24,7 @@ analysis_methods = {
     "select_animals_by_condition": True,
     "analysis_by_stimulus_type": False,
     "duration_for_optomotor_index": 25,
+    "yaw_axis":"z",
     "camera_fps": 100,
     "trackball_radius": 50,
     "monitor_fps": 60,
