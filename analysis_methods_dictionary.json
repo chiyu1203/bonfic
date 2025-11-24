@@ -3,6 +3,7 @@
     "experiment_name": "sweeping",
     "temperature_data_options": "trial",
     "overwrite_curated_dataset": true,
+    "load_previous_methods": false,
     "graph_colour_code": [
         "r",
         "y",
@@ -34,14 +35,16 @@
     "camera_fps": 100,
     "trackball_radius": 50,
     "monitor_fps": 144,
-    "prestim_duration": 185,
+    "prestim_duration": 205,
     "stim_duration": [
+        1,
+        4,
         8
     ],
     "interval_duration": [
-        10,
-        15,
-        20
+        4,
+        5,
+        6
     ],
     "analysis_window": [
         -2,

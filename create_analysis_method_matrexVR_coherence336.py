@@ -6,6 +6,7 @@ analysis_methods = {
     "experiment_name": "coherence",
     "temperature_data_options": "bonsai",
     "overwrite_curated_dataset": True,
+    "load_previous_methods": True,
     "graph_colour_code": ["r", "y", "m", "c", "k", "b", "g", "r"],
     "save_output": True,
     "fictrac_posthoc_analysis": True,

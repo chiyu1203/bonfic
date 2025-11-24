@@ -6,6 +6,7 @@ analysis_methods = {
     "experiment_name": "coherence",
     "overwrite_curated_dataset": True,
     "temperature_data_options": None,
+    "load_previous_methods": True,
     "graph_colour_code": ["r", "y", "m", "c", "k", "b", "g", "r"],
     "save_output": False,
     "fictrac_posthoc_analysis": False,

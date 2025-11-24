@@ -54,17 +54,18 @@ def a_guest(x):
 
 def analysis_stim_evoked_response_combo(
     stim_to_analyse,
+    stimulus_info,
     yaw_angular_velocity,
     travel_distance_fbf,
     tem_df_this_exp,
-    analysis_window,
-    camera_fps,
-    optomotor_range,
-    analysis_methods,
-    stimulus_info
+    analysis_methods
+
 ):
+    analysis_window=analysis_methods.get("analysis_window")
+    camera_fps=analysis_methods.get("camera_fps")
     init_frame = abs(analysis_window[0]) * camera_fps
     end_frame = analysis_window[1] * camera_fps
+    duration_for_optomotor_index=analysis_methods.get("duration_for_optomotor_index")
     yaw_rotation_tbt = extract_stim_locked_data(
         stim_to_analyse, yaw_angular_velocity[:, 0], analysis_window, camera_fps
     )
@@ -120,7 +121,7 @@ def analysis_stim_evoked_response_combo(
     travel_distance_during_stim = (
         cum_travel_distance[:, end_frame] - cum_travel_distance[:, init_frame]
     )
-    if optomotor_range>=0:
+    if duration_for_optomotor_index>=0:
         opto_all_trials, opto_all_isi = probes_optomotor_index(
         yaw_rotation_tbt, init_frame,end_frame,camera_fps, shortened_isi
     )
@@ -392,6 +393,16 @@ def main(thisDir, json_file):
             print(f"load analysis methods from file {json_file}")
             analysis_methods = json.loads(f.read())
     # Load analysis methods
+    load_previous_methods=analysis_methods.get("load_previous_methods",False)
+    if load_previous_methods:
+        previous_methods_file=find_file(thisDir, "analysis_methods_dictionary_backup.json")
+        if previous_methods_file!=None:
+            with open(previous_methods_file, "r") as f:
+                print(f"load analysis methods from previous file {previous_methods_file}")
+                previous_analysis_methods = json.loads(f.read())
+            analysis_methods.update(previous_analysis_methods)
+        else:
+            print("previous analysis methods file is not found. Use the current one.")
     monitor_fps = analysis_methods.get("monitor_fps")
     camera_fps = analysis_methods.get("camera_fps")
     stim_duration = analysis_methods.get("stim_duration")
@@ -408,9 +419,6 @@ def main(thisDir, json_file):
     yaw_axis=analysis_methods.get("yaw_axis","z").lower()# define which axis to use to examine animal's rotational velocity
     ###Think about whether to specify which rotational axis to calculate optomotor index
     ###Maybe ensure velocity can go negative, which indicates animals move backward
-    optomotor_range = (
-        int(duration_for_optomotor_index / 5) - 1
-    )  # minus 1 because index start from 0
     # Here to set some environmental variables
     colormap_name = "coolwarm"
     sm = cm.ScalarMappable(cmap=colormap_name)
@@ -427,10 +435,13 @@ def main(thisDir, json_file):
     tracking_csv_file_directory = find_file(thisDir, tracking_csv_pattern)
     database_pattern = "database*.pickle"
     database = find_file(thisDir, database_pattern)
+    database_pattern ="database*.parquet.gzip"
+    database2 = find_file(thisDir, database_pattern)
     temperature_pattern = "temperature_humidity.npy.gz"
     this_temp_directory = find_file(thisDir, temperature_pattern)
 
     df = pd.read_pickle(database)
+    df2=pd.read_parquet(database2)
     if analysis_methods.get("filtering_method") == "sg_filter":
         x_all = savgol_filter(df.loc[:, ["intergrated x position"]], 71, 3, axis=0)
         y_all = savgol_filter(df.loc[:, ["intergrated y position"]], 71, 3, axis=0)
@@ -695,14 +706,11 @@ def main(thisDir, json_file):
         end_frame,
     ) = analysis_stim_evoked_response_combo(
         stim_to_analyse,
+        stim_info,
         yaw_angular_velocity,
         travel_distance_fbf,
         tem_df_this_exp,
-        analysis_window,
-        camera_fps,
-        optomotor_range,
-        analysis_methods,
-        stim_info
+        analysis_methods
     )
 
     cum_yaw_rotation = np.nancumsum(yaw_rotation_tbt, axis=1)
@@ -953,10 +961,8 @@ def main(thisDir, json_file):
             linestyle="--",
             label="Stimulus Ends",
         )
-        if visual_paradigm_name=='coherence':
-            yaw_orientation_limit = 1.5
-        else:
-            yaw_orientation_limit = 0.05
+
+        yaw_orientation_limit = 100
         y_axis_lim = [yaw_orientation_limit * -1, yaw_orientation_limit]
         # ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
         # if stim duration is a list, plot the max and min values
@@ -986,7 +992,7 @@ def main(thisDir, json_file):
         cbar = plt.colorbar(sm, ax=ax4, orientation="vertical", ticks=tick_positions)
         cbar.set_ticklabels(tick_labels)
 
-        plot_name = f"optomotor_analysis_until{(optomotor_range+1)*5}s.png"
+        plot_name = f"optomotor_analysis_until{duration_for_optomotor_index}s.png"
         if save_output == True:
             fig2.savefig(thisDir / plot_name)
         plt.show()
@@ -1045,7 +1051,8 @@ def main(thisDir, json_file):
     if save_output == True and overwrite_curated_dataset == True:
         summary_file_name = thisDir / "behavioural_summary.pickle"
         summary_df.to_pickle(summary_file_name)
-        # data_dict = summary_df.to_dict()
+        parquet_directory = thisDir / "behavioural_summary.parquet.gzip"
+        summary_df.to_parquet(parquet_directory,compression='gzip')
         data_dict = {name: col.values for name, col in summary_df.items()}
         summary_file_name = thisDir / "behavioural_summary.mat"
         savemat(summary_file_name, data_dict)
@@ -1103,17 +1110,15 @@ if __name__ == "__main__":
     #thisDir = r"Y:\GN25053\251108\looming\session7"# walking session, also showing jumping epochs
     #thisDir = r"Y:\GN25052\251102\looming\session1"# walking session, also showing jumping epochs
     #thisDir = r"Y:\GN25052\251102\sweeping\session1"
-    #thisDir = r"Y:\GN25051\251101\sweeping\session1"
+    thisDir = r"Y:\GN25051\251101\sweeping\session1"
     #thisDir = r"Y:\GN25053\251108\coherence\session1"##had issue detecting transition onset. prestim lasts 180 sec only. Animal did not move much.
     #thisDir = r"Y:\GN25054\251109\coherence\session1"#not moving at all
-    #thisDir = r"Y:\GN25055\251115\coherence\session1"#walking animal
-    #thisDir = r"Y:\GN25055\251115\coherence\session2"#walking animal
-    #hisDir = r"Y:\GN25056\251116\coherence\session1"#walking animal
-    #thisDir = r"Y:\GN25056\251116\coherence\session2"#walking animal, either animal jump or tracking error
+    #thisDir = r"Y:\GN25055\251115\coherence\session1"# walking session
+    #thisDir = r"Y:\GN25055\251115\coherence\session2"# walking session
+    #thisDir = r"Y:\GN25056\251116\coherence\session1"# walking session
+    #thisDir = r"Y:\GN25056\251116\coherence\session2"# walking session, either animal jump or tracking error
+    #thisDir = r"Y:\GN25057\251122\coherence\session1"# walking session
     #thisDir = r"Y:\GN25051\251101\coherence\session1"
-    #thisDir = r"C:\Users\neuroLaptop\Documents\GN25056\251116\coherence\session1"
-    thisDir = r"C:\Users\neuroLaptop\Documents\GN25056\251116\coherence\session2"
-    thisDir = r"C:\Users\neuroLaptop\Documents\GN25056\251116\sweeping\session1"
     #thisDir = r"Y:\GN25052\251102\coherence\session1"#had issue detecting transition onset. prestim lasts 180 sec only. Animal did not move much.
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\sweeping\session1"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
