@@ -440,8 +440,8 @@ def main(thisDir, json_file):
     temperature_pattern = "temperature_humidity.npy.gz"
     this_temp_directory = find_file(thisDir, temperature_pattern)
 
-    df = pd.read_pickle(database)
-    df2=pd.read_parquet(database2)
+    #df = pd.read_pickle(database)
+    df=pd.read_parquet(database2)
     if analysis_methods.get("filtering_method") == "sg_filter":
         x_all = savgol_filter(df.loc[:, ["intergrated x position"]], 71, 3, axis=0)
         y_all = savgol_filter(df.loc[:, ["intergrated y position"]], 71, 3, axis=0)
@@ -823,7 +823,10 @@ def main(thisDir, json_file):
         ax2.set_xlabel("Time (s)")
         ## add title
         ax2.set_title("stimulus evoked velocity preview")
-        plot_name = "optomotor_overview.png"
+        if analysis_methods.get("analysis_by_stimulus_type") == True:
+            plot_name = "optomotor_overview_by_type.png"
+        else:
+            plot_name = "optomotor_overview_by_time.png"
         if save_output == True:
             fig1.savefig(thisDir / plot_name)
         plt.show()
@@ -1104,13 +1107,24 @@ if __name__ == "__main__":
     #thisDir = r"Y:\GN25051\251101\looming\session2"# locust loom prestim last 60 sec-only #non-walking session
     #thisDir = r"Y:\GN25053\251108\looming\session2"# locust loom prestim last 60 sec-only #non-walking session
     #thisDir = r"Y:\GN25053\251108\looming\session6"# locust loom prestim last 60 sec-only walking session, also showing jumping epochs
+    #thisDir = r"Y:\GN25058\251123\looming\session3"
+    #thisDir = r"Y:\GN25060\251130\sweeping\session1"
+    #thisDir = r"Y:\GN25059\251129\sweeping\session1"
+    #thisDir = r"Y:\GN25057\251122\sweeping\session1"
     #thisDir = r"Y:\GN25053\251108\looming\session5"# sequential looming, so the prestim last 60 sec walking session, also showing jumping epochs
+    #thisDir = r"Y:\GN25060\251130\looming\session2"# sequential looming, so the prestim last 60 sec walking session, did not walk much
     #thisDir = r"Y:\GN25051\251101\looming\session1"# walking session, also showing jumping epochs
     #thisDir = r"Y:\GN25053\251108\looming\session1"# walking session, just one or two jumping epochs
     #thisDir = r"Y:\GN25053\251108\looming\session7"# walking session, also showing jumping epochs
     #thisDir = r"Y:\GN25052\251102\looming\session1"# walking session, also showing jumping epochs
+    #thisDir = r"Y:\GN25060\251130\looming\session1"
+    #thisDir = r"Y:\GN25060\251130\looming\session4"
+    #thisDir = r"Y:\GN25059\251129\looming\session1"#walking session
+    #thisDir = r"Y:\GN25058\251123\looming\session2"
+    #thisDir = r"Y:\GN25057\251122\looming\session2"
+    #thisDir = r"Y:\GN25059\251129\looming\session1"
     #thisDir = r"Y:\GN25052\251102\sweeping\session1"
-    thisDir = r"Y:\GN25051\251101\sweeping\session1"
+    #thisDir = r"Y:\GN25051\251101\sweeping\session1"
     #thisDir = r"Y:\GN25053\251108\coherence\session1"##had issue detecting transition onset. prestim lasts 180 sec only. Animal did not move much.
     #thisDir = r"Y:\GN25054\251109\coherence\session1"#not moving at all
     #thisDir = r"Y:\GN25055\251115\coherence\session1"# walking session
@@ -1119,7 +1133,12 @@ if __name__ == "__main__":
     #thisDir = r"Y:\GN25056\251116\coherence\session2"# walking session, either animal jump or tracking error
     #thisDir = r"Y:\GN25057\251122\coherence\session1"# walking session
     #thisDir = r"Y:\GN25051\251101\coherence\session1"
+    #thisDir = r"Y:\GN25060\251130\coherence\session2"#vertical coherence
+    #thisDir = r"Y:\GN25059\251129\coherence\session2"#vertical coherence
+    #thisDir = r"Y:\GN25059\251129\coherence\session1"#horizontal coherence
+    thisDir = r"Y:\GN25060\251130\coherence\session1"
     #thisDir = r"Y:\GN25052\251102\coherence\session1"#had issue detecting transition onset. prestim lasts 180 sec only. Animal did not move much.
+
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\sweeping\session1"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"

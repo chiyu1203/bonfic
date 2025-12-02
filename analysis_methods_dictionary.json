@@ -1,6 +1,6 @@
 {
     "exp_place": "Zball",
-    "experiment_name": "sweeping",
+    "experiment_name": "coherence",
     "temperature_data_options": "trial",
     "overwrite_curated_dataset": true,
     "load_previous_methods": false,
@@ -30,24 +30,33 @@
     "load_experiment_condition_from_database": true,
     "select_animals_by_condition": false,
     "analysis_by_stimulus_type": true,
-    "duration_for_optomotor_index": 5,
-    "yaw_axis": "z",
+    "duration_for_optomotor_index": 15,
+    "yaw_axis": "x",
     "camera_fps": 100,
     "trackball_radius": 50,
     "monitor_fps": 144,
-    "prestim_duration": 205,
+    "prestim_duration": 190,
     "stim_duration": [
-        1,
-        4,
-        8
+        5,
+        25,
+        50
     ],
     "interval_duration": [
-        4,
         5,
-        6
+        25,
+        50
     ],
     "analysis_window": [
-        -2,
-        8
+        -5,
+        50
+    ],
+    "stim_type": [
+        -100,
+        -50,
+        -20,
+        0,
+        20,
+        50,
+        100
     ]
 }

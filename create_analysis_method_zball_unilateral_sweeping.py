@@ -6,7 +6,7 @@ analysis_methods = {
     "experiment_name": "sweeping",
     "temperature_data_options": "trial",
     "overwrite_curated_dataset": True,
-    "load_previous_methods": True,
+    "load_previous_methods": False,
     "graph_colour_code": ["r", "y", "m", "c", "k", "b", "g", "r"],
     "save_output": True,
     "fictrac_posthoc_analysis": True,
