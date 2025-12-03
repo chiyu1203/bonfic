@@ -439,23 +439,32 @@ def main(thisDir, json_file):
     database2 = find_file(thisDir, database_pattern)
     temperature_pattern = "temperature_humidity.npy.gz"
     this_temp_directory = find_file(thisDir, temperature_pattern)
-
+    if int(camera_fps/2)%2==0:
+        filter_window_length=int(camera_fps/2)+1
+    else:
+        filter_window_length=int(camera_fps/2)
     #df = pd.read_pickle(database)
     df=pd.read_parquet(database2)
     if analysis_methods.get("filtering_method") == "sg_filter":
-        x_all = savgol_filter(df.loc[:, ["intergrated x position"]], 71, 3, axis=0)
-        y_all = savgol_filter(df.loc[:, ["intergrated y position"]], 71, 3, axis=0)
+        x_all = savgol_filter(df.loc[:, ["intergrated x position"]], filter_window_length, 3, axis=0)
+        y_all = savgol_filter(df.loc[:, ["intergrated y position"]], filter_window_length, 3, axis=0)
+        yaw_angular_velocity = (
+        df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values
+    )  
     elif analysis_methods.get("filtering_method") == "rolling_median":
-        print("work in progress")
+        x_all =df.loc[:, ["intergrated x position"]].rolling(filter_window_length).median()
+        y_all = df.loc[:, ["intergrated y position"]].rolling(filter_window_length).median()
+        yaw_angular_velocity = (
+        df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].rolling(filter_window_length).median().values
+    )  
     else:
         x_all = df.loc[:, ["intergrated x position"]]
         y_all = df.loc[:, ["intergrated y position"]]
+        yaw_angular_velocity = (
+        df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values
+    )  
     travel_distance_fbf = np.transpose(euclidean_distance(np.transpose(x_all),np.transpose(y_all)))
     ## here write an additional function to classify stationary, moving and total travel distance
-    yaw_angular_velocity = (
-        df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values
-    )  # unit is radian/s
-
     if mark_jump_as_nan:
         events = extract_events(travel_distance_fbf, min_length=20)
         ##use fft to classify trials where animals jump. So far this method can be used to detect some obvious jumps but there might be some miss detecting
@@ -622,8 +631,17 @@ def main(thisDir, json_file):
                 stim_info["stim_onset"] = stim_onset
         else:
             transition_onset = np.ones((len(stim_onset) + len(isi_onset),), dtype=int)
+            
             transition_onset[1::2] = stim_onset
             transition_onset[::2] = isi_onset
+            if -1 in stim_info['Duration'].unique():
+                duration_array = np.ones((len(stim_onset) + len(isi_onset),), dtype=int)* np.nan
+                stim_duration_array=np.round((isi_onset[1:]-stim_onset[:-1])/camera_fps)
+                isi_duration_array=np.round((stim_onset-isi_onset)/camera_fps)
+                duration_array[1:-1:2] = stim_duration_array
+                duration_array[::2] = isi_duration_array
+                stim_info["Duration"] = duration_array
+
             stim_info["stim_onset"] = transition_onset
     elif df["timestamp"][1] != df["timestamp"][2]:
         # compare the timestamp between event file and dat file
@@ -720,35 +738,74 @@ def main(thisDir, json_file):
     summary_df["preStim_ISI_duration"] = preStim_ISI_duration
 
     print("ready to plot graph with some data and decompose those lists")
-
+    COL = MplColorHelper(colormap_name, 0, len(stim_type))
     if analysis_methods.get("plotting_tbt_overview") == True:
+        if visual_paradigm_name=='coherence':## this should depends on the lengh of analysis window prior to stimulus
+            running_trial_distance_threshold=10
+        else:
+            running_trial_distance_threshold=10
         fig1 = plt.figure(figsize=(18, 7), tight_layout=True)
-
-        ax = plt.subplot(231)
+        ax = plt.subplot(241)
         if "opto_index" in summary_df.columns:
             ax.hist(summary_df["opto_index"].values, bins=20)
         # ax.set_xlabel("optomotor index")
         ax.set_ylabel("frequency")
         ax.set_title("optomotor response during stimulus presentation")
-        ax3 = plt.subplot(234)
+        ax1 = plt.subplot(242)
+        ax1.hist(summary_df["travel_distance"].values, bins=20)
+        # ax1.set_xlabel("travel distance (mm)")
+        # ax1.set_ylabel("frequency")
+        ax1.set_title("travel distance during stimulus presentation")
+        ax3 = plt.subplot(245)
         if "opto_index_isi" in summary_df.columns:
             ax3.hist(summary_df["opto_index_isi"].values, bins=20)
         ax3.set_xlabel("optomotor index")
         ax3.set_ylabel("frequency")
         ax3.set_title("optomotor response 5 sec prior to the stimulus")
-        # ax1.hist(travel_distance_during_stim, bins=20)
-        ax1 = plt.subplot(232)
-        ax1.hist(summary_df["travel_distance"].values, bins=20)
-        # ax1.set_xlabel("travel distance (mm)")
-        # ax1.set_ylabel("frequency")
-        ax1.set_title("travel distance during stimulus presentation")
-        ax4 = plt.subplot(235)
+        ax4 = plt.subplot(246)
         ax4.hist(summary_df["travel_distance_isi"].values, bins=20)
         ax4.set_xlabel("travel distance (mm)")
         # ax4.set_ylabel("frequency")
         ax4.set_title("travel distance 5 sec prior to the stimulus")
-        ## draw subplot2
-        ax2 = plt.subplot(2, 3, (3, 6))
+        
+        ax_stationary = plt.subplot(243)
+        ax_runnning = plt.subplot(247)
+        for i in range(len(stim_type)):
+            this_coherence = stim_type[i]
+            if type(stim_duration)==list:
+                these_velocities = velocity_arr[(summary_df["stim_type"] == this_coherence) & (summary_df['present_trial_duration']>duration_for_optomotor_index),:]
+                these_travel_distance_isi=summary_df["travel_distance_isi"][(summary_df["stim_type"] == this_coherence) & (summary_df['present_trial_duration']>duration_for_optomotor_index)].values
+            else:
+                these_velocities = velocity_arr[summary_df["stim_type"] == this_coherence, :]
+                these_travel_distance_isi=summary_df["travel_distance_isi"][summary_df["stim_type"] == this_coherence, :].values
+            
+            stationary_trial=these_velocities[these_travel_distance_isi<running_trial_distance_threshold]
+            time_points = np.arange(these_velocities.shape[1])
+            if stationary_trial.shape[0]>0:
+                time_points_b = np.tile(time_points, (stationary_trial.shape[0], 1))
+                ax_stationary.scatter(time_points_b, stationary_trial, s=1, color=COL.get_rgb(i),label=str(this_coherence))
+                #ax_stationary.plot(time_points_b, stationary_trial, color=COL.get_rgb(i),label=str(this_coherence))
+            running_trial=these_velocities[these_travel_distance_isi>running_trial_distance_threshold]
+            if running_trial.shape[0]>0:
+                time_points_b = np.tile(time_points, (running_trial.shape[0], 1))
+                ax_runnning.scatter(time_points_b, running_trial, s=1, color=COL.get_rgb(i),label=str(this_coherence))
+                #ax_runnning.plot(time_points_b, running_trial, color=COL.get_rgb(i),label=str(this_coherence))
+        ax_runnning.legend()
+        ax_stationary.legend()
+        ax_runnning.axvline(
+            x=init_frame,
+            color="black",
+            linestyle="--",
+            label="Stimulus Starts",
+        )
+        ax_stationary.axvline(
+            x=init_frame,
+            color="black",
+            linestyle="--",
+            label="Stimulus Starts",
+        )
+        ## draw subplot2 a heatmap of velocity
+        ax2 = plt.subplot(2, 4, (4, 8))
         if analysis_methods.get("analysis_by_stimulus_type") == True:
             velocity_sorted_list = []
             for thisStim in stim_type:
@@ -831,7 +888,7 @@ def main(thisDir, json_file):
             fig1.savefig(thisDir / plot_name)
         plt.show()
     if analysis_methods.get("plotting_position_dependant_fixation") == True:
-        COL = MplColorHelper(colormap_name, 0, len(stim_type))
+
         colormap = np.array(["k", "r", "b", "g", "y", "m", "c", "k"])
         fig5, (ax1, ax2, ax3) = plt.subplots(
             nrows=1, ncols=3, figsize=(18, 7), tight_layout=True
@@ -913,16 +970,18 @@ def main(thisDir, json_file):
         plt.show()
 
     if analysis_methods.get("plotting_optomotor_response") == True:
-        COL = MplColorHelper(colormap_name, 0, len(stim_type))
         # colormap = np.array(["k", "y", "m", "c", "r", "b", "g", "k"])
         fig2, (ax3, ax4) = plt.subplots(
             nrows=1, ncols=2, figsize=(36, 14), tight_layout=True
         )
         for i in range(len(stim_type)):
             this_coherence = stim_type[i]
-            this_response = summary_df.loc[
-                summary_df["stim_type"] == this_coherence, "opto_index"
-            ].values
+            if type(stim_duration)==list:
+                this_response = summary_df.loc[(summary_df["stim_type"] == this_coherence) & (summary_df['present_trial_duration']>duration_for_optomotor_index),"opto_index"].values
+            else:
+                this_response = summary_df.loc[
+                    summary_df["stim_type"] == this_coherence, "opto_index"
+                ].values
             if len(this_response) == 0:
                 continue
             mean_response = np.nanmean(this_response, axis=0)
@@ -938,11 +997,14 @@ def main(thisDir, json_file):
                 elinewidth=2,
                 capsize=3,
             )
-            this_z = cum_yaw_rotation[summary_df["stim_type"] == this_coherence, :]
-            time_points = np.arange(this_z.shape[1])
-            time_points_b = np.tile(time_points, (this_z.shape[0], 1))
-            # ax4.scatter(time_points_b, this_z, s=1, color=custom_cmap[i])
-            ax4.scatter(time_points_b, this_z, s=1, color=COL.get_rgb(i))
+            if type(stim_duration)==list:
+                this_rotational_velocity = cum_yaw_rotation[(summary_df["stim_type"] == this_coherence) & (summary_df['present_trial_duration']>duration_for_optomotor_index),:]
+            else:
+                this_rotational_velocity = cum_yaw_rotation[summary_df["stim_type"] == this_coherence, :]
+            time_points = np.arange(this_rotational_velocity.shape[1])
+            time_points_b = np.tile(time_points, (this_rotational_velocity.shape[0], 1))
+            # ax4.scatter(time_points_b, this_rotational_velocity, s=1, color=custom_cmap[i])
+            ax4.scatter(time_points_b, this_rotational_velocity, s=1, color=COL.get_rgb(i))
 
         ax3.set_ylim(-1, 1)
         # xticks=stim_type,
@@ -965,7 +1027,7 @@ def main(thisDir, json_file):
             label="Stimulus Ends",
         )
 
-        yaw_orientation_limit = 100
+        yaw_orientation_limit = 200
         y_axis_lim = [yaw_orientation_limit * -1, yaw_orientation_limit]
         # ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
         # if stim duration is a list, plot the max and min values
@@ -1135,8 +1197,8 @@ if __name__ == "__main__":
     #thisDir = r"Y:\GN25051\251101\coherence\session1"
     #thisDir = r"Y:\GN25060\251130\coherence\session2"#vertical coherence
     #thisDir = r"Y:\GN25059\251129\coherence\session2"#vertical coherence
-    #thisDir = r"Y:\GN25059\251129\coherence\session1"#horizontal coherence
-    thisDir = r"Y:\GN25060\251130\coherence\session1"
+    thisDir = r"Y:\GN25059\251129\coherence\session1"#horizontal coherence
+    #thisDir = r"Y:\GN25060\251130\coherence\session1"
     #thisDir = r"Y:\GN25052\251102\coherence\session1"#had issue detecting transition onset. prestim lasts 180 sec only. Animal did not move much.
 
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\sweeping\session1"
