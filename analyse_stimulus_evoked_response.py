@@ -770,6 +770,8 @@ def main(thisDir, json_file):
         
         ax_stationary = plt.subplot(243)
         ax_runnning = plt.subplot(247)
+        ax_stationary.set_title("stationary trial (based on travel distance during ISI)")
+        ax_runnning.set_title("running trial (based on travel distance during ISI)")
         for i in range(len(stim_type)):
             this_coherence = stim_type[i]
             if type(stim_duration)==list:
@@ -818,7 +820,7 @@ def main(thisDir, json_file):
             velocity_arr = tmp[0, :, :]
             yticks = np.arange(int(num_stim/len(stim_type)/2),num_stim,int(num_stim/len(stim_type)))
             if type(stim_type[0])==str:
-                yticklabels = [this_stim_type for this_stim_type in stim_type]
+                pass
             else:
                 yticklabels = [str(this_stim_type) for this_stim_type in stim_type]
             ax2.set(
@@ -887,6 +889,37 @@ def main(thisDir, json_file):
         if save_output == True:
             fig1.savefig(thisDir / plot_name)
         plt.show()
+
+    if visual_paradigm_name=='sweeping' or visual_paradigm_name=='looming':
+        fig_extra, axes = plt.subplots(
+            nrows=len(stim_duration), ncols=1, figsize=(18, 7), tight_layout=True
+        )
+        use_mean=True
+        use_median=False
+        for j in range(len(stim_duration)):
+            for i in range(len(stim_type)):
+                this_duration=stim_duration[j]
+                this_type=stim_type[i]
+                these_velocities = velocity_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration),:]
+                num_sample=(abs(analysis_window[0])+this_duration+1)*camera_fps
+                x_value=np.tile(np.arange(num_sample),(these_velocities.shape[0],1))
+                
+                if use_median:
+                    axes[j].plot(np.arange(num_sample),np.median(these_velocities[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                elif use_mean:
+                    axes[j].plot(np.arange(num_sample),np.mean(these_velocities[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                else:
+                    axes[j].scatter(x_value,these_velocities[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
+            if j==0:
+                axes[j].legend()
+            axes[j].set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
+       
+        plot_name = f"visual_evoked_response_different_duration.png"
+        if save_output == True:
+            fig_extra.savefig(thisDir / plot_name)
+        
+
+
     if analysis_methods.get("plotting_position_dependant_fixation") == True:
 
         colormap = np.array(["k", "r", "b", "g", "y", "m", "c", "k"])
@@ -1008,10 +1041,12 @@ def main(thisDir, json_file):
 
         ax3.set_ylim(-1, 1)
         # xticks=stim_type,
+        if visual_paradigm_name=='sweeping':
+            ax3.set_xticklabels(stim_type,rotation=45, fontsize = 10)
         ax3.set(
             xlabel=visual_paradigm_name,
             yticks=[-1, 0, 1],
-            ylabel="Optomotor Index during stimulus",
+            ylabel="Optomotor Index during stimulus"
         )
         # xticks=[np.max(stim_type), 0, np.min(stim_type)], np.sort(summary_df.stim_type.unique())
         ax4.axvline(
@@ -1169,12 +1204,17 @@ if __name__ == "__main__":
     #thisDir = r"Y:\GN25051\251101\looming\session2"# locust loom prestim last 60 sec-only #non-walking session
     #thisDir = r"Y:\GN25053\251108\looming\session2"# locust loom prestim last 60 sec-only #non-walking session
     #thisDir = r"Y:\GN25053\251108\looming\session6"# locust loom prestim last 60 sec-only walking session, also showing jumping epochs
-    #thisDir = r"Y:\GN25058\251123\looming\session3"
+    #thisDir = r"Y:\GN25058\251123\looming\session3"#locust loom
+    #thisDir = r"Y:\GN25062\251206\sweeping\session1"# bilateral sweeping, there were problem with stimulus combination. NB and BN were not used. Instead, additional NW (0,0,0,0,1,1,1,1) and WN (1,1,1,1,0,0,0,0)
+    #thisDir = r"Y:\GN25061\251205\sweeping\session1"
     #thisDir = r"Y:\GN25060\251130\sweeping\session1"
     #thisDir = r"Y:\GN25059\251129\sweeping\session1"
     #thisDir = r"Y:\GN25057\251122\sweeping\session1"
     #thisDir = r"Y:\GN25053\251108\looming\session5"# sequential looming, so the prestim last 60 sec walking session, also showing jumping epochs
     #thisDir = r"Y:\GN25060\251130\looming\session2"# sequential looming, so the prestim last 60 sec walking session, did not walk much
+    #thisDir = r"Y:\GN25062\251206\looming\session2"# sequential looming, looks promising
+    #thisDir = r"Y:\GN25061\251205\looming\session2"# sequential looming
+    #thisDir = r"Y:\GN25061\251205\looming\session4"
     #thisDir = r"Y:\GN25051\251101\looming\session1"# walking session, also showing jumping epochs
     #thisDir = r"Y:\GN25053\251108\looming\session1"# walking session, just one or two jumping epochs
     #thisDir = r"Y:\GN25053\251108\looming\session7"# walking session, also showing jumping epochs
@@ -1197,8 +1237,10 @@ if __name__ == "__main__":
     #thisDir = r"Y:\GN25051\251101\coherence\session1"
     #thisDir = r"Y:\GN25060\251130\coherence\session2"#vertical coherence
     #thisDir = r"Y:\GN25059\251129\coherence\session2"#vertical coherence
-    thisDir = r"Y:\GN25059\251129\coherence\session1"#horizontal coherence
-    #thisDir = r"Y:\GN25060\251130\coherence\session1"
+    #thisDir = r"Y:\GN25059\251129\coherence\session1"#horizontal coherence
+    #thisDir = r"Y:\GN25062\251206\coherence\session2"#horizontal coherence, not walking session
+    #thisDir = r"Y:\GN25062\251206\coherence\session1"#vertical coherence, not walking session
+    #thisDir = r"Y:\GN25060\251130\coherence\session1"#horizontal coherence, can be a good example
     #thisDir = r"Y:\GN25052\251102\coherence\session1"#had issue detecting transition onset. prestim lasts 180 sec only. Animal did not move much.
 
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\sweeping\session1"
