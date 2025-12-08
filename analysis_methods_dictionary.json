@@ -1,6 +1,6 @@
 {
     "exp_place": "Zball",
-    "experiment_name": "coherence",
+    "experiment_name": "looming",
     "temperature_data_options": "trial",
     "overwrite_curated_dataset": true,
     "load_previous_methods": false,
@@ -20,43 +20,35 @@
     "align_with_isi_onset": false,
     "mark_jump_as_nan": false,
     "active_trials_only": true,
-    "filtering_method": "sg_filter",
+    "filtering_method": "rolling_median",
     "plotting_tbt_overview": true,
     "plotting_trajectory": true,
     "plotting_event_related_trajectory": true,
     "plotting_deceleration_accerleration": false,
     "plotting_position_dependant_fixation": false,
-    "plotting_optomotor_response": true,
+    "plotting_optomotor_response": false,
     "load_experiment_condition_from_database": true,
     "select_animals_by_condition": false,
-    "analysis_by_stimulus_type": true,
-    "duration_for_optomotor_index": 15,
+    "analysis_by_stimulus_type": false,
+    "duration_for_optomotor_index": 0,
     "yaw_axis": "x",
     "camera_fps": 100,
     "trackball_radius": 50,
     "monitor_fps": 144,
-    "prestim_duration": 190,
+    "prestim_duration": 60,
     "stim_duration": [
-        5,
-        25,
-        50
+        1,
+        4,
+        8,
+        16
     ],
     "interval_duration": [
         5,
-        25,
-        50
+        10,
+        15
     ],
     "analysis_window": [
-        -5,
-        50
-    ],
-    "stim_type": [
-        -100,
-        -50,
-        -20,
-        0,
-        20,
-        50,
-        100
+        -2,
+        17
     ]
 }
