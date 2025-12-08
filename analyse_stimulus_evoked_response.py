@@ -237,6 +237,41 @@ def recovery_detection(dev_trial, dev_timing_from_analysis_window):
         index_list[i] = indices
     return index_list
 
+def plotting_visual_guided_response(metrics_arr,stim_duration,stim_type,summary_df,analysis_methods,running_trial_distance_threshold,COL):
+    analysis_window=analysis_methods.get("analysis_window")
+    camera_fps = analysis_methods.get("camera_fps")
+    fig_stationary, axes_stationary = plt.subplots(
+        nrows=len(stim_duration), ncols=1, figsize=(18, 7), tight_layout=True
+    )
+    fig_running, axes_running = plt.subplots(
+        nrows=len(stim_duration), ncols=1, figsize=(18, 7), tight_layout=True
+    )
+    use_mean=False
+    use_median=True
+    for j in range(len(stim_duration)):
+        for i in range(len(stim_type)):
+            this_duration=stim_duration[j]
+            this_type=stim_type[i]
+            these_velocities_running = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']>running_trial_distance_threshold),:]
+            these_velocities_stationary = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']<running_trial_distance_threshold),:]
+            num_sample=(abs(analysis_window[0])+this_duration+1)*camera_fps
+            x_value=np.tile(np.arange(num_sample),(these_velocities_stationary.shape[0],1))
+            
+            if use_median:
+                axes_stationary[j].plot(np.arange(num_sample),np.median(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                axes_running[j].plot(np.arange(num_sample),np.median(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+            elif use_mean:
+                axes_stationary[j].plot(np.arange(num_sample),np.mean(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                axes_running[j].plot(np.arange(num_sample),np.mean(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+            else:
+                axes_stationary[j].scatter(x_value,these_velocities_stationary[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
+                axes_running[j].scatter(x_value,these_velocities_running[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
+        if j==0:
+            axes_stationary[j].legend()
+            axes_running[j].legend()
+        axes_stationary[j].set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
+        axes_running[j].set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
+    return fig_stationary,fig_running
 
 def extract_events(array, min_length=10, threshold=0.5):
     """
@@ -891,34 +926,18 @@ def main(thisDir, json_file):
         plt.show()
 
     if visual_paradigm_name=='sweeping' or visual_paradigm_name=='looming':
-        fig_extra, axes = plt.subplots(
-            nrows=len(stim_duration), ncols=1, figsize=(18, 7), tight_layout=True
-        )
-        use_mean=True
-        use_median=False
-        for j in range(len(stim_duration)):
-            for i in range(len(stim_type)):
-                this_duration=stim_duration[j]
-                this_type=stim_type[i]
-                these_velocities = velocity_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration),:]
-                num_sample=(abs(analysis_window[0])+this_duration+1)*camera_fps
-                x_value=np.tile(np.arange(num_sample),(these_velocities.shape[0],1))
-                
-                if use_median:
-                    axes[j].plot(np.arange(num_sample),np.median(these_velocities[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
-                elif use_mean:
-                    axes[j].plot(np.arange(num_sample),np.mean(these_velocities[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
-                else:
-                    axes[j].scatter(x_value,these_velocities[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
-            if j==0:
-                axes[j].legend()
-            axes[j].set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
-       
-        plot_name = f"visual_evoked_response_different_duration.png"
+        fig_stationary,fig_running=plotting_visual_guided_response(velocity_arr,stim_duration,stim_type,summary_df,analysis_methods,running_trial_distance_threshold,COL)    
         if save_output == True:
-            fig_extra.savefig(thisDir / plot_name)
-        
-
+            plot_name = f"visual_guided_velocity_different_duration_stationary.png"
+            fig_stationary.savefig(thisDir / plot_name)
+            plot_name = f"visual_guided_velocity_different_duration_running.png"
+            fig_running.savefig(thisDir / plot_name)
+        fig_stationary,fig_running=plotting_visual_guided_response(cum_yaw_rotation,stim_duration,stim_type,summary_df,analysis_methods,running_trial_distance_threshold,COL)   
+        if save_output == True:
+            plot_name = f"visual_guided_angular_velocity_{yaw_axis}axis_different_duration_stationary.png"
+            fig_stationary.savefig(thisDir / plot_name)
+            plot_name = f"visual_guided_angular_velocit_{yaw_axis}axis_different_duration_running.png"
+            fig_running.savefig(thisDir / plot_name)
 
     if analysis_methods.get("plotting_position_dependant_fixation") == True:
 
@@ -1205,6 +1224,8 @@ if __name__ == "__main__":
     #thisDir = r"Y:\GN25053\251108\looming\session2"# locust loom prestim last 60 sec-only #non-walking session
     #thisDir = r"Y:\GN25053\251108\looming\session6"# locust loom prestim last 60 sec-only walking session, also showing jumping epochs
     #thisDir = r"Y:\GN25058\251123\looming\session3"#locust loom
+    #thisDir = r"Y:\GN25060\251130\looming\session1"#locust loom
+    #thisDir = r"Y:\GN25061\251205\looming\session3"#locust loom
     #thisDir = r"Y:\GN25062\251206\sweeping\session1"# bilateral sweeping, there were problem with stimulus combination. NB and BN were not used. Instead, additional NW (0,0,0,0,1,1,1,1) and WN (1,1,1,1,0,0,0,0)
     #thisDir = r"Y:\GN25061\251205\sweeping\session1"
     #thisDir = r"Y:\GN25060\251130\sweeping\session1"
@@ -1212,19 +1233,17 @@ if __name__ == "__main__":
     #thisDir = r"Y:\GN25057\251122\sweeping\session1"
     #thisDir = r"Y:\GN25053\251108\looming\session5"# sequential looming, so the prestim last 60 sec walking session, also showing jumping epochs
     #thisDir = r"Y:\GN25060\251130\looming\session2"# sequential looming, so the prestim last 60 sec walking session, did not walk much
-    #thisDir = r"Y:\GN25062\251206\looming\session2"# sequential looming, looks promising
+    #thisDir = r"Y:\GN25062\251206\looming\session2"# sequential looming, walking session
     #thisDir = r"Y:\GN25061\251205\looming\session2"# sequential looming
     #thisDir = r"Y:\GN25061\251205\looming\session4"
-    #thisDir = r"Y:\GN25051\251101\looming\session1"# walking session, also showing jumping epochs
-    #thisDir = r"Y:\GN25053\251108\looming\session1"# walking session, just one or two jumping epochs
-    #thisDir = r"Y:\GN25053\251108\looming\session7"# walking session, also showing jumping epochs
-    #thisDir = r"Y:\GN25052\251102\looming\session1"# walking session, also showing jumping epochs
-    #thisDir = r"Y:\GN25060\251130\looming\session1"
-    #thisDir = r"Y:\GN25060\251130\looming\session4"
-    #thisDir = r"Y:\GN25059\251129\looming\session1"#walking session
+    #thisDir = r"Y:\GN25060\251130\looming\session4"#non-walking session
+    #thisDir = r"Y:\GN25059\251129\looming\session1"#walking session #angular velocity looks weird
     #thisDir = r"Y:\GN25058\251123\looming\session2"
     #thisDir = r"Y:\GN25057\251122\looming\session2"
-    #thisDir = r"Y:\GN25059\251129\looming\session1"
+    #thisDir = r"Y:\GN25053\251108\looming\session7"# walking session, also showing jumping epochs
+    #thisDir = r"Y:\GN25053\251108\looming\session1"# walking session, just one or two jumping epochs
+    #thisDir = r"Y:\GN25052\251102\looming\session1"# walking session, also showing jumping epochs
+    #thisDir = r"Y:\GN25051\251101\looming\session1"# walking session, also showing jumping epochs    
     #thisDir = r"Y:\GN25052\251102\sweeping\session1"
     #thisDir = r"Y:\GN25051\251101\sweeping\session1"
     #thisDir = r"Y:\GN25053\251108\coherence\session1"##had issue detecting transition onset. prestim lasts 180 sec only. Animal did not move much.
