@@ -247,8 +247,8 @@ def plotting_visual_guided_response(metrics_arr,stim_type,summary_df,analysis_me
     fig_running, axes_running = plt.subplots(
         nrows=len(stim_duration), ncols=1, figsize=(18, 7), tight_layout=True
     )
-    use_mean=True
-    use_median=False
+    use_mean=False
+    use_median=True
     for j in range(len(stim_duration)):
         for i in range(len(stim_type)):
             this_duration=stim_duration[j]
@@ -373,18 +373,27 @@ def classify_trial_type(summary_df, turning_threshold, running_speed_threshold):
         )
         summary_df["optoxstim"] = summary_df["opto_index"] * summary_df["stim_type"]
 
-    turning_trials = summary_df.loc[abs(summary_df["opto_index"]) > turning_threshold]
     running_trials = summary_df.loc[
         summary_df["travel_distance"] > running_speed_threshold
     ]
-    turning_walk_trials = summary_df.loc[
-        (summary_df["travel_distance"] > running_speed_threshold)
-        & (abs(summary_df["opto_index"]) > turning_threshold)
+    stationary_trials = summary_df.loc[
+        summary_df["travel_distance"] < running_speed_threshold
     ]
-    straight_walk_trials = summary_df.loc[
-        (summary_df["travel_distance"] > running_speed_threshold)
-        & (abs(summary_df["opto_index"]) < turning_threshold)
-    ]
+    if 'opto_index' in summary_df.columns:
+        turning_trials = summary_df.loc[abs(summary_df["opto_index"]) > turning_threshold]
+
+        turning_walk_trials = summary_df.loc[
+            (summary_df["travel_distance"] > running_speed_threshold)
+            & (abs(summary_df["opto_index"]) > turning_threshold)
+        ]
+        straight_walk_trials = summary_df.loc[
+            (summary_df["travel_distance"] > running_speed_threshold)
+            & (abs(summary_df["opto_index"]) < turning_threshold)
+        ]
+    else:
+       turning_trials=None
+       turning_walk_trials=None
+       straight_walk_trials=None
     if "optoxstim" in summary_df:
         follow_trials = turning_walk_trials.loc[turning_walk_trials["optoxstim"] < 0]
         against_trials = turning_walk_trials.loc[turning_walk_trials["optoxstim"] > 0]
@@ -394,6 +403,7 @@ def classify_trial_type(summary_df, turning_threshold, running_speed_threshold):
         tmp = follow_trials.groupby("stim_type").count()
         follow_count_coherence = tmp.index.values
         follow_count = tmp.values[:, 0]
+    return running_trials,stationary_trials,straight_walk_trials,turning_trials
 
 
 def generate_index_points(stim_to_analyse, analysis_window, camera_fps):
