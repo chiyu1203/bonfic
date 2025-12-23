@@ -284,7 +284,7 @@ def plotting_visual_guided_response(metrics_arr,stim_type,summary_df,analysis_me
                 this_type=stim_type[i]
                 these_velocities_running = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']>running_trial_distance_threshold),:]
                 these_velocities_stationary = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']<running_trial_distance_threshold),:]
-                num_sample=(abs(analysis_window[0])+this_duration+1)*camera_fps
+                num_sample=(abs(analysis_window[0])+this_duration)*camera_fps
                 if use_median:
                     axes_stationary[j].plot(np.arange(num_sample),np.median(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
                     axes_running[j].plot(np.arange(num_sample),np.median(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
@@ -1307,7 +1307,8 @@ if __name__ == "__main__":
     #thisDir = r"Y:\GN25052\251102\coherence\session1"#had issue detecting transition onset. prestim lasts 180 sec only. Animal did not move much.
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25103\251222\coherence\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\sweeping\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25103\251222\sweeping\session2"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25103\251222\sweeping\session2"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25103\251222\looming\session1"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
