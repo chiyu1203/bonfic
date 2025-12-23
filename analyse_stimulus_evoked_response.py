@@ -249,29 +249,58 @@ def plotting_visual_guided_response(metrics_arr,stim_type,summary_df,analysis_me
     )
     use_mean=False
     use_median=True
-    for j in range(len(stim_duration)):
+    if len(stim_duration)==1:
         for i in range(len(stim_type)):
-            this_duration=stim_duration[j]
+            this_duration=stim_duration[0]
             this_type=stim_type[i]
             these_velocities_running = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']>running_trial_distance_threshold),:]
             these_velocities_stationary = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']<running_trial_distance_threshold),:]
-            num_sample=(abs(analysis_window[0])+this_duration+1)*camera_fps
+            num_sample=(abs(analysis_window[0])+this_duration)*camera_fps
             if use_median:
-                axes_stationary[j].plot(np.arange(num_sample),np.median(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
-                axes_running[j].plot(np.arange(num_sample),np.median(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                if these_velocities_stationary.shape[0]>0:
+                    axes_stationary.plot(np.arange(num_sample),np.median(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                if these_velocities_running.shape[0]>0:
+                    axes_running.plot(np.arange(num_sample),np.median(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
             elif use_mean:
-                axes_stationary[j].plot(np.arange(num_sample),np.mean(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
-                axes_running[j].plot(np.arange(num_sample),np.mean(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                if these_velocities_stationary.shape[0]>0:
+                    axes_stationary.plot(np.arange(num_sample),np.mean(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                if these_velocities_running.shape[0]>0:
+                    axes_running.plot(np.arange(num_sample),np.mean(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
             else:
-                x_value=np.tile(np.arange(num_sample),(these_velocities_stationary.shape[0],1))
-                axes_stationary[j].scatter(x_value,these_velocities_stationary[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
-                x_value=np.tile(np.arange(num_sample),(these_velocities_running.shape[0],1))
-                axes_running[j].scatter(x_value,these_velocities_running[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
-        if j==0:
-            axes_stationary[j].legend()
-            axes_running[j].legend()
-        axes_stationary[j].set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
-        axes_running[j].set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
+                if these_velocities_stationary.shape[0]>0:
+                    x_value=np.tile(np.arange(num_sample),(these_velocities_stationary.shape[0],1))
+                    axes_stationary.scatter(x_value,these_velocities_stationary[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
+                if these_velocities_running.shape[0]>0:    
+                    x_value=np.tile(np.arange(num_sample),(these_velocities_running.shape[0],1))
+                    axes_running.scatter(x_value,these_velocities_running[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
+        axes_stationary.legend()
+        axes_running.legend()
+        axes_stationary.set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
+        axes_running.set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
+    else:
+        for j in range(len(stim_duration)):
+            for i in range(len(stim_type)):
+                this_duration=stim_duration[j]
+                this_type=stim_type[i]
+                these_velocities_running = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']>running_trial_distance_threshold),:]
+                these_velocities_stationary = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']<running_trial_distance_threshold),:]
+                num_sample=(abs(analysis_window[0])+this_duration+1)*camera_fps
+                if use_median:
+                    axes_stationary[j].plot(np.arange(num_sample),np.median(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                    axes_running[j].plot(np.arange(num_sample),np.median(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                elif use_mean:
+                    axes_stationary[j].plot(np.arange(num_sample),np.mean(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                    axes_running[j].plot(np.arange(num_sample),np.mean(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                else:
+                    x_value=np.tile(np.arange(num_sample),(these_velocities_stationary.shape[0],1))
+                    axes_stationary[j].scatter(x_value,these_velocities_stationary[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
+                    x_value=np.tile(np.arange(num_sample),(these_velocities_running.shape[0],1))
+                    axes_running[j].scatter(x_value,these_velocities_running[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
+            if j==0:
+                axes_stationary[j].legend()
+                axes_running[j].legend()
+            axes_stationary[j].set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
+            axes_running[j].set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
     return fig_stationary,fig_running
 
 def extract_events(array, min_length=10, threshold=0.5):
@@ -737,12 +766,15 @@ def main(thisDir, json_file):
             or visual_paradigm_name == "sweeping" 
         ):
             stim_to_analyse = stim_info["stim_onset"]
-            if type(analysis_methods.get("interval_duration")) == list and np.unique(stim_info["ISI"].values)>0:
+            if type(analysis_methods.get("interval_duration")) == list and np.unique(stim_info["ISI"].values)>0:## for the situation where ISI is pre-defiend
                 ISI_duration = stim_info["ISI"].values
-            elif np.unique(stim_info["ISI"].values)<0:
-                ISI_duration=np.round((stim_appearance_onset[1:]-isi_onset[:-1])/camera_fps)
+            elif np.unique(stim_info["ISI"].values)<0:## for the situation where ISI is not pre-defined
+                if 'stim_appearance_onset' in locals():## for the situation there is stimulus appearance and motion are seperated action
+                    ISI_duration=np.round((stim_appearance_onset[1:]-isi_onset[:-1])/camera_fps)
+                else:
+                    ISI_duration=np.round((stim_onset[1:]-isi_onset[:-1])/camera_fps)
                 ISI_duration=np.append(ISI_duration, np.nan)
-            else:
+            else:## for the situation where ISI is pre-defined as a fixed value
                 ISI_duration = np.repeat(
                     analysis_methods.get("interval_duration"), stim_to_analyse.shape[0]
                 )
@@ -866,7 +898,7 @@ def main(thisDir, json_file):
             velocity_arr = tmp[0, :, :]
             yticks = np.arange(int(num_stim/len(stim_type)/2),num_stim,int(num_stim/len(stim_type)))
             if type(stim_type[0])==str:
-                pass
+                yticklabels = stim_type
             else:
                 yticklabels = [str(this_stim_type) for this_stim_type in stim_type]
             ax2.set(
@@ -1072,6 +1104,7 @@ def main(thisDir, json_file):
         ax3.set_ylim(-1, 1)
         # xticks=stim_type,
         if visual_paradigm_name=='sweeping':
+            ax3.set_xticks(stim_type)
             ax3.set_xticklabels(stim_type,rotation=45, fontsize = 10)
         ax3.set(
             xlabel=visual_paradigm_name,
@@ -1272,8 +1305,9 @@ if __name__ == "__main__":
     #thisDir = r"Y:\GN25062\251206\coherence\session1"#vertical coherence, not walking session
     #thisDir = r"Y:\GN25060\251130\coherence\session1"#horizontal coherence, can be a good example
     #thisDir = r"Y:\GN25052\251102\coherence\session1"#had issue detecting transition onset. prestim lasts 180 sec only. Animal did not move much.
-
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25103\251222\coherence\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\sweeping\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25103\251222\sweeping\session2"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()

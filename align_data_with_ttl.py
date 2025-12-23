@@ -141,7 +141,7 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_in
             min_stim=min(min(stim_duration),min(interval_duration))
         else:
             min_isi = min(interval_duration)
-            min_stim = min(stim_duration)
+            min_stim = min(min(stim_duration),min(interval_duration))# need to reformat this one. Not sure why min isi is mixed with min stim
     else:
         if type(interval_duration) == list:
             min_isi = min(interval_duration)
@@ -415,7 +415,9 @@ def analyse_led_signal(thisDir, json_file, stim_info):
             if stim_info['PreMovDuration'].unique()!=0:
                 pass
             else:
-                pass
+                b2w = b2w[:trial_num]
+                w2b = w2b[:trial_num] 
+
         elif w2b[0]<b2w[0]:
             b2w = b2w[: trial_num + 1]
             w2b = w2b[:trial_num]        
