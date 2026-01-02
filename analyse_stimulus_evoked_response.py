@@ -11,7 +11,7 @@ import json, sys, re, time, warnings, gzip
 import pandas as pd
 import numpy as np
 from scipy.io import savemat
-from scipy.signal import savgol_filter
+from scipy.signal import savgol_filter,medfilt
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -24,8 +24,10 @@ from align_data_with_ttl import analyse_led_signal
 current_working_directory = Path.cwd()
 parent_dir = current_working_directory.resolve().parents[0]
 sys.path.insert(0, str(parent_dir) + "\\utilities")
+sys.path.insert(0, str(parent_dir) + "\\ephys_behavior")
 from useful_tools import find_file, find_nearest, calculate_fft
 from data_cleaning import sorting_trial_info, load_temperature_data,euclidean_distance
+from analysis_utils import find_run_transitions
 
 
 class MplColorHelper:
@@ -369,26 +371,30 @@ def probes_optomotor_index(yaw_rotation_tbt, init_frame,end_frame, camera_fps, s
 
 ##### this works and should be faster than extract_events but for some reason this always miss the last consecutive_length-1 elements
 # for example if the correct one is 169:181, this function will return 169:177
-def classify_walk(arr, speed_threshold=10, consecutive_length=5):
-
-    binary_array = arr > speed_threshold
-
-    # Create a kernel of length 5 filled with ones
-    kernel = np.ones(consecutive_length)
-
-    # Use convolution to find the sum of 5 consecutive elements
-    conv = np.convolve(binary_array, kernel, mode="valid")
-
-    # Find the indices where the convolution result is 5 or more
-    start_indices = np.where(conv >= consecutive_length)[0]
-
-    # Adjust the indices to ensure that they point to the start of 5 or more consecutive elements
-    start_indices = [
-        idx
-        for idx in start_indices
-        if np.all(binary_array[idx : idx + consecutive_length])
-    ]
-    return np.asarray(start_indices)
+def find_state_transition(arr, thresholds= [0.03,0.05],consecutive_length=[100,100]):
+    # tmin_max=[3000,5000]
+    # run_time=np.arange(arr.shape[0])
+    # fig, (ax1, ax2) = plt.subplots(
+    #         nrows=2, ncols=1, figsize=(18, 7), tight_layout=True
+    #     )
+    # ax2.scatter(run_time[tmin_max[0]:tmin_max[1]],arr[tmin_max[0]:tmin_max[1]])
+    # #ax1.scatter(run_time[:2000],run_signal[:2000])
+    # #ax2.scatter(run_time[:2000],run_speed_smooth[:2000])
+    # ax2.axhline(y=thresholds[1],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='r')
+    # ax2.axhline(y=thresholds[0],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='k')
+    # plot_name = f"smoothing_kernel_length_angular_velocity{tmin_max[0]}_{tmin_max[1]}overview.png"
+    # fig.savefig(plot_name)
+    kernel = np.ones(consecutive_length[0])
+    state1_binary = arr > thresholds[0]
+    conv = np.convolve(state1_binary, kernel, mode="valid")
+    consecutive_points = np.where(conv >= consecutive_length[0])[0]
+    state1_starts = consecutive_points[np.insert(np.diff(consecutive_points)>=consecutive_length[1], 0, True)]
+    kernel = np.ones(consecutive_length[1])
+    state2_binary = arr < thresholds[1]
+    conv = np.convolve(state2_binary, kernel, mode="valid")
+    consecutive_points = np.where(conv >= consecutive_length[1])[0]    
+    state2_starts = consecutive_points[np.insert(np.diff(consecutive_points)>=consecutive_length[0], 0, True)]
+    return state1_starts,state2_starts
 
 
 def classify_trial_type(summary_df, turning_threshold, running_speed_threshold):
@@ -527,11 +533,25 @@ def main(thisDir, json_file):
         df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values
     )  
     elif analysis_methods.get("filtering_method") == "rolling_median":
+        run_signal = euclidean_distance(np.transpose(df.loc[:, ["intergrated x position"]]),np.transpose(df.loc[:, ["intergrated y position"]]))[0]
+
+        #inter_run_interval also means min stationary duration. Because the end goal is to calculate run-triggerd activity. This duration is set rather strict so sudden stop will be ignore
+        #
+        smooth_kernel = round(0.3*camera_fps)
+        smooth_kernel = smooth_kernel if np.mod(smooth_kernel, 2) == 1 else smooth_kernel + 1 #must be an odd number for median filter
+        run_speed_smooth =  medfilt(run_signal, int(smooth_kernel))
+        min_walk_duration=1
+        min_stationary_duration=1
+        run_start_times,stationary_start_times=find_state_transition(run_speed_smooth, thresholds=[0.03,0.05], consecutive_length=[min_walk_duration*camera_fps,min_stationary_duration*camera_fps])
+
+        #run_start_times,stationary_start_times=find_run_transitions(run_signal, run_time, thresh = [0.03,0.05,0.07], smooth_kernel = 0.3, inter_run_interval = 1, min_run_duration = 1, sample_freq = camera_fps)
         x_all =df.loc[:, ["intergrated x position"]].rolling(filter_window_length).median()
         y_all = df.loc[:, ["intergrated y position"]].rolling(filter_window_length).median()
         yaw_angular_velocity = (
         df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].rolling(filter_window_length).median().values
-    )  
+    )
+        ccw_turn_starts,cw_turn_starts=find_state_transition(np.transpose(yaw_angular_velocity)[0],thresholds=[0.04,-0.04], consecutive_length=[min_walk_duration*camera_fps,min_stationary_duration*camera_fps])
+        print(run_start_times.shape,stationary_start_times.shape,ccw_turn_starts.shape,cw_turn_starts.shape)
     else:
         x_all = df.loc[:, ["intergrated x position"]]
         y_all = df.loc[:, ["intergrated y position"]]
@@ -814,6 +834,8 @@ def main(thisDir, json_file):
     summary_df["stim_type"] = stim_name_arr
     summary_df["present_trial_duration"] = present_duration_arr
     summary_df["preStim_ISI_duration"] = preStim_ISI_duration
+    summary_df["stim_onset_thframe"]=stim_onset
+    summary_df["isi_onset_thframe"]=isi_onset
 
     print("ready to plot graph with some data and decompose those lists")
     COL = MplColorHelper(colormap_name, 0, len(stim_type))
@@ -1225,6 +1247,12 @@ def main(thisDir, json_file):
         file_name = thisDir / "angular_velocity_tbt.npy"
         with open(file_name, "wb") as f:
             np.save(f, yaw_rotation_tbt)
+        file_name = thisDir / "angular_velocity_all.npy"
+        with open(file_name, "wb") as f:
+            np.save(f, yaw_angular_velocity)
+        file_name = thisDir / "travel_distance_all.npy"
+        with open(file_name, "wb") as f:
+            np.save(f, travel_distance_fbf)
         print("Save velocity, angular velocity into array and behavioural summary as dataframe. Move to the next animal")
         json_string = json.dumps(analysis_methods, indent=1)
         with open(thisDir / "analysis_methods_dictionary_backup.json", "w") as f:
@@ -1308,7 +1336,8 @@ if __name__ == "__main__":
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25103\251222\coherence\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\sweeping\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25103\251222\sweeping\session2"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25103\251222\looming\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25103\251222\looming\session1"
+    thisDir = r"C:\Users\neuroLaptop\Documents\GN25060\251130\coherence\session1"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
