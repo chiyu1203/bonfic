@@ -27,7 +27,7 @@ sys.path.insert(0, str(parent_dir) + "\\utilities")
 sys.path.insert(0, str(parent_dir) + "\\ephys_behavior")
 from useful_tools import find_file, find_nearest, calculate_fft
 from data_cleaning import sorting_trial_info, load_temperature_data,euclidean_distance
-from analysis_utils import find_run_transitions
+#from analysis_utils import find_run_transitions
 
 
 class MplColorHelper:
@@ -593,7 +593,8 @@ def main(thisDir, json_file):
     if this_PD_directory:
         file_name = this_PD_directory.stem
         if pd_start=='meta':
-            [_, exp_time]=re.split("meta_", file_name)
+            [_,this_date_hour,this_min,this_sec]=re.split("[\d]{0}_", file_name)
+            exp_time=this_date_hour + "_" + this_min + "_" + this_sec
         else:
             [_, exp_time] = re.split(f"{pd_start}\d_", file_name)
 
@@ -1005,82 +1006,63 @@ def main(thisDir, json_file):
             fig_running.savefig(thisDir / plot_name)
 
     if analysis_methods.get("plotting_position_dependant_fixation") == True:
-
+        duration_type=stim_info['Duration'].unique()
         colormap = np.array(["k", "r", "b", "g", "y", "m", "c", "k"])
-        fig5, (ax1, ax2, ax3) = plt.subplots(
-            nrows=1, ncols=3, figsize=(18, 7), tight_layout=True
+        fig5, axes = plt.subplots(
+            nrows=1, ncols=duration_type.shape[0], figsize=(18, 7), tight_layout=True
         )
-        f_count = 0
-        s_count = 0
-        m_count = 0
-        for i in range(len(stim_type)):
-            this_type_stim = stim_type[i]
-            this_response = np.diff(
-                cum_yaw_rotation[summary_df["stim_type"] == this_type_stim, :]
-            )
-            time_points = np.arange(this_response.shape[1])
-            time_points_b = np.tile(time_points, (this_response.shape[0], 1))
-
-            if this_type_stim.endswith("fast"):
-                ax1.plot(
-                    np.mean(time_points_b, axis=0),
-                    np.mean(this_response, axis=0),
-                    color=colormap[f_count],
-                    alpha=0.2,
+        for j in range(duration_type.shape[0]):
+            this_stim_duration=duration_type[j]
+            for i in range(len(stim_type)):
+                this_type_stim = stim_type[i]
+                this_response = np.diff(
+                    cum_yaw_rotation[summary_df["stim_type"] == this_type_stim, :]
                 )
-                f_count += 1
-            elif this_type_stim.endswith("slow"):
-                ax3.plot(
-                    np.mean(time_points_b, axis=0),
-                    np.mean(this_response, axis=0),
-                    color=colormap[s_count],
-                    alpha=0.2,
+                time_points = np.arange(this_response.shape[1])
+                time_points_b = np.tile(time_points, (this_response.shape[0], 1))
+                if duration_type.shape[0]==1:
+                    axes.plot(
+                        np.mean(time_points_b, axis=0),
+                        np.mean(this_response, axis=0),
+                        color=colormap[i],
+                        alpha=0.2,
+                        label=this_type_stim,
+                    )
+                else:
+                    axes[j].plot(
+                        np.mean(time_points_b, axis=0),
+                        np.mean(this_response, axis=0),
+                        color=colormap[i],
+                        alpha=0.2,
+                        label=this_type_stim,
+                    )
+            axes.legend()
+            if duration_type.shape[0]==1:
+                axes.axvline(
+                    x=init_frame,
+                    color="black",
+                    linestyle="--",
+                    label="Stimulus Starts",
                 )
-                s_count += 1
+                axes.axvline(
+                    x=init_frame + camera_fps * this_stim_duration,
+                    color="black",
+                    linestyle="--",
+                    label="Stimulus Ends",
+                )
             else:
-                ax2.plot(
-                    np.mean(time_points_b, axis=0),
-                    np.mean(this_response, axis=0),
-                    color=colormap[m_count],
-                    alpha=0.2,
+                axes[j].axvline(
+                    x=init_frame,
+                    color="black",
+                    linestyle="--",
+                    label="Stimulus Starts",
                 )
-                m_count += 1
-        ax1.axvline(
-            x=init_frame,
-            color="black",
-            linestyle="--",
-            label="Stimulus Starts",
-        )
-        ax1.axvline(
-            x=init_frame + camera_fps * stim_duration[0],
-            color="black",
-            linestyle="--",
-            label="Stimulus Ends",
-        )
-        ax2.axvline(
-            x=init_frame,
-            color="black",
-            linestyle="--",
-            label="Stimulus Starts",
-        )
-        ax2.axvline(
-            x=init_frame + camera_fps * stim_duration[1],
-            color="black",
-            linestyle="--",
-            label="Stimulus Ends",
-        )
-        ax3.axvline(
-            x=init_frame,
-            color="black",
-            linestyle="--",
-            label="Stimulus Starts",
-        )
-        ax3.axvline(
-            x=init_frame + camera_fps * stim_duration[2],
-            color="black",
-            linestyle="--",
-            label="Stimulus Ends",
-        )
+                axes[j].axvline(
+                    x=init_frame + camera_fps * this_stim_duration,
+                    color="black",
+                    linestyle="--",
+                    label="Stimulus Ends",
+                )
         plot_name = f"conflict_analysis_overview.png"
         if save_output == True:
             fig5.savefig(thisDir / plot_name)
@@ -1094,7 +1076,7 @@ def main(thisDir, json_file):
         for i in range(len(stim_type)):
             this_coherence = stim_type[i]
             if type(stim_duration)==list:
-                this_response = summary_df.loc[(summary_df["stim_type"] == this_coherence) & (summary_df['present_trial_duration']>duration_for_optomotor_index),"opto_index"].values
+                this_response = summary_df.loc[(summary_df["stim_type"] == this_coherence) & (summary_df['present_trial_duration']>=duration_for_optomotor_index),"opto_index"].values
             else:
                 this_response = summary_df.loc[
                     summary_df["stim_type"] == this_coherence, "opto_index"
@@ -1115,18 +1097,18 @@ def main(thisDir, json_file):
                 capsize=3,
             )
             if type(stim_duration)==list:
-                this_rotational_velocity = cum_yaw_rotation[(summary_df["stim_type"] == this_coherence) & (summary_df['present_trial_duration']>duration_for_optomotor_index),:]
+                this_rotational_velocity = cum_yaw_rotation[(summary_df["stim_type"] == this_coherence) & (summary_df['present_trial_duration']>=duration_for_optomotor_index),:]
             else:
                 this_rotational_velocity = cum_yaw_rotation[summary_df["stim_type"] == this_coherence, :]
             time_points = np.arange(this_rotational_velocity.shape[1])
             time_points_b = np.tile(time_points, (this_rotational_velocity.shape[0], 1))
             # ax4.scatter(time_points_b, this_rotational_velocity, s=1, color=custom_cmap[i])
-            ax4.scatter(time_points_b, this_rotational_velocity, s=1, color=COL.get_rgb(i))
+            ax4.scatter(time_points_b, this_rotational_velocity, s=1, color=COL.get_rgb(i),label=this_coherence)
 
         ax3.set_ylim(-1, 1)
         # xticks=stim_type,
         if visual_paradigm_name=='sweeping':
-            ax3.set_xticks(stim_type)
+            #ax3.set_xticks(stim_type)
             ax3.set_xticklabels(stim_type,rotation=45, fontsize = 10)
         ax3.set(
             xlabel=visual_paradigm_name,
@@ -1337,7 +1319,22 @@ if __name__ == "__main__":
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\sweeping\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25103\251222\sweeping\session2"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25103\251222\looming\session1"
-    thisDir = r"C:\Users\neuroLaptop\Documents\GN25060\251130\coherence\session1"
+    #thisDir = r"C:\Users\neuroLaptop\Documents\GN25060\251130\coherence\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25106\251229\coherence\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25105\251229\coherence\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25104\251223\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25104\251223\conflict\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25104\251223\sweeping\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25105\251229\sweeping\session1"## needs a new scene name for bilateral ccw cw sequence
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25106\251229\sweeping\session1"## needs a new scene name for bilateral ccw cw sequence
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26102\260112\coherence\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26103\260112\coherence\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26101\260107\coherence\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26101\260108\coherence\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26101\260107\sweeping\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26101\260108\sweeping\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26102\260112\sweeping\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26103\260112\sweeping\session1"
     # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
