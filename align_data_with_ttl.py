@@ -135,28 +135,28 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_in
     pre_stim_interval = analysis_methods.get("prestim_duration")
     interval_duration = analysis_methods.get("interval_duration")
     stim_duration = analysis_methods.get("stim_duration")
+    if type(interval_duration) == list:
+        min_interval= min(interval_duration)
+    else:
+        min_interval= interval_duration
+    if type(stim_duration) == list:
+        min_stim= min(stim_duration)
+    else:
+        min_stim= stim_duration
+    min_phase_duration=[0.5,0.5]
     if 'PreMovDuration' in stim_info.columns:
         if stim_info['PreMovDuration'].unique()!=0:
-            min_isi=stim_info['PreMovDuration'].unique()
-            min_stim=min(min(stim_duration),min(interval_duration))
+            min_phase_duration=[stim_info['PreMovDuration'].unique(),min(min_stim,min_interval)]
         else:
-            min_isi = min(interval_duration)
-            min_stim = min(min(stim_duration),min(interval_duration))# need to reformat this one. Not sure why min isi is mixed with min stim
+            min_phase_duration= [min_interval,min_stim]
     else:
-        if type(interval_duration) == list:
-            min_isi = min(interval_duration)
-        else:
-            min_isi = interval_duration
-        if type(stim_duration) == list:
-            min_stim = min(stim_duration)
-        else:
-            min_stim = stim_duration
+        min_phase_duration= [min_interval,min_stim]
     pass_threshold = arr > on_threshold
     pass_threshold_index = np.where(pass_threshold)[0]
     up_phase = np.append(
         pass_threshold_index[0],
         pass_threshold_index[1:][
-            np.diff(pass_threshold_index) > min_stim * 0.8 * sample_rate
+            np.diff(pass_threshold_index) > min_phase_duration[0] * 0.8 * sample_rate
         ],
     )
     b2w = up_phase[up_phase > sample_rate * (pre_stim_interval - 10)]
@@ -166,7 +166,7 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_in
     down_phase = np.append(
         pass_threshold_index[0],
         pass_threshold_index[1:][
-            np.diff(pass_threshold_index) > min_isi * 0.8 * sample_rate
+            np.diff(pass_threshold_index) > min_phase_duration[1] * 0.8 * sample_rate
         ],
     )
     w2b = down_phase[down_phase > sample_rate * (pre_stim_interval-10)]
