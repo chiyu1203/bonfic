@@ -108,7 +108,7 @@ def analysis_stim_evoked_response_combo(
     #######Note: opto_index_isi and travel_distance is defined based on responses during the 5 sec window prior the stimulus;
     ####### whereas the summarised jaw, velocity arrays include values starting from minimal length of ISI prior to the stimulus
     velocity = travel_distance_tbt * camera_fps  # over 1.0 is probably a jump
-    cum_travel_distance = np.nancumsum(travel_distance_tbt, axis=1)
+    cum_travel_distance = np.nancumsum(travel_distance_tbt, axis=1)/camera_fps
     shortened_isi=5 ##set an arbitrary time window prior to the onset of stimulus for the response to ISI. This arbitary window is needed because the duration of ISI is not stored in the dataset.
     #And then the minimal length of ISI used is usually 5 sec. Therefore, setting this duration to 5 should not cover the previous trial.
     ## Note: if the first element in the time window is shorter than this 5 sec, then just use how long it is set in the time window
@@ -388,12 +388,18 @@ def find_state_transition(arr, thresholds= [0.03,0.05],consecutive_length=[100,1
     state1_binary = arr > thresholds[0]
     conv = np.convolve(state1_binary, kernel, mode="valid")
     consecutive_points = np.where(conv >= consecutive_length[0])[0]
-    state1_starts = consecutive_points[np.insert(np.diff(consecutive_points)>=consecutive_length[1], 0, True)]
+    if consecutive_points.shape[0]>0:
+        state1_starts = consecutive_points[np.insert(np.diff(consecutive_points)>=consecutive_length[1], 0, True)]
+    else:
+        state1_starts=np.nan
     kernel = np.ones(consecutive_length[1])
     state2_binary = arr < thresholds[1]
     conv = np.convolve(state2_binary, kernel, mode="valid")
     consecutive_points = np.where(conv >= consecutive_length[1])[0]    
-    state2_starts = consecutive_points[np.insert(np.diff(consecutive_points)>=consecutive_length[0], 0, True)]
+    if consecutive_points.shape[0]>0:
+        state2_starts = consecutive_points[np.insert(np.diff(consecutive_points)>=consecutive_length[0], 0, True)]
+    else:
+        state2_starts=np.nan
     return state1_starts,state2_starts
 
 
@@ -486,6 +492,7 @@ def main(thisDir, json_file):
             print("previous analysis methods file is not found. Use the current one.")
     monitor_fps = analysis_methods.get("monitor_fps")
     camera_fps = analysis_methods.get("camera_fps")
+    trackball_radius=analysis_methods.get("trackball_radius")
     stim_duration = analysis_methods.get("stim_duration")
     interval_duration= analysis_methods.get("interval_duration")
     visual_paradigm_name = analysis_methods.get("experiment_name")
@@ -507,25 +514,57 @@ def main(thisDir, json_file):
     turning_threshold = 0.33
     # Here to allocate files
     pd_start="meta"
-    #pd_ext = "lux*.csv"
-    pd_ext = f"{pd_start}*.csv"
-    this_PD_directory = find_file(thisDir, pd_ext)
-    trial_pattern = "trial*.csv"
-    csv_file_directory = find_file(thisDir, trial_pattern)
-    tracking_csv_pattern = "tracking_*.csv"
-    tracking_csv_file_directory = find_file(thisDir, tracking_csv_pattern)
-    database_pattern = "database*.pickle"
-    database = find_file(thisDir, database_pattern)
-    database_pattern ="database*.parquet.gzip"
-    database2 = find_file(thisDir, database_pattern)
-    temperature_pattern = "temperature_humidity.npy.gz"
-    this_temp_directory = find_file(thisDir, temperature_pattern)
+    #PD_file_pattern = "lux*.csv"
+    PD_file_pattern = f"{pd_start}*.csv"
+    PD_file_directory = find_file(thisDir, PD_file_pattern)
+    trial_file_pattern = "trial*.csv"
+    trial_file_directory = find_file(thisDir, trial_file_pattern)
+    tracking_file_pattern = "tracking*.csv"
+    tracking_file_directory = find_file(thisDir, tracking_file_pattern)
+    database_file_pattern = "database*.pickle"
+    database = find_file(thisDir, database_file_pattern)
+    database_file_pattern ="database*.parquet.gzip"
+    database2 = find_file(thisDir, database_file_pattern)
+    temperature_file_pattern = "temperature_humidity.npy.gz"
+    this_temp_directory = find_file(thisDir, temperature_file_pattern)
     if int(camera_fps/2)%2==0:
         filter_window_length=int(camera_fps/2)+1
     else:
         filter_window_length=int(camera_fps/2)
     #df = pd.read_pickle(database)
-    df=pd.read_parquet(database2)
+    ##here to load tracking data
+    ##if the tracking data is logged on bonsai (come from fictrac realtime).The file name is tracking_events
+    # Howwever, depends on whether using LogEvent or CsvWriter node, the format is different.
+    # Below is the format when using LogEvent node, which was used in VCC ball setup.
+    # The CsvWriter node simplifies the format so it is the default way to log tracking data.
+    # if tracking_file_directory != None and fictrac_posthoc_analysis is False:
+    #     tracking_info = pd.read_csv(
+    #         tracking_file_directory, delimiter="(", engine="python"
+    #     )
+    #     tracking_info = tracking_info.reset_index()
+    #     tracking_info[["timestamp", "value"]] = tracking_info.iloc[:, 1].str.split(
+    #         ", ", expand=True
+    #     )
+    #     tracking_info["value"] = tracking_info["value"].str.replace(
+    #         r"[()]", "", regex=True
+    #     )
+    #     tracking_info["value"] = tracking_info["value"].str.replace(
+    #         r"[,]", ".", regex=True
+    #     )
+    #     tracking_info["timestamp"] = tracking_info["timestamp"].str.replace(
+    #         r"[,]", ".", regex=True
+    #     )
+    #     tracking_info["timestamp"] = pd.to_numeric(tracking_info["timestamp"])
+    #     tracking_info["timestamp"] = tracking_info["timestamp"].astype("float32")
+    #     tracking_info["value"] = pd.to_numeric(tracking_info["value"])
+    if database2 is None and fictrac_posthoc_analysis is False:
+        df=pd.read_csv(tracking_file_directory,skiprows=0)
+        columns_name=["intergrated x position","intergrated y position",f"delta rotation vector lab {yaw_axis}","pd_phase"]
+        df.columns=columns_name
+        df[["intergrated x position","intergrated y position"]]=df[["intergrated x position","intergrated y position"]]*trackball_radius
+        df[f"delta rotation vector lab {yaw_axis}"] = df[f"delta rotation vector lab {yaw_axis}"] * camera_fps
+    else:
+        df=pd.read_parquet(database2)
     if analysis_methods.get("filtering_method") == "sg_filter":
         x_all = savgol_filter(df.loc[:, ["intergrated x position"]], filter_window_length, 3, axis=0)
         y_all = savgol_filter(df.loc[:, ["intergrated y position"]], filter_window_length, 3, axis=0)
@@ -543,7 +582,7 @@ def main(thisDir, json_file):
         min_walk_duration=1
         min_stationary_duration=1
         run_start_times,stationary_start_times=find_state_transition(run_speed_smooth, thresholds=[0.03,0.05], consecutive_length=[min_walk_duration*camera_fps,min_stationary_duration*camera_fps])
-
+        #np.isnan(run_start_times)
         #run_start_times,stationary_start_times=find_run_transitions(run_signal, run_time, thresh = [0.03,0.05,0.07], smooth_kernel = 0.3, inter_run_interval = 1, min_run_duration = 1, sample_freq = camera_fps)
         x_all =df.loc[:, ["intergrated x position"]].rolling(filter_window_length).median()
         y_all = df.loc[:, ["intergrated y position"]].rolling(filter_window_length).median()
@@ -551,7 +590,8 @@ def main(thisDir, json_file):
         df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].rolling(filter_window_length).median().values
     )
         ccw_turn_starts,cw_turn_starts=find_state_transition(np.transpose(yaw_angular_velocity)[0],thresholds=[0.04,-0.04], consecutive_length=[min_walk_duration*camera_fps,min_stationary_duration*camera_fps])
-        print(run_start_times.shape,stationary_start_times.shape,ccw_turn_starts.shape,cw_turn_starts.shape)
+        
+        #print(run_start_times.shape,stationary_start_times.shape,ccw_turn_starts.shape,cw_turn_starts.shape)
     else:
         x_all = df.loc[:, ["intergrated x position"]]
         y_all = df.loc[:, ["intergrated y position"]]
@@ -582,7 +622,7 @@ def main(thisDir, json_file):
                 travel_distance_fbf[events[i][0] : events[i][1]] = np.nan
     else:
         pass
-    travel_distance_whole_session = np.nansum(travel_distance_fbf)
+    travel_distance_whole_session = np.nansum(travel_distance_fbf)/camera_fps
     if analysis_methods.get("plotting_trajectory") == True:
         fig = plt.figure()  # a new figure window
         ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
@@ -590,8 +630,8 @@ def main(thisDir, json_file):
         fig.savefig(thisDir / "trajectory_plot.png")
 
     # Here to load time based on one of the files created by bonsai such as PD file or events files
-    if this_PD_directory:
-        file_name = this_PD_directory.stem
+    if PD_file_directory:
+        file_name = PD_file_directory.stem
         if pd_start=='meta':
             [_,this_date_hour,this_min,this_sec]=re.split("[\d]{0}_", file_name)
             exp_time=this_date_hour + "_" + this_min + "_" + this_sec
@@ -601,7 +641,7 @@ def main(thisDir, json_file):
         [exp_date, exp_hour] = re.split("T", exp_time)
         test_dt = pd.to_datetime(exp_time, format="%Y-%m-%dT%H_%M_%S")
     else:
-        [exp_date, exp_hour] = csv_file_directory.stem.split("events")[1].split("T")
+        [exp_date, exp_hour] = trial_file_directory.stem.split("events")[1].split("T")
         exp_time = exp_date + " " + exp_hour
         test_dt = pd.to_datetime(exp_time, format="%Y-%m-%d %H_%M_%S")
     # Here to load temperature data if possible
@@ -616,9 +656,9 @@ def main(thisDir, json_file):
             tem_df_this_exp = np.load(f)
         ### re-load temerature data if the user wants to overwrite the curated dataset or if temperature data is not available
         elif temperature_data_options.lower().startswith("bon"):
-            temperature_pattern = "lux*.csv"
+            temperature_file_pattern = "lux*.csv"
             termperature_pattern_meta="meta*.csv"
-            led_files = find_file(thisDir, temperature_pattern,termperature_pattern_meta)
+            led_files = find_file(thisDir, temperature_file_pattern,termperature_pattern_meta)
             if led_files!=None:
                 tmp = pd.read_csv(led_files, delimiter=",", header=0, index_col=None)
                 if "Temperature" in tmp.columns:
@@ -632,10 +672,10 @@ def main(thisDir, json_file):
                     print("work in progress. Needs to organise this pandas dataframe")
         else:
             if temperature_data_options.lower() == "el_usb":
-                temperature_pattern = "temperature_humidity*.txt"
+                temperature_file_pattern = "temperature_humidity*.txt"
             if temperature_data_options == "DL220THP":
-                temperature_pattern = "DL220*.csv"
-            this_temp_directory = find_file(thisDir, temperature_pattern)
+                temperature_file_pattern = "DL220*.csv"
+            this_temp_directory = find_file(thisDir, temperature_file_pattern)
             try:
                 tem_df = load_temperature_data(txt_path=this_temp_directory)
                 start_time_tem = find_nearest(tem_df.index, test_dt)
@@ -661,30 +701,7 @@ def main(thisDir, json_file):
         else:
             print("Nothing is saved in the debug mode. Move to the next animal")
 
-    ##here to start analying stimulus-evoked response.
-    ## if the tracking data is logged on bonsai (come from fictrac realtime). The file name is tracking_events...
-    if tracking_csv_file_directory != None and fictrac_posthoc_analysis is False:
-        tracking_info = pd.read_csv(
-            tracking_csv_file_directory, delimiter="(", engine="python"
-        )
-        tracking_info = tracking_info.reset_index()
-        tracking_info[["timestamp", "value"]] = tracking_info.iloc[:, 1].str.split(
-            ", ", expand=True
-        )
-        tracking_info["value"] = tracking_info["value"].str.replace(
-            r"[()]", "", regex=True
-        )
-        tracking_info["value"] = tracking_info["value"].str.replace(
-            r"[,]", ".", regex=True
-        )
-        tracking_info["timestamp"] = tracking_info["timestamp"].str.replace(
-            r"[,]", ".", regex=True
-        )
-        tracking_info["timestamp"] = pd.to_numeric(tracking_info["timestamp"])
-        tracking_info["timestamp"] = tracking_info["timestamp"].astype("float32")
-        tracking_info["value"] = pd.to_numeric(tracking_info["value"])
-
-    stim_info = pd.read_csv(csv_file_directory)
+    stim_info = pd.read_csv(trial_file_directory)
     # if file_name == "lux4_2024-12-09T12_02_03":
     #     stim_info = stim_info.iloc[:336]
     stim_info, stim_type = sorting_trial_info(
@@ -703,13 +720,7 @@ def main(thisDir, json_file):
     ### analyse LED signal to align the onset and offset of stimuli with video frames
     if fictrac_posthoc_analysis:
         stim_onset, isi_onset = analyse_led_signal(thisDir, analysis_methods, stim_info)
-        if (
-            visual_paradigm_name == "gratings"
-            or visual_paradigm_name == "sweeploom"
-            or visual_paradigm_name == "conflict"
-            or visual_paradigm_name == "looming"
-            or visual_paradigm_name == "sweeping" 
-        ):
+        if visual_paradigm_name in ["gratings","sweeploom","conflict","looming","sweeping"]:
             if stim_info['PreMovDuration'].unique()!=0:
                 if stim_onset.shape[0]%2==1:
                     stim_onset=stim_onset[:-1]
@@ -739,6 +750,12 @@ def main(thisDir, json_file):
                 stim_info["Duration"] = duration_array
 
             stim_info["stim_onset"] = transition_onset
+    elif "pd_phase" in df.columns:
+        transition_onsets=np.where(np.diff(df['pd_phase'].values))[0]
+        stim_onset=transition_onsets[::2]
+        isi_onset=transition_onsets[1::2]
+        stim_info["stim_onset"] = stim_onset
+
     elif df["timestamp"][1] != df["timestamp"][2]:
         # compare the timestamp between event file and dat file
         data_timestamp = df.loc[:, "timestamp"]
@@ -778,14 +795,7 @@ def main(thisDir, json_file):
         else:
             preStim_ISI_duration=stim_info
     else:
-        if (
-            visual_paradigm_name == "gratings"
-            or visual_paradigm_name == "sweeploom"
-            or visual_paradigm_name.endswith("sities")
-            or visual_paradigm_name == "conflict"
-            or visual_paradigm_name == "looming"
-            or visual_paradigm_name == "sweeping" 
-        ):
+        if visual_paradigm_name in ["gratings","sweeploom","conflict","looming","sweeping","choices","densities"]:
             stim_to_analyse = stim_info["stim_onset"]
             if type(analysis_methods.get("interval_duration")) == list and np.unique(stim_info["ISI"].values)>0:## for the situation where ISI is pre-defiend
                 ISI_duration = stim_info["ISI"].values
@@ -830,7 +840,22 @@ def main(thisDir, json_file):
         analysis_methods
     )
 
-    cum_yaw_rotation = np.nancumsum(yaw_rotation_tbt, axis=1)
+    heading_angle = np.nancumsum(yaw_rotation_tbt, axis=1)/camera_fps
+    heading_angle=180*heading_angle/np.pi# converting the unit to
+    if visual_paradigm_name=='choices':
+        heading_at_stim=np.reshape(np.repeat(heading_angle[:,init_frame],init_frame), (num_stim, init_frame))
+        heading_prev_stim=heading_angle[:,:init_frame]-heading_at_stim
+        heading_at_stim=np.reshape(np.repeat(heading_angle[:,init_frame],end_frame), (num_stim, end_frame))
+        heading_post_stim=heading_angle[:,init_frame:]-heading_at_stim
+    # plot the heading angle
+    #     ax = plt.subplot(111, polar=True)
+    #     ax.hist(angles, bins=24, alpha=0.75)
+    #     ax.set_yticks([5,10])
+    #     ax.set_xticklabels([])
+    # #ax.set_title(f'banding direction: {parameters}')
+    #     plt.savefig('heading_histogram')
+
+
     # add trial info to summary_df
     summary_df["stim_type"] = stim_name_arr
     summary_df["present_trial_duration"] = present_duration_arr
@@ -841,10 +866,8 @@ def main(thisDir, json_file):
     print("ready to plot graph with some data and decompose those lists")
     COL = MplColorHelper(colormap_name, 0, len(stim_type))
     if analysis_methods.get("plotting_tbt_overview") == True:
-        if visual_paradigm_name=='coherence':## this should depends on the lengh of analysis window prior to stimulus
-            running_trial_distance_threshold=10
-        else:
-            running_trial_distance_threshold=10
+
+        running_trial_distance_threshold=0.1 #this threshold is defined based on travel distance 5-sec prior to stimulus onset
         fig1 = plt.figure(figsize=(18, 7), tight_layout=True)
         ax = plt.subplot(241)
         if "opto_index" in summary_df.columns:
@@ -998,7 +1021,7 @@ def main(thisDir, json_file):
             fig_stationary.savefig(thisDir / plot_name)
             plot_name = f"visual_guided_velocity_different_duration_running.png"
             fig_running.savefig(thisDir / plot_name)
-        fig_stationary,fig_running=plotting_visual_guided_response(cum_yaw_rotation,stim_type,summary_df,analysis_methods,running_trial_distance_threshold,COL)   
+        fig_stationary,fig_running=plotting_visual_guided_response(heading_angle,stim_type,summary_df,analysis_methods,running_trial_distance_threshold,COL)   
         if save_output == True:
             plot_name = f"visual_guided_angular_velocity_{yaw_axis}axis_different_duration_stationary.png"
             fig_stationary.savefig(thisDir / plot_name)
@@ -1016,7 +1039,7 @@ def main(thisDir, json_file):
             for i in range(len(stim_type)):
                 this_type_stim = stim_type[i]
                 this_response = np.diff(
-                    cum_yaw_rotation[summary_df["stim_type"] == this_type_stim, :]
+                    heading_angle[summary_df["stim_type"] == this_type_stim, :]
                 )
                 time_points = np.arange(this_response.shape[1])
                 time_points_b = np.tile(time_points, (this_response.shape[0], 1))
@@ -1097,9 +1120,9 @@ def main(thisDir, json_file):
                 capsize=3,
             )
             if type(stim_duration)==list:
-                this_rotational_velocity = cum_yaw_rotation[(summary_df["stim_type"] == this_coherence) & (summary_df['present_trial_duration']>=duration_for_optomotor_index),:]
+                this_rotational_velocity = heading_angle[(summary_df["stim_type"] == this_coherence) & (summary_df['present_trial_duration']>=duration_for_optomotor_index),:]
             else:
-                this_rotational_velocity = cum_yaw_rotation[summary_df["stim_type"] == this_coherence, :]
+                this_rotational_velocity = heading_angle[summary_df["stim_type"] == this_coherence, :]
             time_points = np.arange(this_rotational_velocity.shape[1])
             time_points_b = np.tile(time_points, (this_rotational_velocity.shape[0], 1))
             # ax4.scatter(time_points_b, this_rotational_velocity, s=1, color=custom_cmap[i])
@@ -1129,7 +1152,7 @@ def main(thisDir, json_file):
             label="Stimulus Ends",
         )
 
-        yaw_orientation_limit = 200
+        yaw_orientation_limit = 180
         y_axis_lim = [yaw_orientation_limit * -1, yaw_orientation_limit]
         # ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
         # if stim duration is a list, plot the max and min values
@@ -1149,7 +1172,7 @@ def main(thisDir, json_file):
         ax4.set(
             yticks=[y_axis_lim[0], 0, y_axis_lim[1]],
             ylim=[y_axis_lim[0], y_axis_lim[1]],
-            ylabel="Orientation (rad)",
+            ylabel="Orientation (degree)",
             xticks=xticks,
             xticklabels=xticklabels,
             xlabel="Time (s)",
@@ -1323,7 +1346,7 @@ if __name__ == "__main__":
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25106\251229\coherence\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25105\251229\coherence\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25104\251223\coherence\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25104\251223\conflict\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25104\251223\conflict\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25104\251223\sweeping\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25105\251229\sweeping\session1"## needs a new scene name for bilateral ccw cw sequence
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25106\251229\sweeping\session1"## needs a new scene name for bilateral ccw cw sequence
@@ -1335,7 +1358,8 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26101\260108\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26102\260112\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26103\260112\sweeping\session1"
-    # json_file = r"C:\Users\neuroPC\Documents\GitHub\UnityDataAnalysis\analysis_methods_dictionary.json"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26103\260112\choices\session1"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26102\260112\choices\session1"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
