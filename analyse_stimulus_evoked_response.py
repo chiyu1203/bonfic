@@ -26,7 +26,7 @@ parent_dir = current_working_directory.resolve().parents[0]
 sys.path.insert(0, str(parent_dir) + "\\utilities")
 sys.path.insert(0, str(parent_dir) + "\\ephys_behavior")
 from useful_tools import find_file, find_nearest, calculate_fft
-from data_cleaning import sorting_trial_info, load_temperature_data,euclidean_distance
+from data_cleaning import sorting_trial_info, load_temperature_data,euclidean_distance,diskretize,bfill
 #from analysis_utils import find_run_transitions
 
 
@@ -66,14 +66,14 @@ def analysis_stim_evoked_response_combo(
     analysis_window=analysis_methods.get("analysis_window")
     camera_fps=analysis_methods.get("camera_fps")
     init_frame = abs(analysis_window[0]) * camera_fps
-    end_frame = analysis_window[1] * camera_fps
+    end_frame = analysis_window[1] * camera_fps + init_frame
     duration_for_optomotor_index=analysis_methods.get("duration_for_optomotor_index")
-    yaw_rotation_tbt = extract_stim_locked_data(
-        stim_to_analyse, yaw_angular_velocity[:, 0], analysis_window, camera_fps
+    angular_velocity_tbt = extract_stim_locked_data(
+        stim_to_analyse, yaw_angular_velocity, analysis_window, camera_fps
     )
     travel_distance_tbt= extract_stim_locked_data(
         stim_to_analyse,
-        travel_distance_fbf[:, 0],
+        travel_distance_fbf,
         analysis_window,
         camera_fps,
     )
@@ -105,52 +105,26 @@ def analysis_stim_evoked_response_combo(
         humid_tbt = np.empty((stimulus_info.shape[0], 1))
         humid_tbt[:] = np.nan
 
-    #######Note: opto_index_isi and travel_distance is defined based on responses during the 5 sec window prior the stimulus;
-    ####### whereas the summarised jaw, velocity arrays include values starting from minimal length of ISI prior to the stimulus
-    velocity = travel_distance_tbt * camera_fps  # over 1.0 is probably a jump
-    cum_travel_distance = np.nancumsum(travel_distance_tbt, axis=1)/camera_fps
-    shortened_isi=5 ##set an arbitrary time window prior to the onset of stimulus for the response to ISI. This arbitary window is needed because the duration of ISI is not stored in the dataset.
-    #And then the minimal length of ISI used is usually 5 sec. Therefore, setting this duration to 5 should not cover the previous trial.
-    ## Note: if the first element in the time window is shorter than this 5 sec, then just use how long it is set in the time window
-    if shortened_isi*camera_fps<init_frame:
-        travel_distance_prior_stim = (
-            cum_travel_distance[:, init_frame]
-            - cum_travel_distance[:, shortened_isi * camera_fps]
-        )  ##remove the initial five sec during isi
-    else:
-        travel_distance_prior_stim = cum_travel_distance[:, init_frame]##this calculate the travel distance fro frame 0 to the start of the stimulus onset
+    #######Note: opto_index_isi and travel_distance_isi is defined based either the first element of analysis window or 5 sec, depends on which one is shorter.
+    shortened_isi=5
+    if shortened_isi>abs(analysis_window[0]):
         shortened_isi=abs(analysis_window[0])
-    travel_distance_during_stim = (
-        cum_travel_distance[:, end_frame] - cum_travel_distance[:, init_frame]
-    )
-    if duration_for_optomotor_index>=0:
+    summary_list={
+        "stim_index": stim_to_analyse.index,
+        "temperature": temp_tbt,
+        "humidity":humid_tbt
+    }
+    if duration_for_optomotor_index>0:
         opto_all_trials, opto_all_isi = probes_optomotor_index(
-        yaw_rotation_tbt, init_frame,end_frame,camera_fps, shortened_isi
+        angular_velocity_tbt, init_frame,end_frame,camera_fps, shortened_isi
     )
-        summary_list = {
-            "opto_index_isi": opto_all_isi,
-            "opto_index": opto_all_trials,
-            "travel_distance_isi": travel_distance_prior_stim,
-            "travel_distance": travel_distance_during_stim,
-            "stim_index": stim_to_analyse.index,
-            "temperature": temp_tbt,
-            "humidity": humid_tbt,
-        }
-    else:
-        summary_list={
-            "travel_distance_isi": travel_distance_prior_stim,
-            "travel_distance": travel_distance_during_stim,
-            "stim_index": stim_to_analyse.index,
-            "temperature": temp_tbt,
-            "humidity":humid_tbt
-        }
-
-    summary_df = pd.DataFrame(summary_list)  
+        opto_dict={"opto_index_isi": opto_all_isi,
+            "opto_index": opto_all_trials}
+        summary_list.update(opto_dict) 
     return (
-        summary_df,
-        cum_travel_distance,
-        velocity,
-        yaw_rotation_tbt,
+        summary_list,
+        angular_velocity_tbt,
+        travel_distance_tbt,
         init_frame,
         end_frame,
     )
@@ -354,18 +328,21 @@ def extract_stim_locked_data(
     return stim_locked_data
 
 
-def probes_optomotor_index(yaw_rotation_tbt, init_frame,end_frame, camera_fps, shortened_isi):
+def probes_optomotor_index(angular_velocity_tbt, init_frame,end_frame, camera_fps, shortened_isi):
     isi_frame = init_frame - camera_fps * shortened_isi
-    opto_all_trials = np.ones((yaw_rotation_tbt.shape[0]))
-    opto_all_isi = np.ones((yaw_rotation_tbt.shape[0]))
+    opto_all_trials = np.ones((angular_velocity_tbt.shape[0]))
+    opto_all_isi = np.ones((angular_velocity_tbt.shape[0]))
     ## when quantifying optomotor response, we focus on only stimulus onset so using init_frame:end_frame
-    for i in range(0, yaw_rotation_tbt.shape[0]):
+    for i in range(0, angular_velocity_tbt.shape[0]):
         opto_all_trials[i] = optomotor_response_idx(
-            yaw_rotation_tbt[i, init_frame:end_frame]
+            angular_velocity_tbt[i, init_frame:end_frame]
         )
-        opto_all_isi[i] = optomotor_response_idx(
-            yaw_rotation_tbt[i, isi_frame:init_frame]
-        )
+        if angular_velocity_tbt[i, isi_frame:init_frame].shape[0]>0:
+            opto_all_isi[i] = optomotor_response_idx(
+                angular_velocity_tbt[i, isi_frame:init_frame]
+            )
+        else:
+            opto_all_isi[i]=np.nan
     return opto_all_trials, opto_all_isi
 
 
@@ -479,6 +456,7 @@ def main(thisDir, json_file):
         with open(json_file, "r") as f:
             print(f"load analysis methods from file {json_file}")
             analysis_methods = json.loads(f.read())
+    BODY_LENGTH=4
     # Load analysis methods
     load_previous_methods=analysis_methods.get("load_previous_methods",False)
     if load_previous_methods:
@@ -492,7 +470,7 @@ def main(thisDir, json_file):
             print("previous analysis methods file is not found. Use the current one.")
     monitor_fps = analysis_methods.get("monitor_fps")
     camera_fps = analysis_methods.get("camera_fps")
-    trackball_radius=analysis_methods.get("trackball_radius")
+    trackball_radius=analysis_methods.get("trackball_radius")## track ball radius in (cm)
     stim_duration = analysis_methods.get("stim_duration")
     interval_duration= analysis_methods.get("interval_duration")
     visual_paradigm_name = analysis_methods.get("experiment_name")
@@ -533,30 +511,6 @@ def main(thisDir, json_file):
         filter_window_length=int(camera_fps/2)
     #df = pd.read_pickle(database)
     ##here to load tracking data
-    ##if the tracking data is logged on bonsai (come from fictrac realtime).The file name is tracking_events
-    # Howwever, depends on whether using LogEvent or CsvWriter node, the format is different.
-    # Below is the format when using LogEvent node, which was used in VCC ball setup.
-    # The CsvWriter node simplifies the format so it is the default way to log tracking data.
-    # if tracking_file_directory != None and fictrac_posthoc_analysis is False:
-    #     tracking_info = pd.read_csv(
-    #         tracking_file_directory, delimiter="(", engine="python"
-    #     )
-    #     tracking_info = tracking_info.reset_index()
-    #     tracking_info[["timestamp", "value"]] = tracking_info.iloc[:, 1].str.split(
-    #         ", ", expand=True
-    #     )
-    #     tracking_info["value"] = tracking_info["value"].str.replace(
-    #         r"[()]", "", regex=True
-    #     )
-    #     tracking_info["value"] = tracking_info["value"].str.replace(
-    #         r"[,]", ".", regex=True
-    #     )
-    #     tracking_info["timestamp"] = tracking_info["timestamp"].str.replace(
-    #         r"[,]", ".", regex=True
-    #     )
-    #     tracking_info["timestamp"] = pd.to_numeric(tracking_info["timestamp"])
-    #     tracking_info["timestamp"] = tracking_info["timestamp"].astype("float32")
-    #     tracking_info["value"] = pd.to_numeric(tracking_info["value"])
     if database2 is None and fictrac_posthoc_analysis is False:
         df=pd.read_csv(tracking_file_directory,skiprows=0)
         columns_name=["intergrated x position","intergrated y position",f"delta rotation vector lab {yaw_axis}","pd_phase"]
@@ -566,14 +520,11 @@ def main(thisDir, json_file):
     else:
         df=pd.read_parquet(database2)
     if analysis_methods.get("filtering_method") == "sg_filter":
-        x_all = savgol_filter(df.loc[:, ["intergrated x position"]], filter_window_length, 3, axis=0)
-        y_all = savgol_filter(df.loc[:, ["intergrated y position"]], filter_window_length, 3, axis=0)
-        yaw_angular_velocity = (
-        df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values
-    )  
+        x_all = savgol_filter(df.loc[:, ["intergrated x position"]].values[:,0], filter_window_length, 3, axis=0)
+        y_all = savgol_filter(df.loc[:, ["intergrated y position"]].values[:,0], filter_window_length, 3, axis=0)
+        yaw_angular_velocity =df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values[:,0]
     elif analysis_methods.get("filtering_method") == "rolling_median":
         run_signal = euclidean_distance(np.transpose(df.loc[:, ["intergrated x position"]]),np.transpose(df.loc[:, ["intergrated y position"]]))[0]
-
         #inter_run_interval also means min stationary duration. Because the end goal is to calculate run-triggerd activity. This duration is set rather strict so sudden stop will be ignore
         #
         smooth_kernel = round(0.3*camera_fps)
@@ -584,21 +535,37 @@ def main(thisDir, json_file):
         run_start_times,stationary_start_times=find_state_transition(run_speed_smooth, thresholds=[0.03,0.05], consecutive_length=[min_walk_duration*camera_fps,min_stationary_duration*camera_fps])
         #np.isnan(run_start_times)
         #run_start_times,stationary_start_times=find_run_transitions(run_signal, run_time, thresh = [0.03,0.05,0.07], smooth_kernel = 0.3, inter_run_interval = 1, min_run_duration = 1, sample_freq = camera_fps)
-        x_all =df.loc[:, ["intergrated x position"]].rolling(filter_window_length).median()
-        y_all = df.loc[:, ["intergrated y position"]].rolling(filter_window_length).median()
-        yaw_angular_velocity = (
-        df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].rolling(filter_window_length).median().values
-    )
+        x_all =df.loc[:, ["intergrated x position"]].rolling(filter_window_length).median().values
+        y_all = df.loc[:, ["intergrated y position"]].rolling(filter_window_length).median().values
+        yaw_angular_velocity =df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].rolling(filter_window_length).median().values
         ccw_turn_starts,cw_turn_starts=find_state_transition(np.transpose(yaw_angular_velocity)[0],thresholds=[0.04,-0.04], consecutive_length=[min_walk_duration*camera_fps,min_stationary_duration*camera_fps])
-        
+        x_all=bfill(x_all[:,0])
+        y_all=bfill(y_all[:,0])
+        yaw_angular_velocity=bfill(yaw_angular_velocity[:,0])
         #print(run_start_times.shape,stationary_start_times.shape,ccw_turn_starts.shape,cw_turn_starts.shape)
     else:
-        x_all = df.loc[:, ["intergrated x position"]]
-        y_all = df.loc[:, ["intergrated y position"]]
-        yaw_angular_velocity = (
-        df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values
-    )  
-    travel_distance_fbf = np.transpose(euclidean_distance(np.transpose(x_all),np.transpose(y_all)))
+        x_all = df.loc[:, ["intergrated x position"]].values[:,0]
+        y_all = df.loc[:, ["intergrated y position"]].values[:,0]
+        yaw_angular_velocity = df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values[:,0]
+    # rXY = np.vstack((x_all, y_all))
+    # step_index = diskretize(list(rXY[0]), list(rXY[1]), BODY_LENGTH*6)
+    # curated_X = rXY[0][step_index]
+    # curated_Y = rXY[1][step_index]
+    # angles = np.arctan2(np.diff(curated_Y), np.diff(curated_X)) ## in time series analysis, the angles should come from locustVR directly.
+    # angles = np.insert(angles, 0, np.nan)
+    # heading_angle = np.nancumsum(yaw_angular_velocity, axis=0)/camera_fps
+    # heading_angle = (heading_angle + np.pi) % (2 * np.pi) - np.pi
+    # #heading_angle=heading_angle[step_index]
+    # fig, (ax1, ax2,ax3) = plt.subplots(1, 3, figsize=(27, 7), tight_layout=True)
+    # ax1.scatter(np.arange(angles.shape[0]),angles)
+    # ax2.scatter(np.arange(heading_angle.shape[0]),heading_angle*-1)
+    # ax3.scatter(np.arange(heading_angle[step_index].shape[0]),heading_angle[step_index]*-1)
+    # ax1.set_title("discritised based on curated X and Y")
+    # ax2.set_title("fictrac raw")
+    # ax3.set_title("fictrac discritised based on new index")
+    # fig.savefig("check_angle.png")
+
+    travel_distance_fbf = euclidean_distance(x_all,y_all)
     ## here write an additional function to classify stationary, moving and total travel distance
     if mark_jump_as_nan:
         events = extract_events(travel_distance_fbf, min_length=20)
@@ -825,10 +792,9 @@ def main(thisDir, json_file):
     stim_name_arr = np.array(stim_info["stim_type"][stim_to_analyse.index])
     present_duration_arr = np.array(stim_info["Duration"][stim_to_analyse.index])
     (
-        summary_df,
-        cum_travel_distance,
-        velocity_arr,
-        yaw_rotation_tbt,
+        summary_list,
+        angular_velocity_tbt,
+        travel_distance_tbt,
         init_frame,
         end_frame,
     ) = analysis_stim_evoked_response_combo(
@@ -839,24 +805,28 @@ def main(thisDir, json_file):
         tem_df_this_exp,
         analysis_methods
     )
+    velocity_arr = travel_distance_tbt * camera_fps  # over 1.0 is probably a jump
+    cum_travel_distance = np.nancumsum(velocity_arr, axis=1)/camera_fps
+    heading_angle = np.nancumsum(angular_velocity_tbt, axis=1)/camera_fps
+    heading_at_stim=heading_angle[:,init_frame]
+    heading_prev_stim=heading_angle[:,:init_frame]-np.reshape(np.repeat(heading_at_stim,init_frame), (num_stim, init_frame))
+    heading_post_stim=heading_angle[:,init_frame:]-np.reshape(np.repeat(heading_at_stim,end_frame), (num_stim, end_frame))
+    distance_at_stim=cum_travel_distance[:,init_frame]
+    cum_distance_prev_stim=cum_travel_distance[:,:init_frame]-np.reshape(np.repeat(distance_at_stim,init_frame), (num_stim, init_frame))
+    cum_distance_post_stim=cum_travel_distance[:,init_frame:]-np.reshape(np.repeat(distance_at_stim,end_frame), (num_stim, end_frame))
+    if cum_distance_prev_stim.shape[1]==0:
+        total_distance_prev_stim=np.full((cum_distance_prev_stim.shape[0]), np.nan)
+    else:
+        total_distance_prev_stim=cum_distance_prev_stim[:,-1]
+    if cum_distance_post_stim.shape[1]==0:
+        total_distance_post_stim=np.full((cum_distance_post_stim.shape[0]), np.nan)
+    else:
+        total_distance_post_stim=cum_distance_post_stim[:,-1]
 
-    heading_angle = np.nancumsum(yaw_rotation_tbt, axis=1)/camera_fps
-    heading_angle=180*heading_angle/np.pi# converting the unit to
-    if visual_paradigm_name=='choices':
-        heading_at_stim=np.reshape(np.repeat(heading_angle[:,init_frame],init_frame), (num_stim, init_frame))
-        heading_prev_stim=heading_angle[:,:init_frame]-heading_at_stim
-        heading_at_stim=np.reshape(np.repeat(heading_angle[:,init_frame],end_frame), (num_stim, end_frame))
-        heading_post_stim=heading_angle[:,init_frame:]-heading_at_stim
-    # plot the heading angle
-    #     ax = plt.subplot(111, polar=True)
-    #     ax.hist(angles, bins=24, alpha=0.75)
-    #     ax.set_yticks([5,10])
-    #     ax.set_xticklabels([])
-    # #ax.set_title(f'banding direction: {parameters}')
-    #     plt.savefig('heading_histogram')
-
-
-    # add trial info to summary_df
+    distance_dict={"travel_distance_isi": total_distance_prev_stim,"travel_distance":total_distance_post_stim}
+    summary_list.update(distance_dict)
+    # convert the list into pandas dataframe
+    summary_df = pd.DataFrame(summary_list) 
     summary_df["stim_type"] = stim_name_arr
     summary_df["present_trial_duration"] = present_duration_arr
     summary_df["preStim_ISI_duration"] = preStim_ISI_duration
@@ -865,9 +835,34 @@ def main(thisDir, json_file):
 
     print("ready to plot graph with some data and decompose those lists")
     COL = MplColorHelper(colormap_name, 0, len(stim_type))
-    if analysis_methods.get("plotting_tbt_overview") == True:
+    if visual_paradigm_name=='choices':
+        fig = plt.figure(figsize=[24, 18])
+        for i, this_stim_type in enumerate(stim_type):
+            heading_angle_discretised=[]
+            ax = fig.add_subplot(1,8,i+1, polar=True)  # Create polar axes
+            for this_index in list(np.where(stim_info['stim_type']==this_stim_type)[0]):
+                step_index = diskretize(distance=travel_distance_tbt[this_index,:],diskretise_length=BODY_LENGTH*6)
+                # angles = np.arctan2(np.diff(curated_Y), np.diff(curated_X)) ## in time series analysis, the angles should come from locustVR directly.
+                # angles = np.insert(angles, 0, np.nan)
+                these_heading_angles=heading_post_stim[this_index,step_index]
+                if these_heading_angles.shape[0]>1:
+                    these_heading_angles = (these_heading_angles + np.pi) % (2 * np.pi) - np.pi
+                    heading_angle_discretised.extend(np.degrees(these_heading_angles[1:]))
+            ax.hist(heading_angle_discretised, bins=12, alpha=0.75)
+            ax.set(title=this_stim_type,yticks=[1,5])
+                # fig, (ax1, ax2,ax3) = plt.subplots(1, 3, figsize=(27, 7), tight_layout=True)
+                # ax1.scatter(np.arange(angles.shape[0]),angles)
+                # ax2.scatter(np.arange(heading_angle.shape[0]),heading_angle*-1)
+                # ax3.scatter(np.arange(heading_angle[step_index].shape[0]),heading_angle[step_index]*-1)
+                # ax1.set_title("discritised based on curated X and Y")
+                # ax2.set_title("fictrac raw")
+                # ax3.set_title("fictrac discritised based on new index")
+                # fig.savefig(f"check_angle_{i}th_trial.png")    
+        fig.savefig(thisDir/"heading_distribution.png")
+            
 
-        running_trial_distance_threshold=0.1 #this threshold is defined based on travel distance 5-sec prior to stimulus onset
+    if analysis_methods.get("plotting_tbt_overview") == True:
+        running_trial_distance_threshold=10 #this threshold is defined based on travel distance 5-sec prior to stimulus onset
         fig1 = plt.figure(figsize=(18, 7), tight_layout=True)
         ax = plt.subplot(241)
         if "opto_index" in summary_df.columns:
@@ -1251,7 +1246,7 @@ def main(thisDir, json_file):
             np.save(f, velocity_arr)
         file_name = thisDir / "angular_velocity_tbt.npy"
         with open(file_name, "wb") as f:
-            np.save(f, yaw_rotation_tbt)
+            np.save(f, angular_velocity_tbt)
         file_name = thisDir / "angular_velocity_all.npy"
         with open(file_name, "wb") as f:
             np.save(f, yaw_angular_velocity)
@@ -1268,7 +1263,7 @@ def main(thisDir, json_file):
     else:
         print("dont save anything")
 
-    return summary_df, velocity_arr, yaw_rotation_tbt, travel_distance_whole_session
+    return summary_df, velocity_arr, angular_velocity_tbt, travel_distance_whole_session
 
 
 if __name__ == "__main__":
