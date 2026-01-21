@@ -470,7 +470,7 @@ def main(thisDir, json_file):
             print("previous analysis methods file is not found. Use the current one.")
     monitor_fps = analysis_methods.get("monitor_fps")
     camera_fps = analysis_methods.get("camera_fps")
-    trackball_radius=analysis_methods.get("trackball_radius")## track ball radius in (cm)
+    trackball_radius=analysis_methods.get("trackball_radius",5)## track ball radius in (cm)
     stim_duration = analysis_methods.get("stim_duration")
     interval_duration= analysis_methods.get("interval_duration")
     visual_paradigm_name = analysis_methods.get("experiment_name")
@@ -810,10 +810,10 @@ def main(thisDir, json_file):
     heading_angle = np.nancumsum(angular_velocity_tbt, axis=1)/camera_fps
     heading_at_stim=heading_angle[:,init_frame]
     heading_prev_stim=heading_angle[:,:init_frame]-np.reshape(np.repeat(heading_at_stim,init_frame), (num_stim, init_frame))
-    heading_post_stim=heading_angle[:,init_frame:]-np.reshape(np.repeat(heading_at_stim,end_frame), (num_stim, end_frame))
+    heading_post_stim=heading_angle[:,init_frame:]-np.reshape(np.repeat(heading_at_stim,end_frame-init_frame), (num_stim, end_frame-init_frame))
     distance_at_stim=cum_travel_distance[:,init_frame]
     cum_distance_prev_stim=cum_travel_distance[:,:init_frame]-np.reshape(np.repeat(distance_at_stim,init_frame), (num_stim, init_frame))
-    cum_distance_post_stim=cum_travel_distance[:,init_frame:]-np.reshape(np.repeat(distance_at_stim,end_frame), (num_stim, end_frame))
+    cum_distance_post_stim=cum_travel_distance[:,init_frame:]-np.reshape(np.repeat(distance_at_stim,end_frame-init_frame), (num_stim, end_frame-init_frame))
     if cum_distance_prev_stim.shape[1]==0:
         total_distance_prev_stim=np.full((cum_distance_prev_stim.shape[0]), np.nan)
     else:
@@ -834,14 +834,14 @@ def main(thisDir, json_file):
     summary_df["isi_onset_thframe"]=isi_onset
 
     print("ready to plot graph with some data and decompose those lists")
-    COL = MplColorHelper(colormap_name, 0, len(stim_type))
+    COL = MplColorHelper(colormap_name, 0, len(stim_type)-1)
     if visual_paradigm_name=='choices':
         fig = plt.figure(figsize=[24, 18])
         for i, this_stim_type in enumerate(stim_type):
             heading_angle_discretised=[]
             ax = fig.add_subplot(1,8,i+1, polar=True)  # Create polar axes
             for this_index in list(np.where(stim_info['stim_type']==this_stim_type)[0]):
-                step_index = diskretize(distance=travel_distance_tbt[this_index,:],diskretise_length=BODY_LENGTH*6)
+                step_index = diskretize(distance=cum_distance_post_stim[this_index,:],diskretise_length=BODY_LENGTH*6)
                 # angles = np.arctan2(np.diff(curated_Y), np.diff(curated_X)) ## in time series analysis, the angles should come from locustVR directly.
                 # angles = np.insert(angles, 0, np.nan)
                 these_heading_angles=heading_post_stim[this_index,step_index]
@@ -859,10 +859,14 @@ def main(thisDir, json_file):
                 # ax3.set_title("fictrac discritised based on new index")
                 # fig.savefig(f"check_angle_{i}th_trial.png")    
         fig.savefig(thisDir/"heading_distribution.png")
-            
+    else:
+        heading_angle=np.degrees(heading_angle)
 
     if analysis_methods.get("plotting_tbt_overview") == True:
-        running_trial_distance_threshold=10 #this threshold is defined based on travel distance 5-sec prior to stimulus onset
+        shortened_isi=5
+        if shortened_isi>abs(analysis_window[0]):
+            shortened_isi=abs(analysis_window[0])
+        running_trial_distance_threshold=1*shortened_isi #this threshold is defined based on travel distance 5-sec prior to stimulus onset
         fig1 = plt.figure(figsize=(18, 7), tight_layout=True)
         ax = plt.subplot(241)
         if "opto_index" in summary_df.columns:
@@ -1126,8 +1130,9 @@ def main(thisDir, json_file):
         ax3.set_ylim(-1, 1)
         # xticks=stim_type,
         if visual_paradigm_name=='sweeping':
-            #ax3.set_xticks(stim_type)
-            ax3.set_xticklabels(stim_type,rotation=45, fontsize = 10)
+            ax3.tick_params("x", labelrotation=45)
+            ax3.set_xticks(stim_type)
+            #ax3.set_xticklabels(stim_type,rotation=45, fontsize = 10)
         ax3.set(
             xlabel=visual_paradigm_name,
             yticks=[-1, 0, 1],
@@ -1354,7 +1359,18 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26102\260112\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26103\260112\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26103\260112\choices\session1"
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26102\260112\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26102\260112\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260119\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260120\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260119\coherence\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260120\sweeping\session2"# the isi in bilateral non-rotation sequence is 10 or 20 because too many conditions
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\conflict\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260119\sweeping\session2"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\sweeping\session2"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\sweeping\session2"## negative angular velocity means cw?!
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\coherence\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\choices\session1"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
