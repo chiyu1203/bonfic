@@ -593,7 +593,7 @@ def main(thisDir, json_file):
     if analysis_methods.get("plotting_trajectory") == True:
         fig = plt.figure()  # a new figure window
         ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
-        ax.scatter(x_all, y_all, c=np.arange(len(y_all)), marker=".", alpha=0.5)
+        ax.scatter(y_all,x_all,c=np.arange(len(y_all)), marker=".", alpha=0.5)
         fig.savefig(thisDir / "trajectory_plot.png")
 
     # Here to load time based on one of the files created by bonsai such as PD file or events files
@@ -1011,7 +1011,6 @@ def main(thisDir, json_file):
             plot_name = "optomotor_overview_by_time.png"
         if save_output == True:
             fig1.savefig(thisDir / plot_name)
-        plt.show()
 
     if visual_paradigm_name=='sweeping' or visual_paradigm_name=='looming':
         fig_stationary,fig_running=plotting_visual_guided_response(velocity_arr,stim_type,summary_df,analysis_methods,running_trial_distance_threshold,COL)    
@@ -1028,21 +1027,21 @@ def main(thisDir, json_file):
             fig_running.savefig(thisDir / plot_name)
 
     if analysis_methods.get("plotting_position_dependant_fixation") == True:
-        duration_type=stim_info['Duration'].unique()
+        groups = stim_info.groupby(['Duration', 'LocustTexture1'])
+        y_axis_lim=[-2.5,2.5]
+        num_indep_variables=groups.ngroups
         colormap = np.array(["k", "r", "b", "g", "y", "m", "c", "k"])
         fig5, axes = plt.subplots(
-            nrows=1, ncols=duration_type.shape[0], figsize=(18, 7), tight_layout=True
+            nrows=1, ncols=num_indep_variables, figsize=(18, 7), tight_layout=True
         )
-        for j in range(duration_type.shape[0]):
-            this_stim_duration=duration_type[j]
+        j=0
+        for name, this_group in groups:
             for i in range(len(stim_type)):
                 this_type_stim = stim_type[i]
-                this_response = np.diff(
-                    heading_angle[summary_df["stim_type"] == this_type_stim, :]
-                )
+                this_response=angular_velocity_tbt[np.where(this_group["stim_type"]==this_type_stim)[0],:]
                 time_points = np.arange(this_response.shape[1])
                 time_points_b = np.tile(time_points, (this_response.shape[0], 1))
-                if duration_type.shape[0]==1:
+                if num_indep_variables==1:
                     axes.plot(
                         np.mean(time_points_b, axis=0),
                         np.mean(this_response, axis=0),
@@ -1050,6 +1049,7 @@ def main(thisDir, json_file):
                         alpha=0.2,
                         label=this_type_stim,
                     )
+                    axes.legend()
                 else:
                     axes[j].plot(
                         np.mean(time_points_b, axis=0),
@@ -1058,8 +1058,8 @@ def main(thisDir, json_file):
                         alpha=0.2,
                         label=this_type_stim,
                     )
-            axes.legend()
-            if duration_type.shape[0]==1:
+                    axes[j].legend()
+            if num_indep_variables==1:
                 axes.axvline(
                     x=init_frame,
                     color="black",
@@ -1067,11 +1067,12 @@ def main(thisDir, json_file):
                     label="Stimulus Starts",
                 )
                 axes.axvline(
-                    x=init_frame + camera_fps * this_stim_duration,
+                    x=init_frame + camera_fps * name[0],
                     color="black",
                     linestyle="--",
                     label="Stimulus Ends",
                 )
+                axes.set(title=f'locust texture{name[1]}',yticks=[y_axis_lim[0], 0, y_axis_lim[1]],ylim=y_axis_lim,ylabel="angular velocity (rad/s)")
             else:
                 axes[j].axvline(
                     x=init_frame,
@@ -1080,18 +1081,18 @@ def main(thisDir, json_file):
                     label="Stimulus Starts",
                 )
                 axes[j].axvline(
-                    x=init_frame + camera_fps * this_stim_duration,
+                    x=init_frame + camera_fps * name[0],
                     color="black",
                     linestyle="--",
                     label="Stimulus Ends",
                 )
+                axes[j].set(title=f'locust texture{name[1]}',yticks=[y_axis_lim[0], 0, y_axis_lim[1]],ylim=y_axis_lim,ylabel="angular velocity (rad/s)")
+            j=j+1
         plot_name = f"conflict_analysis_overview.png"
         if save_output == True:
             fig5.savefig(thisDir / plot_name)
-        plt.show()
 
     if analysis_methods.get("plotting_optomotor_response") == True:
-        # colormap = np.array(["k", "y", "m", "c", "r", "b", "g", "k"])
         fig2, (ax3, ax4) = plt.subplots(
             nrows=1, ncols=2, figsize=(36, 14), tight_layout=True
         )
@@ -1128,11 +1129,9 @@ def main(thisDir, json_file):
             ax4.scatter(time_points_b, this_rotational_velocity, s=1, color=COL.get_rgb(i),label=this_coherence)
 
         ax3.set_ylim(-1, 1)
-        # xticks=stim_type,
         if visual_paradigm_name=='sweeping':
             ax3.tick_params("x", labelrotation=45)
             ax3.set_xticks(stim_type)
-            #ax3.set_xticklabels(stim_type,rotation=45, fontsize = 10)
         ax3.set(
             xlabel=visual_paradigm_name,
             yticks=[-1, 0, 1],
@@ -1364,10 +1363,11 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260120\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260119\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260120\sweeping\session2"# the isi in bilateral non-rotation sequence is 10 or 20 because too many conditions
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\conflict\session1"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260120\conflict\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260119\sweeping\session2"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\sweeping\session2"
-    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\sweeping\session2"## negative angular velocity means cw?!
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\sweeping\session2"## negative angular velocity means ccw positive means cw
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\choices\session1"
