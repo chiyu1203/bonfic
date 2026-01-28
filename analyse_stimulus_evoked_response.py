@@ -345,39 +345,171 @@ def probes_optomotor_index(angular_velocity_tbt, init_frame,end_frame, camera_fp
             opto_all_isi[i]=np.nan
     return opto_all_trials, opto_all_isi
 
+def find_states_with_debounce(
+    x,
+    thresholds=[0.002,0.005],
+    min_length=100
+):
+    # a debounced hysteretic state machine written by chatGPT. This method should results in more sustained states against sudden changes or recording noise
+    """
+    Robust ON/OFF state machine with debounce against transient changes.
 
-##### this works and should be faster than extract_events but for some reason this always miss the last consecutive_length-1 elements
-# for example if the correct one is 169:181, this function will return 169:177
-def find_state_transition(arr, thresholds= [0.03,0.05],consecutive_length=[100,100]):
-    # tmin_max=[3000,5000]
-    # run_time=np.arange(arr.shape[0])
-    # fig, (ax1, ax2) = plt.subplots(
-    #         nrows=2, ncols=1, figsize=(18, 7), tight_layout=True
-    #     )
-    # ax2.scatter(run_time[tmin_max[0]:tmin_max[1]],arr[tmin_max[0]:tmin_max[1]])
-    # #ax1.scatter(run_time[:2000],run_signal[:2000])
-    # #ax2.scatter(run_time[:2000],run_speed_smooth[:2000])
-    # ax2.axhline(y=thresholds[1],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='r')
-    # ax2.axhline(y=thresholds[0],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='k')
-    # plot_name = f"smoothing_kernel_length_angular_velocity{tmin_max[0]}_{tmin_max[1]}overview.png"
-    # fig.savefig(plot_name)
-    kernel = np.ones(consecutive_length[0])
-    state1_binary = arr > thresholds[0]
+    Returns:
+        states        : np.ndarray of "ON" / "OFF"
+        on_to_off_idx : list of ON -> OFF transition indices
+        off_to_on_idx : list of OFF -> ON transition indices
+    """
+
+    n = len(x)
+    states = np.empty(n, dtype=object)
+
+    # ---- Initial state ----
+    if x[0] > thresholds[1]:
+        current_state = "ON"
+    else:
+        current_state = "OFF"
+
+    states[0] = current_state
+
+    candidate_state = None
+    candidate_count = 0
+
+    on_to_off_idx = []
+    off_to_on_idx = []
+
+    # ---- State machine ----
+    for i in range(1, n):
+
+        value = x[i]
+
+        # Determine candidate state based on thresholds
+        if current_state == "OFF" and value > thresholds[1]:
+            next_candidate = "ON"
+        elif current_state == "ON" and value < thresholds[0]:
+            next_candidate = "OFF"
+        else:
+            next_candidate = None
+
+        # Handle candidate accumulation
+        if next_candidate is None:
+            candidate_state = None
+            candidate_count = 0
+            states[i] = current_state
+            continue
+
+        if candidate_state == next_candidate:
+            candidate_count += 1
+        else:
+            candidate_state = next_candidate
+            candidate_count = 1
+
+        # Confirm transition only if it persists long enough
+        if candidate_count >= min_length:
+            current_state = candidate_state
+            #states[i] = current_state
+            states[i-candidate_count:i]=current_state
+
+            if current_state == "ON":
+                off_to_on_idx.append(i-candidate_count)
+            else:
+                on_to_off_idx.append(i-candidate_count)
+
+            candidate_state = None
+            candidate_count = 0
+        else:
+            states[i] = current_state
+
+    return states, on_to_off_idx, off_to_on_idx
+def find_states_with_min_duration(signal,thresholds=[0.002,0.005],min_length=100):
+    # a method to consider values over or below certian threshold for a sustained time. This method should result in more fragmented epochs
+    kernel = np.ones(min_length)
+    state1_binary = signal > thresholds[0]
     conv = np.convolve(state1_binary, kernel, mode="valid")
-    consecutive_points = np.where(conv >= consecutive_length[0])[0]
+    consecutive_points = np.where(conv >= min_length)[0]
     if consecutive_points.shape[0]>0:
-        state1_starts = consecutive_points[np.insert(np.diff(consecutive_points)>=consecutive_length[1], 0, True)]
+        state1_starts = consecutive_points[np.insert(np.diff(consecutive_points)>=min_length, 0, True)]
     else:
         state1_starts=np.nan
-    kernel = np.ones(consecutive_length[1])
-    state2_binary = arr < thresholds[1]
+    kernel = np.ones(min_length)
+    state2_binary = signal < thresholds[1]
     conv = np.convolve(state2_binary, kernel, mode="valid")
-    consecutive_points = np.where(conv >= consecutive_length[1])[0]    
+    consecutive_points = np.where(conv >= min_length)[0]    
     if consecutive_points.shape[0]>0:
-        state2_starts = consecutive_points[np.insert(np.diff(consecutive_points)>=consecutive_length[0], 0, True)]
+        state2_starts = consecutive_points[np.insert(np.diff(consecutive_points)>=min_length, 0, True)]
     else:
         state2_starts=np.nan
     return state1_starts,state2_starts
+
+def identify_behavioural_states(travel_distance_fbf,angular_velocity,filter_method,camera_fps,consecutive_duration=[0.25,0.25],smooth_window_length=51,skip_smoothing=None):
+    consecutive_length=[camera_fps*consecutive_duration[0],camera_fps*consecutive_duration[1]]
+    if skip_smoothing==None:
+        if filter_method in ["sg_filter","rolling_median"]:
+            skip_smoothing=True
+        else:
+            skip_smoothing=False
+    if skip_smoothing==True:      
+        speed_signal =  travel_distance_fbf
+        turn_signal =  abs(angular_velocity)
+    else:
+        speed_signal =  medfilt(travel_distance_fbf, int(smooth_window_length))
+        turn_signal =  abs(medfilt(angular_velocity, int(smooth_window_length)))
+
+    if skip_smoothing==True and filter_method=='rolling_median':
+        walk_thresholds=[0.001,0.003]
+        turn_thresholds=[0.2,0.5]
+        warnings.warn("rolling_median filter is not applied to speed. consider using use medfilt for that")
+    elif skip_smoothing==False and filter_method=='rolling_median':
+        walk_thresholds=[0.0008,0.003]
+        turn_thresholds=[0.2,0.5]
+    elif skip_smoothing==True and filter_method=="sg_filter":
+        walk_thresholds=[0.001,0.003]
+        turn_thresholds=[0.25,0.5]
+        warnings.warn("sg filter is not applied to angular velocity. consider using use medfilt for that")
+    elif skip_smoothing==False and filter_method=="sg_filter":
+        walk_thresholds=[0.001,0.003]
+        turn_thresholds=[0.25,0.5]
+    elif skip_smoothing==True:
+        warnings.warn("no smoothing method is applied before classified state. The result will be susceptible to noise")
+        walk_thresholds=[0.01,0.02]
+        turn_thresholds=[0.25,0.5]
+    else:
+        walk_thresholds=[0.003,0.01]
+        turn_thresholds=[0.2,0.5]
+
+    walk_states, _,_=find_states_with_debounce(speed_signal,thresholds=walk_thresholds,min_length=consecutive_length[0])
+    turn_states, _,_=find_states_with_debounce(turn_signal,thresholds=turn_thresholds,min_length=consecutive_length[1])
+    # tmin_max=[0,5000]
+    # run_time=np.arange(speed_signal.shape[0])
+    # fig, ((ax1, ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(
+    #         nrows=3, ncols=2, figsize=(18, 7), tight_layout=True
+    #     )
+    # ax1.scatter(run_time[tmin_max[0]:tmin_max[1]],travel_distance_fbf[tmin_max[0]:tmin_max[1]],s=0.1)
+    # ax3.scatter(run_time[tmin_max[0]:tmin_max[1]],speed_signal[tmin_max[0]:tmin_max[1]],s=0.1)
+    # ax1.set(title='raw')
+    # ax3.set(title='after medfilt')
+    # ax1.axhline(y=walk_thresholds[1],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='r')
+    # ax1.axhline(y=walk_thresholds[0],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='k')
+    # ax3.axhline(y=walk_thresholds[1],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='r')
+    # ax3.axhline(y=walk_thresholds[0],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='k')
+    # ax5.scatter(np.where(walk_states[tmin_max[0]:tmin_max[1]]=='OFF')[0],np.zeros((np.where(walk_states[tmin_max[0]:tmin_max[1]]=='OFF')[0].shape)))
+    # ax5.scatter(np.where(walk_states[tmin_max[0]:tmin_max[1]]=='ON')[0],np.ones((np.where(walk_states[tmin_max[0]:tmin_max[1]]=='ON')[0].shape)))
+    # ax2.scatter(run_time[tmin_max[0]:tmin_max[1]],abs(angular_velocity)[tmin_max[0]:tmin_max[1]],s=0.1)
+    # ax4.scatter(run_time[tmin_max[0]:tmin_max[1]],turn_signal[tmin_max[0]:tmin_max[1]],s=0.1)
+    # ax2.set(title='raw')
+    # ax4.set(title='after medfilt')
+    # ax2.axhline(y=turn_thresholds[1],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='r')
+    # ax2.axhline(y=turn_thresholds[0],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='k')
+    # ax4.axhline(y=turn_thresholds[1],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='r')
+    # ax4.axhline(y=turn_thresholds[0],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='k')
+    # ax6.scatter(np.where(turn_states[tmin_max[0]:tmin_max[1]]=='OFF')[0],np.zeros((np.where(turn_states[tmin_max[0]:tmin_max[1]]=='OFF')[0].shape)))
+    # ax6.scatter(np.where(turn_states[tmin_max[0]:tmin_max[1]]=='ON')[0],np.ones((np.where(turn_states[tmin_max[0]:tmin_max[1]]=='ON')[0].shape)))    
+    # if skip_smoothing:
+    #     plot_name = f"overview_no_{walk_thresholds[0]}_{walk_thresholds[1]}_{turn_thresholds[0]}_{turn_thresholds[1]}_{filter_method}_{tmin_max[0]}_{tmin_max[1]}.png"    
+    # else:
+    #     plot_name = f"overview_{smooth_window_length}_{walk_thresholds[0]}_{walk_thresholds[1]}_{turn_thresholds[0]}_{turn_thresholds[1]}_{filter_method}_{tmin_max[0]}_{tmin_max[1]}.png"
+    # fig.savefig(plot_name)
+    # plt.show()
+    return walk_states,turn_states
 
 
 def classify_trial_type(summary_df, turning_threshold, running_speed_threshold):
@@ -446,6 +578,26 @@ def optomotor_response_idx(ev_dat):
     return opt_idx
 
 
+
+def preprocess_tracking_data(df,filtering_method,yaw_axis,smooth_window_length):
+    if filtering_method == "sg_filter":
+        x_all = savgol_filter(df.loc[:, ["intergrated x position"]].values[:,0], smooth_window_length, 3, axis=0)
+        y_all = savgol_filter(df.loc[:, ["intergrated y position"]].values[:,0], smooth_window_length, 3, axis=0)
+        yaw_angular_velocity =df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values[:,0]
+    elif filtering_method == "rolling_median":
+        x_all =df.loc[:, ["intergrated x position"]].rolling(smooth_window_length).median().values
+        y_all = df.loc[:, ["intergrated y position"]].rolling(smooth_window_length).median().values
+        yaw_angular_velocity =df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].rolling(smooth_window_length).median().values
+        x_all=bfill(x_all[:,0])
+        y_all=bfill(y_all[:,0])
+        yaw_angular_velocity=bfill(yaw_angular_velocity[:,0])
+    else:
+        x_all = df.loc[:, ["intergrated x position"]].values[:,0]
+        y_all = df.loc[:, ["intergrated y position"]].values[:,0]
+        yaw_angular_velocity = df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values[:,0]    
+    
+    return x_all,y_all,yaw_angular_velocity
+
 def main(thisDir, json_file):
     if type(thisDir)==str:
         thisDir = Path(thisDir)
@@ -505,10 +657,9 @@ def main(thisDir, json_file):
     database2 = find_file(thisDir, database_file_pattern)
     temperature_file_pattern = "temperature_humidity.npy.gz"
     this_temp_directory = find_file(thisDir, temperature_file_pattern)
-    if int(camera_fps/2)%2==0:
-        filter_window_length=int(camera_fps/2)+1
-    else:
-        filter_window_length=int(camera_fps/2)
+    filtering_method=analysis_methods.get("filtering_method")
+    smooth_window_length = round(0.5*camera_fps)
+    smooth_window_length = smooth_window_length if np.mod(smooth_window_length, 2) == 1 else smooth_window_length + 1 #must be an odd number for median filter and sg filter
     #df = pd.read_pickle(database)
     ##here to load tracking data
     if database2 is None and fictrac_posthoc_analysis is False:
@@ -519,53 +670,10 @@ def main(thisDir, json_file):
         df[f"delta rotation vector lab {yaw_axis}"] = df[f"delta rotation vector lab {yaw_axis}"] * camera_fps
     else:
         df=pd.read_parquet(database2)
-    if analysis_methods.get("filtering_method") == "sg_filter":
-        x_all = savgol_filter(df.loc[:, ["intergrated x position"]].values[:,0], filter_window_length, 3, axis=0)
-        y_all = savgol_filter(df.loc[:, ["intergrated y position"]].values[:,0], filter_window_length, 3, axis=0)
-        yaw_angular_velocity =df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values[:,0]
-    elif analysis_methods.get("filtering_method") == "rolling_median":
-        run_signal = euclidean_distance(np.transpose(df.loc[:, ["intergrated x position"]]),np.transpose(df.loc[:, ["intergrated y position"]]))[0]
-        #inter_run_interval also means min stationary duration. Because the end goal is to calculate run-triggerd activity. This duration is set rather strict so sudden stop will be ignore
-        #
-        smooth_kernel = round(0.3*camera_fps)
-        smooth_kernel = smooth_kernel if np.mod(smooth_kernel, 2) == 1 else smooth_kernel + 1 #must be an odd number for median filter
-        run_speed_smooth =  medfilt(run_signal, int(smooth_kernel))
-        min_walk_duration=1
-        min_stationary_duration=1
-        run_start_times,stationary_start_times=find_state_transition(run_speed_smooth, thresholds=[0.03,0.05], consecutive_length=[min_walk_duration*camera_fps,min_stationary_duration*camera_fps])
-        #np.isnan(run_start_times)
-        #run_start_times,stationary_start_times=find_run_transitions(run_signal, run_time, thresh = [0.03,0.05,0.07], smooth_kernel = 0.3, inter_run_interval = 1, min_run_duration = 1, sample_freq = camera_fps)
-        x_all =df.loc[:, ["intergrated x position"]].rolling(filter_window_length).median().values
-        y_all = df.loc[:, ["intergrated y position"]].rolling(filter_window_length).median().values
-        yaw_angular_velocity =df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].rolling(filter_window_length).median().values
-        ccw_turn_starts,cw_turn_starts=find_state_transition(np.transpose(yaw_angular_velocity)[0],thresholds=[0.04,-0.04], consecutive_length=[min_walk_duration*camera_fps,min_stationary_duration*camera_fps])
-        x_all=bfill(x_all[:,0])
-        y_all=bfill(y_all[:,0])
-        yaw_angular_velocity=bfill(yaw_angular_velocity[:,0])
-        #print(run_start_times.shape,stationary_start_times.shape,ccw_turn_starts.shape,cw_turn_starts.shape)
-    else:
-        x_all = df.loc[:, ["intergrated x position"]].values[:,0]
-        y_all = df.loc[:, ["intergrated y position"]].values[:,0]
-        yaw_angular_velocity = df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values[:,0]
-    # rXY = np.vstack((x_all, y_all))
-    # step_index = diskretize(list(rXY[0]), list(rXY[1]), BODY_LENGTH*6)
-    # curated_X = rXY[0][step_index]
-    # curated_Y = rXY[1][step_index]
-    # angles = np.arctan2(np.diff(curated_Y), np.diff(curated_X)) ## in time series analysis, the angles should come from locustVR directly.
-    # angles = np.insert(angles, 0, np.nan)
-    # heading_angle = np.nancumsum(yaw_angular_velocity, axis=0)/camera_fps
-    # heading_angle = (heading_angle + np.pi) % (2 * np.pi) - np.pi
-    # #heading_angle=heading_angle[step_index]
-    # fig, (ax1, ax2,ax3) = plt.subplots(1, 3, figsize=(27, 7), tight_layout=True)
-    # ax1.scatter(np.arange(angles.shape[0]),angles)
-    # ax2.scatter(np.arange(heading_angle.shape[0]),heading_angle*-1)
-    # ax3.scatter(np.arange(heading_angle[step_index].shape[0]),heading_angle[step_index]*-1)
-    # ax1.set_title("discritised based on curated X and Y")
-    # ax2.set_title("fictrac raw")
-    # ax3.set_title("fictrac discritised based on new index")
-    # fig.savefig("check_angle.png")
 
+    x_all,y_all,yaw_angular_velocity=preprocess_tracking_data(df,filtering_method,yaw_axis,smooth_window_length)
     travel_distance_fbf = euclidean_distance(x_all,y_all)
+    walk_states,turn_states=identify_behavioural_states(travel_distance_fbf,yaw_angular_velocity,filtering_method,camera_fps,consecutive_duration=[0.25,0.25],smooth_window_length=smooth_window_length,skip_smoothing=False)
     ## here write an additional function to classify stationary, moving and total travel distance
     if mark_jump_as_nan:
         events = extract_events(travel_distance_fbf, min_length=20)
@@ -595,6 +703,9 @@ def main(thisDir, json_file):
         ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
         ax.scatter(y_all,x_all,c=np.arange(len(y_all)), marker=".", alpha=0.5)
         fig.savefig(thisDir / "trajectory_plot.png")
+    if analysis_methods.get("analyse_spontaneous_activity")==True:
+        
+        return
 
     # Here to load time based on one of the files created by bonsai such as PD file or events files
     if PD_file_directory:
