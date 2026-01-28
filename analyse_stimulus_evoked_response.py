@@ -365,9 +365,9 @@ def find_states_with_debounce(
 
     # ---- Initial state ----
     if x[0] > thresholds[1]:
-        current_state = "ON"
+        current_state = 1
     else:
-        current_state = "OFF"
+        current_state = 0
 
     states[0] = current_state
 
@@ -383,10 +383,10 @@ def find_states_with_debounce(
         value = x[i]
 
         # Determine candidate state based on thresholds
-        if current_state == "OFF" and value > thresholds[1]:
-            next_candidate = "ON"
-        elif current_state == "ON" and value < thresholds[0]:
-            next_candidate = "OFF"
+        if current_state == 0 and value > thresholds[1]:
+            next_candidate = 1
+        elif current_state == 1 and value < thresholds[0]:
+            next_candidate = 0
         else:
             next_candidate = None
 
@@ -409,7 +409,7 @@ def find_states_with_debounce(
             #states[i] = current_state
             states[i-candidate_count:i]=current_state
 
-            if current_state == "ON":
+            if current_state == 1:
                 off_to_on_idx.append(i-candidate_count)
             else:
                 on_to_off_idx.append(i-candidate_count)
@@ -620,47 +620,46 @@ def main(thisDir, json_file):
             analysis_methods.update(previous_analysis_methods)
         else:
             print("previous analysis methods file is not found. Use the current one.")
+    ## Here to load environmental variables about the setup
+    exp_place = analysis_methods.get("exp_place")
     monitor_fps = analysis_methods.get("monitor_fps")
     camera_fps = analysis_methods.get("camera_fps")
     trackball_radius=analysis_methods.get("trackball_radius",5)## track ball radius in (cm)
+    fictrac_posthoc_analysis = analysis_methods.get("fictrac_posthoc_analysis")
+    temperature_data_options = analysis_methods.get("temperature_data_options")
+    overwrite_curated_dataset = analysis_methods.get("overwrite_curated_dataset")
+    save_output = analysis_methods.get("save_output")
+    ## Here to load environmental variables about the stimulus
     stim_duration = analysis_methods.get("stim_duration")
     interval_duration= analysis_methods.get("interval_duration")
     visual_paradigm_name = analysis_methods.get("experiment_name")
-    fictrac_posthoc_analysis = analysis_methods.get("fictrac_posthoc_analysis")
     align_with_isi_onset = analysis_methods.get("align_with_isi_onset")
-    exp_place = analysis_methods.get("exp_place")
-    temperature_data_options = analysis_methods.get("temperature_data_options")
-    overwrite_curated_dataset = analysis_methods.get("overwrite_curated_dataset")
+
+    ## Here to load environmental variables about the behaviour
     mark_jump_as_nan = analysis_methods.get("mark_jump_as_nan", False)
-    save_output = analysis_methods.get("save_output")
     duration_for_optomotor_index=analysis_methods.get("duration_for_optomotor_index",0)
     yaw_axis=analysis_methods.get("yaw_axis","z").lower()# define which axis to use to examine animal's rotational velocity
-    ###Think about whether to specify which rotational axis to calculate optomotor index
-    ###Maybe ensure velocity can go negative, which indicates animals move backward
-    # Here to set some environmental variables
+    filtering_method=analysis_methods.get("filtering_method")
+    smooth_window_length = round(0.5*camera_fps)
+    smooth_window_length = smooth_window_length if np.mod(smooth_window_length, 2) == 1 else smooth_window_length + 1 #must be an odd number for median filter and sg filter
+
+    # Here to load environmental variables about plotting
     colormap_name = "coolwarm"
     sm = cm.ScalarMappable(cmap=colormap_name)
-    running_speed_threshold = 50
-    turning_threshold = 0.33
     # Here to allocate files
     pd_start="meta"
-    #PD_file_pattern = "lux*.csv"
-    PD_file_pattern = f"{pd_start}*.csv"
-    PD_file_directory = find_file(thisDir, PD_file_pattern)
+    PD_file_pattern1 = "lux*.csv"
+    PD_file_pattern2 = f"{pd_start}*.csv"
+    PD_file_directory = find_file(thisDir, PD_file_pattern2,PD_file_pattern1)
     trial_file_pattern = "trial*.csv"
     trial_file_directory = find_file(thisDir, trial_file_pattern)
     tracking_file_pattern = "tracking*.csv"
     tracking_file_directory = find_file(thisDir, tracking_file_pattern)
-    database_file_pattern = "database*.pickle"
-    database = find_file(thisDir, database_file_pattern)
     database_file_pattern ="database*.parquet.gzip"
     database2 = find_file(thisDir, database_file_pattern)
     temperature_file_pattern = "temperature_humidity.npy.gz"
     this_temp_directory = find_file(thisDir, temperature_file_pattern)
-    filtering_method=analysis_methods.get("filtering_method")
-    smooth_window_length = round(0.5*camera_fps)
-    smooth_window_length = smooth_window_length if np.mod(smooth_window_length, 2) == 1 else smooth_window_length + 1 #must be an odd number for median filter and sg filter
-    #df = pd.read_pickle(database)
+
     ##here to load tracking data
     if database2 is None and fictrac_posthoc_analysis is False:
         df=pd.read_csv(tracking_file_directory,skiprows=0)
@@ -1349,8 +1348,6 @@ def main(thisDir, json_file):
         )  # this normalise the recovery duration from the first deceleration
 
     if save_output == True and overwrite_curated_dataset == True:
-        summary_file_name = thisDir / "behavioural_summary.pickle"
-        summary_df.to_pickle(summary_file_name)
         parquet_directory = thisDir / "behavioural_summary.parquet.gzip"
         summary_df.to_parquet(parquet_directory,compression='gzip')
         data_dict = {name: col.values for name, col in summary_df.items()}
@@ -1362,12 +1359,6 @@ def main(thisDir, json_file):
         file_name = thisDir / "angular_velocity_tbt.npy"
         with open(file_name, "wb") as f:
             np.save(f, angular_velocity_tbt)
-        file_name = thisDir / "angular_velocity_all.npy"
-        with open(file_name, "wb") as f:
-            np.save(f, yaw_angular_velocity)
-        file_name = thisDir / "travel_distance_all.npy"
-        with open(file_name, "wb") as f:
-            np.save(f, travel_distance_fbf)
         print("Save velocity, angular velocity into array and behavioural summary as dataframe. Move to the next animal")
         json_string = json.dumps(analysis_methods, indent=1)
         with open(thisDir / "analysis_methods_dictionary_backup.json", "w") as f:
