@@ -195,8 +195,7 @@ conda activate tracking_analysis
 conda update -n base -c defaults conda
 conda config --add channels conda-forge
 conda config --set channel_priority strict
-conda install --yes -c conda-forge -v h5py opencv ipython jupyter matplotlib pandas matplotlib scipy openpyxl ipyparallel
-conda install numpy"<=2.0.0"
+conda install --yes -c conda-forge -v numpy h5py opencv ipython jupyter matplotlib pandas matplotlib scipy openpyxl ipyparallel
 ```
 
 ## creating virtual environment from an environment.yml file or a requirement.txt
@@ -238,7 +237,9 @@ git clone https://github.com/chiyu1203/utilities.git
 
 Use **bonfic_tutorial.ipynb**, which includes the essence of **analyse_stimulus_evoked_response.py** in this repo and **preprocess_fictrac_data** from **utilities** and plotting some group data.
 
-The analysis methods are organised into a json file, which is created from a python file. This json file tells the notebook and python script how to analysis the data (with some boolean options) and include meta information of the experiment that is not included during data collection phase. 
+The analysis methods are organised into a json file, which is created from a python file. This json file tells the notebook and python script how to analysis the data (with some boolean options) and include meta information of the experiment that is not included during data collection phase.
+
+NOTE: from times to time, bonsai logs one trial into 2 rows, which causes error in sorting_trial_info
 
 Therefore, each project (or each experiment) has its own json file. Below explains what those analysis methods are about.
 
