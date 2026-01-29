@@ -44,7 +44,7 @@ switch on extension located behind the rig. This will turn on both IR lights and
 
 These light create some noises so they are wrapped with tin foil.
 
-There are two ways to run the experiment, using online fictrac or offline fictrac. Online fictrac is essential for closed-loop experiment. 
+There are two ways to run the experiment, using online fictrac or offline fictrac. Online fictrac is essential for closed-loop experiment. ## in the z ball and matrexvr ball (not sure about vccball), poisitive rotational velocity along jaw axis means animal is turning counterclockwise. Additional in BonVision monitor environment, horizontal angular increment means clockwise in the zball and matrexvr ball, but it means counterclockwise in vccball
 
 However, due to some potential incompatability issue between AMD CPU and OpenCL, we drop a lot of frames when doing online fictrac analysis and saving frames into video 
 
