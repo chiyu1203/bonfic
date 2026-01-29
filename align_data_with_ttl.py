@@ -242,13 +242,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
 
     visual_paradigm_name = analysis_methods.get("experiment_name")
     exp_place = analysis_methods.get("exp_place")
-    if (
-        visual_paradigm_name == "gratings"
-        or visual_paradigm_name == "sloom"
-        or visual_paradigm_name == "conflict"
-        or visual_paradigm_name == "looming"
-        or visual_paradigm_name == "sweeping"        
-    ):
+    if visual_paradigm_name in ["sloom","conflict","looming","sweeping","densities","gratings"]:
         trial_num = stim_info.shape[0]
     else:
         trial_num = int(stim_info.shape[0] / 2)
@@ -421,8 +415,11 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         elif w2b[0]<b2w[0]:
             b2w = b2w[: trial_num + 1]
             w2b = w2b[:trial_num]        
-        elif w2b[0]>b2w[0]:#coherence w2b is prior to ISI; b2w is prior to stimulus w2b-b2w shows stimulus duration b2w[1:]-w2b[:-1] shows ISI duration but b2w[:-1]-w2b[:] in r"Y:\GN25052\251102\coherence\session1" and r"Y:\GN25053\251108\coherence\session1" 
+        elif w2b[0]>b2w[0] and visual_paradigm_name=='coherence':#coherence w2b is prior to ISI; b2w is prior to stimulus w2b-b2w shows stimulus duration b2w[1:]-w2b[:-1] shows ISI duration but b2w[:-1]-w2b[:] in r"Y:\GN25052\251102\coherence\session1" and r"Y:\GN25053\251108\coherence\session1" 
             b2w = b2w[1:trial_num + 1]## The stimulus selectivity takes 160 secs in full screen. The stimulus selectivity takes 175 secs in single monitor protocol.
+            w2b = w2b[:trial_num]
+        else:
+            b2w = b2w[:trial_num]
             w2b = w2b[:trial_num]
 
     ## this probably means the same as dict fictrac_posthoc_analysis, if fictrac_vidLog exists, then probably do not posthoc analysis
