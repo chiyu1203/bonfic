@@ -359,9 +359,7 @@ def find_states_with_debounce(
         on_to_off_idx : list of ON -> OFF transition indices
         off_to_on_idx : list of OFF -> ON transition indices
     """
-
-    n = len(x)
-    states = np.empty(n, dtype=object)
+    states = np.zeros(len(x),dtype=int)
 
     # ---- Initial state ----
     if x[0] > thresholds[1]:
@@ -374,14 +372,10 @@ def find_states_with_debounce(
     candidate_state = None
     candidate_count = 0
 
-    on_to_off_idx = []
-    off_to_on_idx = []
-
     # ---- State machine ----
-    for i in range(1, n):
+    for i in range(1, len(x)):
 
         value = x[i]
-
         # Determine candidate state based on thresholds
         if current_state == 0 and value > thresholds[1]:
             next_candidate = 1
@@ -407,19 +401,17 @@ def find_states_with_debounce(
         if candidate_count >= min_length:
             current_state = candidate_state
             #states[i] = current_state
-            states[i-candidate_count:i]=current_state
-
-            if current_state == 1:
-                off_to_on_idx.append(i-candidate_count)
-            else:
-                on_to_off_idx.append(i-candidate_count)
-
+            states[i-candidate_count:i+1]=current_state
+            # if current_state == 1:
+            #     off_to_on_idx.append(i-candidate_count)
+            # else:
+            #     on_to_off_idx.append(i-candidate_count)
             candidate_state = None
             candidate_count = 0
         else:
             states[i] = current_state
 
-    return states, on_to_off_idx, off_to_on_idx
+    return states#, on_to_off_idx, off_to_on_idx
 def find_states_with_min_duration(signal,thresholds=[0.002,0.005],min_length=100):
     # a method to consider values over or below certian threshold for a sustained time. This method should result in more fragmented epochs
     kernel = np.ones(min_length)
@@ -476,8 +468,8 @@ def identify_behavioural_states(travel_distance_fbf,angular_velocity,filter_meth
         walk_thresholds=[0.003,0.01]
         turn_thresholds=[0.2,0.5]
 
-    walk_states, _,_=find_states_with_debounce(speed_signal,thresholds=walk_thresholds,min_length=consecutive_length[0])
-    turn_states, _,_=find_states_with_debounce(turn_signal,thresholds=turn_thresholds,min_length=consecutive_length[1])
+    walk_states=find_states_with_debounce(speed_signal,thresholds=walk_thresholds,min_length=consecutive_length[0])
+    turn_states=find_states_with_debounce(turn_signal,thresholds=turn_thresholds,min_length=consecutive_length[1])
     # tmin_max=[0,5000]
     # run_time=np.arange(speed_signal.shape[0])
     # fig, ((ax1, ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(
@@ -596,9 +588,10 @@ def preprocess_tracking_data(df,filtering_method,yaw_axis,smooth_window_length):
         y_all = df.loc[:, ["intergrated y position"]].values[:,0]
         yaw_angular_velocity = df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values[:,0]    
     
-    return x_all,y_all,yaw_angular_velocity
+    return x_all,y_all,yaw_angular_velocity*-1 # multiply by -1 to get animal's angular velocity. Otherwise, it is the angular velocity of the ball
 
 def main(thisDir, json_file):
+    ## in the z ball, poisitive rotational velocity along jaw axis means animal is turning counterclockwise, 
     if type(thisDir)==str:
         thisDir = Path(thisDir)
     # Figuring out path and directory
@@ -623,7 +616,7 @@ def main(thisDir, json_file):
     ## Here to load environmental variables about the setup
     exp_place = analysis_methods.get("exp_place")
     monitor_fps = analysis_methods.get("monitor_fps")
-    camera_fps = analysis_methods.get("camera_fps")
+    camera_fps = analysis_methods.get("camera_fps",100)
     trackball_radius=analysis_methods.get("trackball_radius",5)## track ball radius in (cm)
     fictrac_posthoc_analysis = analysis_methods.get("fictrac_posthoc_analysis")
     temperature_data_options = analysis_methods.get("temperature_data_options")
@@ -651,6 +644,12 @@ def main(thisDir, json_file):
     PD_file_pattern1 = "lux*.csv"
     PD_file_pattern2 = f"{pd_start}*.csv"
     PD_file_directory = find_file(thisDir, PD_file_pattern2,PD_file_pattern1)
+    if PD_file_directory.stem.startswith("meta1"):
+        print("you probably use camera 2 to run this experiment. The default camera fps is 144 Hz")
+        analysis_methods.update({"camera_fps":144})
+    elif PD_file_directory.stem.startswith("meta2") or PD_file_directory.stem.startswith("meta"):
+        print("you probably use camera 2 to run this experiment. The default camera fps is 100 Hz")
+        analysis_methods.update({"camera_fps":100})
     trial_file_pattern = "trial*.csv"
     trial_file_directory = find_file(thisDir, trial_file_pattern)
     tracking_file_pattern = "tracking*.csv"
@@ -675,6 +674,7 @@ def main(thisDir, json_file):
     walk_states,turn_states=identify_behavioural_states(travel_distance_fbf,yaw_angular_velocity,filtering_method,camera_fps,consecutive_duration=[0.25,0.25],smooth_window_length=smooth_window_length,skip_smoothing=False)
     ## here write an additional function to classify stationary, moving and total travel distance
     if mark_jump_as_nan:
+        s2w,w2s=find_states_with_min_duration(travel_distance_fbf,thresholds=[1,10], min_length=20)
         events = extract_events(travel_distance_fbf, min_length=20)
         ##use fft to classify trials where animals jump. So far this method can be used to detect some obvious jumps but there might be some miss detecting
         auc = np.zeros(len(events))
@@ -797,22 +797,25 @@ def main(thisDir, json_file):
     ### analyse LED signal to align the onset and offset of stimuli with video frames
     if fictrac_posthoc_analysis:
         stim_onset, isi_onset = analyse_led_signal(thisDir, analysis_methods, stim_info)
-        if visual_paradigm_name in ["gratings","sweeploom","conflict","looming","sweeping"]:
-            if stim_info['PreMovDuration'].unique()!=0:
-                if stim_onset.shape[0]%2==1:
-                    stim_onset=stim_onset[:-1]
-                if isi_onset.shape[0]%2==1:
-                    isi_onset=isi_onset[:-1]
+        if visual_paradigm_name in ["gratings","sweeploom","conflict","looming","sweeping","densities"]:
+            if 'PreMovDuration' in stim_info.columns:
+                if stim_info['PreMovDuration'].unique()!=0:
+                    if stim_onset.shape[0]%2==1:
+                        stim_onset=stim_onset[:-1]
+                    if isi_onset.shape[0]%2==1:
+                        isi_onset=isi_onset[:-1]
 
-                stim_appearance_onset=stim_onset[::2]
-                stim_motion_stop_onset=stim_onset[1::2]
-                stim_onset=isi_onset[::2]
-                isi_onset=isi_onset[1::2]
-                print("stimulus duration + 0.5 sec")
-                print(isi_onset-stim_onset)
-                stim_info["stim_onset"] = stim_onset
-            else:
-                stim_info["stim_onset"] = stim_onset
+                    stim_appearance_onset=stim_onset[::2]
+                    stim_motion_stop_onset=stim_onset[1::2]
+                    stim_onset=isi_onset[::2]
+                    isi_onset=isi_onset[1::2]
+                    print("stimulus duration + 0.5 sec")
+                    print(isi_onset-stim_onset)
+                    stim_info["stim_onset"] = stim_onset
+                else:
+                    stim_info["stim_onset"] = stim_onset
+            stim_info["stim_onset"] = stim_onset    
+
         else:
             transition_onset = np.ones((len(stim_onset) + len(isi_onset),), dtype=int)
             
@@ -827,7 +830,7 @@ def main(thisDir, json_file):
                 stim_info["Duration"] = duration_array
 
             stim_info["stim_onset"] = transition_onset
-    elif "pd_phase" in df.columns:
+    elif "pd_phase" in df.columns:##this was created for closed-loop choices assay
         transition_onsets=np.where(np.diff(df['pd_phase'].values))[0]
         stim_onset=transition_onsets[::2]
         isi_onset=transition_onsets[1::2]
@@ -844,16 +847,8 @@ def main(thisDir, json_file):
         ]
         stim_info["stim_onset"] = stim_onset
     else:
-        # compare the timestamp between event file and dat file
-        data_timestamp = tracking_info["timestamp"]
-        stimulus_timestamp_b = np.tile(stimulus_timestamp, (len(data_timestamp), 1))
-        data_timestamp_b = np.tile(data_timestamp, (len(stimulus_timestamp), 1))
-        timestamp_diff = data_timestamp_b > np.transpose(stimulus_timestamp_b)
-        stim_onset1 = np.where(np.roll(timestamp_diff, 1, axis=1) != timestamp_diff)[1][
-            1::2
-        ]
         warnings.warn(
-            "still need to debug this place for situation where there is no log file"
+            "not support using tracking_info timestamp anymore. Use older version for this analysis"
         )
         return
     ##probably need to add some function here to deal with the situation when isi_onset_log is True
@@ -874,22 +869,31 @@ def main(thisDir, json_file):
     else:
         if visual_paradigm_name in ["gratings","sweeploom","conflict","looming","sweeping","choices","densities"]:
             stim_to_analyse = stim_info["stim_onset"]
-            if type(analysis_methods.get("interval_duration")) == list and np.unique(stim_info["ISI"].values)>0:## for the situation where ISI is pre-defiend
-                ISI_duration = stim_info["ISI"].values
-            elif np.unique(stim_info["ISI"].values)<0:## for the situation where ISI is not pre-defined
-                if 'stim_appearance_onset' in locals():## for the situation there is stimulus appearance and motion are seperated action
-                    ISI_duration=np.round((stim_appearance_onset[1:]-isi_onset[:-1])/camera_fps)
-                else:
-                    ISI_duration=np.round((stim_onset[1:]-isi_onset[:-1])/camera_fps)
-                ISI_duration=np.append(ISI_duration, np.nan)
-            else:## for the situation where ISI is pre-defined as a fixed value
-                ISI_duration = np.repeat(
-                    analysis_methods.get("interval_duration"), stim_to_analyse.shape[0]
-                )
-            preStim_ISI_duration = np.append(
-                analysis_methods.get("prestim_duration"), ISI_duration[:-1]
-            )
+            if "ISI" in stim_info.columns:
+                if type(analysis_methods.get("interval_duration")) == list and np.unique(stim_info["ISI"].values)>0:## for the situation where ISI is pre-defiend
+                    ISI_duration = stim_info["ISI"].values
+                elif np.unique(stim_info["ISI"].values)<0:## for the situation where ISI is not pre-defined
+                    if 'stim_appearance_onset' in locals():## for the situation there is stimulus appearance and motion are seperated action
+                        ISI_duration=np.round((stim_appearance_onset[1:]-isi_onset[:-1])/camera_fps)
+                    else:
+                        ISI_duration=np.round((stim_onset[1:]-isi_onset[:-1])/camera_fps)
+                    ISI_duration=np.append(ISI_duration, np.nan)
+                else:## for the situation where ISI is pre-defined as a fixed value
+                    ISI_duration = np.repeat(
+                        analysis_methods.get("interval_duration"), stim_to_analyse.shape[0]
+                    )
+            else:
+                ISI_duration=np.round((stim_onset[1:]-isi_onset[:-1])/camera_fps)#I am curious which one uses here besides densities
             num_stim=stim_info.shape[0]
+            if ISI_duration.shape[0]==num_stim:### this mean the duration before stimulus. In a typical workflow, the duration of post-stimulus interval was logged
+                preStim_ISI_duration = np.append(
+                    analysis_methods.get("prestim_duration"), ISI_duration[:-1]
+                )
+            else:### In the case of density, the ISI is neither logged nor specified in the trial information so that the duration of post-stimulus interval would be mixed with the end of experiment, usually discard to avoid confusion.
+                preStim_ISI_duration = np.append(
+                    analysis_methods.get("prestim_duration"), ISI_duration
+                )
+            
         else:
             stim_to_analyse = stim_info.loc[1::2, "stim_onset"]
             if log_stim_ISI_duration:
@@ -962,13 +966,14 @@ def main(thisDir, json_file):
             ax.set(title=this_stim_type,yticks=[1,5])
                 # fig, (ax1, ax2,ax3) = plt.subplots(1, 3, figsize=(27, 7), tight_layout=True)
                 # ax1.scatter(np.arange(angles.shape[0]),angles)
-                # ax2.scatter(np.arange(heading_angle.shape[0]),heading_angle*-1)
-                # ax3.scatter(np.arange(heading_angle[step_index].shape[0]),heading_angle[step_index]*-1)
+                # ax2.scatter(np.arange(heading_angle.shape[0]),heading_angle)
+                # ax3.scatter(np.arange(heading_angle[step_index].shape[0]),heading_angle[step_index])
                 # ax1.set_title("discritised based on curated X and Y")
                 # ax2.set_title("fictrac raw")
                 # ax3.set_title("fictrac discritised based on new index")
                 # fig.savefig(f"check_angle_{i}th_trial.png")    
         fig.savefig(thisDir/"heading_distribution.png")
+        return
     else:
         heading_angle=np.degrees(heading_angle)
 
@@ -1203,6 +1208,10 @@ def main(thisDir, json_file):
             fig5.savefig(thisDir / plot_name)
 
     if analysis_methods.get("plotting_optomotor_response") == True:
+        # if 'cw' in stim_type[0]:
+        #     colormap_name = "gnuplot"
+        #     sm = cm.ScalarMappable(cmap=colormap_name)            
+        #     COL = MplColorHelper(colormap_name, 0, len(stim_type)-1)
         fig2, (ax3, ax4) = plt.subplots(
             nrows=1, ncols=2, figsize=(36, 14), tight_layout=True
         )
@@ -1235,8 +1244,7 @@ def main(thisDir, json_file):
                 this_rotational_velocity = heading_angle[summary_df["stim_type"] == this_coherence, :]
             time_points = np.arange(this_rotational_velocity.shape[1])
             time_points_b = np.tile(time_points, (this_rotational_velocity.shape[0], 1))
-            # ax4.scatter(time_points_b, this_rotational_velocity, s=1, color=custom_cmap[i])
-            ax4.scatter(time_points_b, this_rotational_velocity, s=1, color=COL.get_rgb(i),label=this_coherence)
+            ax4.scatter(time_points_b, this_rotational_velocity, s=0.5, color=COL.get_rgb(i),label=this_coherence)
 
         ax3.set_ylim(-1, 1)
         if visual_paradigm_name=='sweeping':
@@ -1294,7 +1302,6 @@ def main(thisDir, json_file):
         plot_name = f"optomotor_analysis_until{duration_for_optomotor_index}s.png"
         if save_output == True:
             fig2.savefig(thisDir / plot_name)
-        plt.show()
 
     if analysis_methods.get("plotting_deceleration_accerleration") == True:
         travel_distance_after_stim_presence = cum_travel_distance[
@@ -1451,10 +1458,6 @@ if __name__ == "__main__":
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25104\251223\sweeping\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25105\251229\sweeping\session1"## needs a new scene name for bilateral ccw cw sequence
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25106\251229\sweeping\session1"## needs a new scene name for bilateral ccw cw sequence
-    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26102\260112\coherence\session1"
-    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26103\260112\coherence\session1"
-    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26101\260107\coherence\session1"
-    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26101\260108\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26101\260107\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26101\260108\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26102\260112\sweeping\session1"
@@ -1465,14 +1468,24 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260120\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260119\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260120\sweeping\session2"# the isi in bilateral non-rotation sequence is 10 or 20 because too many conditions
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260120\conflict\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260120\conflict\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260119\sweeping\session2"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\sweeping\session2"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\sweeping\session2"## negative angular velocity means ccw positive means cw
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\sweeping\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\sweeping\session1"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26107\260126\sweeping\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26109\260127\sweeping\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\sweeping\session2"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\conflict\session1"
+    #thisDir =r"Y:\GN26008\250727\densities\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26107\260126\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26108\260127\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26109\260127\choices\session1"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
