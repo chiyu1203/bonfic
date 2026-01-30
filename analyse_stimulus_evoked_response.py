@@ -870,9 +870,9 @@ def main(thisDir, json_file):
         if visual_paradigm_name in ["gratings","sweeploom","conflict","looming","sweeping","choices","densities"]:
             stim_to_analyse = stim_info["stim_onset"]
             if "ISI" in stim_info.columns:
-                if type(analysis_methods.get("interval_duration")) == list and np.unique(stim_info["ISI"].values)>0:## for the situation where ISI is pre-defiend
+                if type(analysis_methods.get("interval_duration")) == list and any(stim_info["ISI"].values>0):## for the situation where ISI is pre-defiend
                     ISI_duration = stim_info["ISI"].values
-                elif np.unique(stim_info["ISI"].values)<0:## for the situation where ISI is not pre-defined
+                elif any(stim_info["ISI"].values<0):## for the situation where ISI is not pre-defined
                     if 'stim_appearance_onset' in locals():## for the situation there is stimulus appearance and motion are seperated action
                         ISI_duration=np.round((stim_appearance_onset[1:]-isi_onset[:-1])/camera_fps)
                     else:
@@ -904,7 +904,14 @@ def main(thisDir, json_file):
                 preStim_ISI_duration=stim_info
             num_stim=int(stim_info.shape[0]/2)
     stim_name_arr = np.array(stim_info["stim_type"][stim_to_analyse.index])
-    present_duration_arr = np.array(stim_info["Duration"][stim_to_analyse.index])
+    if any(stim_info["Duration"].values<0):
+        if visual_paradigm_name=='coherence':
+            present_duration_arr = np.round((isi_onset[1:]-stim_onset[:-1])/camera_fps)
+            present_duration_arr=np.append(present_duration_arr, np.nan)
+        else:
+            present_duration_arr = np.round((isi_onset-stim_onset)/camera_fps)
+    else:
+        present_duration_arr = np.array(stim_info["Duration"][stim_to_analyse.index])
     (
         summary_list,
         angular_velocity_tbt,
@@ -949,7 +956,7 @@ def main(thisDir, json_file):
 
     print("ready to plot graph with some data and decompose those lists")
     COL = MplColorHelper(colormap_name, 0, len(stim_type)-1)
-    if visual_paradigm_name=='choices':
+    if visual_paradigm_name=='choices':        
         fig = plt.figure(figsize=[24, 18])
         for i, this_stim_type in enumerate(stim_type):
             heading_angle_discretised=[]
@@ -981,7 +988,7 @@ def main(thisDir, json_file):
         shortened_isi=5
         if shortened_isi>abs(analysis_window[0]):
             shortened_isi=abs(analysis_window[0])
-        running_trial_distance_threshold=1*shortened_isi #this threshold is defined based on travel distance 5-sec prior to stimulus onset
+        running_trial_distance_threshold=1*shortened_isi #this threshold is defined based on travel distance 5-sec prior to stimulus onset        
         fig1 = plt.figure(figsize=(18, 7), tight_layout=True)
         ax = plt.subplot(241)
         if "opto_index" in summary_df.columns:
@@ -1011,25 +1018,25 @@ def main(thisDir, json_file):
         ax_stationary.set_title("stationary trial (based on travel distance during ISI)")
         ax_runnning.set_title("running trial (based on travel distance during ISI)")
         for i in range(len(stim_type)):
-            this_coherence = stim_type[i]
+            this_stim_type = stim_type[i]
             if type(stim_duration)==list:
-                these_velocities = velocity_arr[(summary_df["stim_type"] == this_coherence) & (summary_df['present_trial_duration']>duration_for_optomotor_index),:]
-                these_travel_distance_isi=summary_df["travel_distance_isi"][(summary_df["stim_type"] == this_coherence) & (summary_df['present_trial_duration']>duration_for_optomotor_index)].values
+                these_velocities = velocity_arr[(summary_df["stim_type"] == this_stim_type) & (summary_df['present_trial_duration']>duration_for_optomotor_index),:]
+                these_travel_distance_isi=summary_df["travel_distance_isi"][(summary_df["stim_type"] == this_stim_type) & (summary_df['present_trial_duration']>duration_for_optomotor_index)].values
             else:
-                these_velocities = velocity_arr[summary_df["stim_type"] == this_coherence, :]
-                these_travel_distance_isi=summary_df["travel_distance_isi"][summary_df["stim_type"] == this_coherence, :].values
+                these_velocities = velocity_arr[summary_df["stim_type"] == this_stim_type, :]
+                these_travel_distance_isi=summary_df["travel_distance_isi"][summary_df["stim_type"] == this_stim_type, :].values
             
             stationary_trial=these_velocities[these_travel_distance_isi<running_trial_distance_threshold]
             time_points = np.arange(these_velocities.shape[1])
             if stationary_trial.shape[0]>0:
                 time_points_b = np.tile(time_points, (stationary_trial.shape[0], 1))
-                ax_stationary.scatter(time_points_b, stationary_trial, s=1, color=COL.get_rgb(i),label=str(this_coherence))
-                #ax_stationary.plot(time_points_b, stationary_trial, color=COL.get_rgb(i),label=str(this_coherence))
+                ax_stationary.scatter(time_points_b, stationary_trial, s=1, color=COL.get_rgb(i),label=str(this_stim_type))
+                #ax_stationary.plot(time_points_b, stationary_trial, color=COL.get_rgb(i),label=str(this_stim_type))
             running_trial=these_velocities[these_travel_distance_isi>running_trial_distance_threshold]
             if running_trial.shape[0]>0:
                 time_points_b = np.tile(time_points, (running_trial.shape[0], 1))
-                ax_runnning.scatter(time_points_b, running_trial, s=1, color=COL.get_rgb(i),label=str(this_coherence))
-                #ax_runnning.plot(time_points_b, running_trial, color=COL.get_rgb(i),label=str(this_coherence))
+                ax_runnning.scatter(time_points_b, running_trial, s=1, color=COL.get_rgb(i),label=str(this_stim_type))
+                #ax_runnning.plot(time_points_b, running_trial, color=COL.get_rgb(i),label=str(this_stim_type))
         ax_runnning.legend()
         ax_stationary.legend()
         ax_runnning.axvline(
@@ -1216,12 +1223,12 @@ def main(thisDir, json_file):
             nrows=1, ncols=2, figsize=(36, 14), tight_layout=True
         )
         for i in range(len(stim_type)):
-            this_coherence = stim_type[i]
+            this_stim_type = stim_type[i]
             if type(stim_duration)==list:
-                this_response = summary_df.loc[(summary_df["stim_type"] == this_coherence) & (summary_df['present_trial_duration']>=duration_for_optomotor_index),"opto_index"].values
+                this_response = summary_df.loc[(summary_df["stim_type"] == this_stim_type) & (summary_df['present_trial_duration']>=duration_for_optomotor_index),"opto_index"].values
             else:
                 this_response = summary_df.loc[
-                    summary_df["stim_type"] == this_coherence, "opto_index"
+                    summary_df["stim_type"] == this_stim_type, "opto_index"
                 ].values
             if len(this_response) == 0:
                 continue
@@ -1230,7 +1237,7 @@ def main(thisDir, json_file):
                 this_response.shape[0]
             )
             ax3.errorbar(
-                this_coherence,
+                this_stim_type,
                 mean_response,
                 yerr=sem_response,
                 c="k",
@@ -1239,15 +1246,15 @@ def main(thisDir, json_file):
                 capsize=3,
             )
             if type(stim_duration)==list:
-                this_rotational_velocity = heading_angle[(summary_df["stim_type"] == this_coherence) & (summary_df['present_trial_duration']>=duration_for_optomotor_index),:]
+                this_rotational_velocity = heading_angle[(summary_df["stim_type"] == this_stim_type) & (summary_df['present_trial_duration']>=duration_for_optomotor_index),:]
             else:
-                this_rotational_velocity = heading_angle[summary_df["stim_type"] == this_coherence, :]
+                this_rotational_velocity = heading_angle[summary_df["stim_type"] == this_stim_type, :]
             time_points = np.arange(this_rotational_velocity.shape[1])
             time_points_b = np.tile(time_points, (this_rotational_velocity.shape[0], 1))
-            ax4.scatter(time_points_b, this_rotational_velocity, s=0.5, color=COL.get_rgb(i),label=this_coherence)
+            ax4.scatter(time_points_b, this_rotational_velocity, s=0.5, color=COL.get_rgb(i),label=this_stim_type)
 
         ax3.set_ylim(-1, 1)
-        if visual_paradigm_name=='sweeping':
+        if visual_paradigm_name=='sweeping' or visual_paradigm_name=='gratings':
             ax3.tick_params("x", labelrotation=45)
             ax3.set_xticks(stim_type)
         ax3.set(
@@ -1474,11 +1481,11 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\sweeping\session2"## negative angular velocity means ccw positive means cw
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\sweeping\session1"
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26107\260126\sweeping\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26107\260126\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26109\260127\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\sweeping\session2"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\conflict\session1"
-    #thisDir =r"Y:\GN26008\250727\densities\session1"
+    thisDir =r"Y:\GN26008\250727\gratings\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\choices\session1"
