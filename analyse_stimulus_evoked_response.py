@@ -410,7 +410,6 @@ def find_states_with_debounce(
             candidate_count = 0
         else:
             states[i] = current_state
-
     return states#, on_to_off_idx, off_to_on_idx
 def find_states_with_min_duration(signal,thresholds=[0.002,0.005],min_length=100):
     # a method to consider values over or below certian threshold for a sustained time. This method should result in more fragmented epochs
@@ -441,17 +440,17 @@ def identify_behavioural_states(travel_distance_fbf,angular_velocity,filter_meth
             skip_smoothing=False
     if skip_smoothing==True:      
         speed_signal =  travel_distance_fbf
-        turn_signal =  abs(angular_velocity)
+        turn_signal =  angular_velocity
     else:
         speed_signal =  medfilt(travel_distance_fbf, int(smooth_window_length))
-        turn_signal =  abs(medfilt(angular_velocity, int(smooth_window_length)))
+        turn_signal =  medfilt(angular_velocity, int(smooth_window_length))
 
     if skip_smoothing==True and filter_method=='rolling_median':
         walk_thresholds=[0.001,0.003]
         turn_thresholds=[0.2,0.5]
         warnings.warn("rolling_median filter is not applied to speed. consider using use medfilt for that")
     elif skip_smoothing==False and filter_method=='rolling_median':
-        walk_thresholds=[0.0008,0.003]
+        walk_thresholds=[0.001,0.003]#stop here
         turn_thresholds=[0.2,0.5]
     elif skip_smoothing==True and filter_method=="sg_filter":
         walk_thresholds=[0.001,0.003]
@@ -469,39 +468,30 @@ def identify_behavioural_states(travel_distance_fbf,angular_velocity,filter_meth
         turn_thresholds=[0.2,0.5]
 
     walk_states=find_states_with_debounce(speed_signal,thresholds=walk_thresholds,min_length=consecutive_length[0])
-    turn_states=find_states_with_debounce(turn_signal,thresholds=turn_thresholds,min_length=consecutive_length[1])
-    # tmin_max=[0,5000]
-    # run_time=np.arange(speed_signal.shape[0])
-    # fig, ((ax1, ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(
-    #         nrows=3, ncols=2, figsize=(18, 7), tight_layout=True
-    #     )
-    # ax1.scatter(run_time[tmin_max[0]:tmin_max[1]],travel_distance_fbf[tmin_max[0]:tmin_max[1]],s=0.1)
-    # ax3.scatter(run_time[tmin_max[0]:tmin_max[1]],speed_signal[tmin_max[0]:tmin_max[1]],s=0.1)
-    # ax1.set(title='raw')
-    # ax3.set(title='after medfilt')
-    # ax1.axhline(y=walk_thresholds[1],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='r')
-    # ax1.axhline(y=walk_thresholds[0],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='k')
-    # ax3.axhline(y=walk_thresholds[1],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='r')
-    # ax3.axhline(y=walk_thresholds[0],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='k')
-    # ax5.scatter(np.where(walk_states[tmin_max[0]:tmin_max[1]]=='OFF')[0],np.zeros((np.where(walk_states[tmin_max[0]:tmin_max[1]]=='OFF')[0].shape)))
-    # ax5.scatter(np.where(walk_states[tmin_max[0]:tmin_max[1]]=='ON')[0],np.ones((np.where(walk_states[tmin_max[0]:tmin_max[1]]=='ON')[0].shape)))
-    # ax2.scatter(run_time[tmin_max[0]:tmin_max[1]],abs(angular_velocity)[tmin_max[0]:tmin_max[1]],s=0.1)
-    # ax4.scatter(run_time[tmin_max[0]:tmin_max[1]],turn_signal[tmin_max[0]:tmin_max[1]],s=0.1)
-    # ax2.set(title='raw')
-    # ax4.set(title='after medfilt')
-    # ax2.axhline(y=turn_thresholds[1],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='r')
-    # ax2.axhline(y=turn_thresholds[0],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='k')
-    # ax4.axhline(y=turn_thresholds[1],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='r')
-    # ax4.axhline(y=turn_thresholds[0],xmin=tmin_max[0],xmax=tmin_max[1],linewidth=0.3,color='k')
-    # ax6.scatter(np.where(turn_states[tmin_max[0]:tmin_max[1]]=='OFF')[0],np.zeros((np.where(turn_states[tmin_max[0]:tmin_max[1]]=='OFF')[0].shape)))
-    # ax6.scatter(np.where(turn_states[tmin_max[0]:tmin_max[1]]=='ON')[0],np.ones((np.where(turn_states[tmin_max[0]:tmin_max[1]]=='ON')[0].shape)))    
-    # if skip_smoothing:
-    #     plot_name = f"overview_no_{walk_thresholds[0]}_{walk_thresholds[1]}_{turn_thresholds[0]}_{turn_thresholds[1]}_{filter_method}_{tmin_max[0]}_{tmin_max[1]}.png"    
-    # else:
-    #     plot_name = f"overview_{smooth_window_length}_{walk_thresholds[0]}_{walk_thresholds[1]}_{turn_thresholds[0]}_{turn_thresholds[1]}_{filter_method}_{tmin_max[0]}_{tmin_max[1]}.png"
-    # fig.savefig(plot_name)
-    # plt.show()
-    return walk_states,turn_states
+    turn_states=find_states_with_debounce(abs(turn_signal),thresholds=turn_thresholds,min_length=consecutive_length[1])
+    turn_cw=find_states_with_debounce(turn_signal,thresholds=turn_thresholds,min_length=consecutive_length[1])
+    turn_ccw=find_states_with_debounce(turn_signal*-1,thresholds=turn_thresholds,min_length=consecutive_length[1])
+    tmin_max=[0,-1]#-1 for the entire trace or specify a frame number
+    run_time=np.arange(speed_signal.shape[0])
+    frame_no=run_time[tmin_max[0]:tmin_max[1]]
+    fig, ((ax3,ax4),(ax5,ax6)) = plt.subplots(
+            nrows=2, ncols=2, figsize=(18, 7), tight_layout=True
+        )    
+    ax3.scatter(frame_no,speed_signal[tmin_max[0]:tmin_max[1]],s=0.1)
+    ax3.set(title='after medfilt speed')
+    ax3.axhline(y=walk_thresholds[1],xmin=frame_no[tmin_max[0]],xmax=frame_no[tmin_max[1]-1],linewidth=3,color='r')
+    ax3.axhline(y=walk_thresholds[0],xmin=frame_no[tmin_max[0]],xmax=frame_no[tmin_max[1]-1],linewidth=3,color='k')
+    ax5.scatter(np.where(walk_states[tmin_max[0]:tmin_max[1]]==0)[0],np.zeros((np.where(walk_states[tmin_max[0]:tmin_max[1]]==0)[0].shape)),s=0.1)
+    ax5.scatter(np.where(walk_states[tmin_max[0]:tmin_max[1]]==1)[0],np.ones((np.where(walk_states[tmin_max[0]:tmin_max[1]]==1)[0].shape)),s=0.1)
+    run_time=np.arange(turn_signal.shape[0])
+    frame_no=run_time[tmin_max[0]:tmin_max[1]]
+    ax4.scatter(frame_no,abs(turn_signal[tmin_max[0]:tmin_max[1]]),s=0.1)
+    ax4.set(title='after medfilt abs rotational velocity')
+    ax4.axhline(y=turn_thresholds[1],xmin=frame_no[tmin_max[0]],xmax=frame_no[tmin_max[1]-1],linewidth=3,color='r')
+    ax4.axhline(y=turn_thresholds[0],xmin=frame_no[tmin_max[0]],xmax=frame_no[tmin_max[1]-1],linewidth=3,color='k')
+    ax6.scatter(np.where(turn_states[tmin_max[0]:tmin_max[1]]==0)[0],np.zeros((np.where(turn_states[tmin_max[0]:tmin_max[1]]==0)[0].shape)),s=0.1)
+    ax6.scatter(np.where(turn_states[tmin_max[0]:tmin_max[1]]==1)[0],np.ones((np.where(turn_states[tmin_max[0]:tmin_max[1]]==1)[0].shape)),s=0.1)    
+    return walk_states,turn_states,turn_cw,turn_ccw,fig
 
 
 def classify_trial_type(summary_df, turning_threshold, running_speed_threshold):
@@ -645,7 +635,7 @@ def main(thisDir, json_file):
     PD_file_pattern2 = f"{pd_start}*.csv"
     PD_file_directory = find_file(thisDir, PD_file_pattern2,PD_file_pattern1)
     if PD_file_directory.stem.startswith("meta1"):
-        print("you probably use camera 2 to run this experiment. The default camera fps is 144 Hz")
+        print("you probably use camera 1 to run this experiment. The default camera fps is 144 Hz")
         analysis_methods.update({"camera_fps":144})
     elif PD_file_directory.stem.startswith("meta2") or PD_file_directory.stem.startswith("meta"):
         print("you probably use camera 2 to run this experiment. The default camera fps is 100 Hz")
@@ -671,7 +661,10 @@ def main(thisDir, json_file):
 
     x_all,y_all,yaw_angular_velocity=preprocess_tracking_data(df,filtering_method,yaw_axis,smooth_window_length)
     travel_distance_fbf = euclidean_distance(x_all,y_all)
-    walk_states,turn_states=identify_behavioural_states(travel_distance_fbf,yaw_angular_velocity,filtering_method,camera_fps,consecutive_duration=[0.25,0.25],smooth_window_length=smooth_window_length,skip_smoothing=False)
+    walk_states,turn_states,turn_cw,turn_ccw,fig=identify_behavioural_states(travel_distance_fbf,yaw_angular_velocity,filtering_method,camera_fps,consecutive_duration=[2,0.5],smooth_window_length=smooth_window_length,skip_smoothing=False)
+    plot_name = f"behavioural_states_classification.png"
+    if save_output == True:
+        fig.savefig(thisDir / plot_name)
     ## here write an additional function to classify stationary, moving and total travel distance
     if mark_jump_as_nan:
         s2w,w2s=find_states_with_min_duration(travel_distance_fbf,thresholds=[1,10], min_length=20)
@@ -938,7 +931,7 @@ def main(thisDir, json_file):
     if cum_distance_prev_stim.shape[1]==0:
         total_distance_prev_stim=np.full((cum_distance_prev_stim.shape[0]), np.nan)
     else:
-        total_distance_prev_stim=cum_distance_prev_stim[:,-1]
+        total_distance_prev_stim=abs(cum_distance_prev_stim[:,0])
     if cum_distance_post_stim.shape[1]==0:
         total_distance_post_stim=np.full((cum_distance_post_stim.shape[0]), np.nan)
     else:
@@ -994,51 +987,59 @@ def main(thisDir, json_file):
         if "opto_index" in summary_df.columns:
             ax.hist(summary_df["opto_index"].values, bins=20)
         # ax.set_xlabel("optomotor index")
-        ax.set_ylabel("frequency")
-        ax.set_title("optomotor response during stimulus presentation")
+        ax.set_ylabel("count")
+        ax.set_title("after stimulus presentation")
         ax1 = plt.subplot(242)
         ax1.hist(summary_df["travel_distance"].values, bins=20)
-        # ax1.set_xlabel("travel distance (mm)")
-        # ax1.set_ylabel("frequency")
-        ax1.set_title("travel distance during stimulus presentation")
+        ax1.set_ylabel("count")
+        ax1.set_title("after stimulus presentation")
         ax3 = plt.subplot(245)
         if "opto_index_isi" in summary_df.columns:
             ax3.hist(summary_df["opto_index_isi"].values, bins=20)
         ax3.set_xlabel("optomotor index")
-        ax3.set_ylabel("frequency")
-        ax3.set_title("optomotor response 5 sec prior to the stimulus")
+        ax3.set_ylabel("count")
+        ax3.set_title(f"{shortened_isi} sec prior to the stimulus")
         ax4 = plt.subplot(246)
         ax4.hist(summary_df["travel_distance_isi"].values, bins=20)
-        ax4.set_xlabel("travel distance (mm)")
-        # ax4.set_ylabel("frequency")
-        ax4.set_title("travel distance 5 sec prior to the stimulus")
+        ax4.set_xlabel("travel distance (cm)")
+        ax4.set_ylabel("count")
+        ax4.set_title(f"{shortened_isi} sec prior to the stimulus")
         
         ax_stationary = plt.subplot(243)
         ax_runnning = plt.subplot(247)
-        ax_stationary.set_title("stationary trial (based on travel distance during ISI)")
-        ax_runnning.set_title("running trial (based on travel distance during ISI)")
+        ax_stationary.set_title(f"stationary trial (based on {shortened_isi} sec prior to the stimulus)")
+        ax_runnning.set_title(f"running trial (based on {shortened_isi} sec prior to the stimulus)")
         for i in range(len(stim_type)):
             this_stim_type = stim_type[i]
             if type(stim_duration)==list:
-                these_velocities = velocity_arr[(summary_df["stim_type"] == this_stim_type) & (summary_df['present_trial_duration']>duration_for_optomotor_index),:]
-                these_travel_distance_isi=summary_df["travel_distance_isi"][(summary_df["stim_type"] == this_stim_type) & (summary_df['present_trial_duration']>duration_for_optomotor_index)].values
+                these_velocities = velocity_arr[(summary_df["stim_type"] == this_stim_type) & (summary_df['present_trial_duration']>=duration_for_optomotor_index),:]
+                these_travel_distance_isi=summary_df["travel_distance_isi"][(summary_df["stim_type"] == this_stim_type) & (summary_df['present_trial_duration']>=duration_for_optomotor_index)].values
             else:
                 these_velocities = velocity_arr[summary_df["stim_type"] == this_stim_type, :]
                 these_travel_distance_isi=summary_df["travel_distance_isi"][summary_df["stim_type"] == this_stim_type, :].values
             
-            stationary_trial=these_velocities[these_travel_distance_isi<running_trial_distance_threshold]
+            V_stationary=these_velocities[these_travel_distance_isi<running_trial_distance_threshold]
             time_points = np.arange(these_velocities.shape[1])
-            if stationary_trial.shape[0]>0:
-                time_points_b = np.tile(time_points, (stationary_trial.shape[0], 1))
-                ax_stationary.scatter(time_points_b, stationary_trial, s=1, color=COL.get_rgb(i),label=str(this_stim_type))
-                #ax_stationary.plot(time_points_b, stationary_trial, color=COL.get_rgb(i),label=str(this_stim_type))
-            running_trial=these_velocities[these_travel_distance_isi>running_trial_distance_threshold]
-            if running_trial.shape[0]>0:
-                time_points_b = np.tile(time_points, (running_trial.shape[0], 1))
-                ax_runnning.scatter(time_points_b, running_trial, s=1, color=COL.get_rgb(i),label=str(this_stim_type))
-                #ax_runnning.plot(time_points_b, running_trial, color=COL.get_rgb(i),label=str(this_stim_type))
+            if V_stationary.shape[0]>0:
+                time_points_b = np.tile(time_points, (V_stationary.shape[0], 1))
+                ax_stationary.scatter(time_points_b, V_stationary, s=1, color=COL.get_rgb(i),label=str(this_stim_type))
+                #ax_stationary.plot(np.transpose(time_points_b),np.transpose(V_stationary), color=COL.get_rgb(i),label=str(this_stim_type),linewidth=0.2,alpha=0.5)
+            V_run=these_velocities[these_travel_distance_isi>running_trial_distance_threshold]
+            if V_run.shape[0]>0:
+                time_points_b = np.tile(time_points, (V_run.shape[0], 1))
+                ax_runnning.scatter(time_points_b, V_run, s=1, color=COL.get_rgb(i),label=str(this_stim_type))
+                #ax_runnning.plot(np.transpose(time_points_b),np.transpose(V_run), color=COL.get_rgb(i),label=str(this_stim_type),linewidth=0.2,alpha=0.5)
         ax_runnning.legend()
         ax_stationary.legend()
+        ax_runnning.set(
+            ylim=[0, 25],
+            ylabel="speed (cm/s)",
+            xlabel="Time (frame no)",
+        )
+        ax_stationary.set(
+            ylim=[0, 25],
+            ylabel="speed (cm/s)",
+        )
         ax_runnning.axvline(
             x=init_frame,
             color="black",
@@ -1485,7 +1486,7 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26109\260127\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\sweeping\session2"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\conflict\session1"
-    thisDir =r"Y:\GN26008\250727\gratings\session1"
+    #thisDir =r"Y:\GN26008\250727\gratings\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\choices\session1"
@@ -1493,6 +1494,8 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26107\260126\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26108\260127\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26109\260127\choices\session1"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26114\260209\sweeping\session2"# tracking after 30000 frames has problem, increased threshold improved but can be better
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26113\260203\sweeping\session1"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
