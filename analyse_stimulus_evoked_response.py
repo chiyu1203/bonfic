@@ -1150,7 +1150,12 @@ def main(thisDir, json_file):
             fig_running.savefig(thisDir / plot_name)
 
     if analysis_methods.get("plotting_position_dependant_fixation") == True:
-        groups = stim_info.groupby(['Duration', 'LocustTexture1'])
+        
+        if 'LocustTexture1' in stim_info and 'R1' in stim_info:
+            groups = stim_info.groupby(['R1', 'LocustTexture1'])
+            summary_df=pd.concat([summary_df, stim_info['LocustTexture1'],stim_info['R1']], axis=1)
+        else:
+            groups = stim_info.groupby(['Duration','LocustTexture1']) 
         y_axis_lim=[-2.5,2.5]
         num_indep_variables=groups.ngroups
         colormap = np.array(["k", "r", "b", "g", "y", "m", "c", "k"])
@@ -1189,13 +1194,13 @@ def main(thisDir, json_file):
                     linestyle="--",
                     label="Stimulus Starts",
                 )
-                axes.axvline(
-                    x=init_frame + camera_fps * name[0],
-                    color="black",
-                    linestyle="--",
-                    label="Stimulus Ends",
-                )
-                axes.set(title=f'locust texture{name[1]}',yticks=[y_axis_lim[0], 0, y_axis_lim[1]],ylim=y_axis_lim,ylabel="angular velocity (rad/s)")
+                # axes.axvline(
+                #     x=init_frame + camera_fps * name[1],
+                #     color="black",
+                #     linestyle="--",
+                #     label="Stimulus Ends",
+                # )
+                axes.set(title=f'locust texture{name[1]}, R{name[0]}',yticks=[y_axis_lim[0], 0, y_axis_lim[1]],ylim=y_axis_lim,ylabel="angular velocity (rad/s)")
             else:
                 axes[j].axvline(
                     x=init_frame,
@@ -1203,13 +1208,13 @@ def main(thisDir, json_file):
                     linestyle="--",
                     label="Stimulus Starts",
                 )
-                axes[j].axvline(
-                    x=init_frame + camera_fps * name[0],
-                    color="black",
-                    linestyle="--",
-                    label="Stimulus Ends",
-                )
-                axes[j].set(title=f'locust texture{name[1]}',yticks=[y_axis_lim[0], 0, y_axis_lim[1]],ylim=y_axis_lim,ylabel="angular velocity (rad/s)")
+                # axes[j].axvline(
+                #     x=init_frame + camera_fps * name[0],
+                #     color="black",
+                #     linestyle="--",
+                #     label="Stimulus Ends",
+                # )
+                axes[j].set(title=f'locust texture{name[1]}, R{name[0]}',yticks=[y_axis_lim[0], 0, y_axis_lim[1]],ylim=y_axis_lim,ylabel="angular velocity (rad/s)")
             j=j+1
         plot_name = f"conflict_analysis_overview.png"
         if save_output == True:
@@ -1485,7 +1490,7 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26107\260126\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26109\260127\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\sweeping\session2"
-    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\conflict\session1"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\conflict\session1"
     #thisDir =r"Y:\GN26008\250727\gratings\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
@@ -1494,7 +1499,7 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26107\260126\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26108\260127\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26109\260127\choices\session1"
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26114\260209\sweeping\session2"# tracking after 30000 frames has problem, increased threshold improved but can be better
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26114\260209\sweeping\session2"# tracking after 30000 frames has problem, increased threshold improved but can be better
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26113\260203\sweeping\session1"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
