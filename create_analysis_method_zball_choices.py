@@ -24,16 +24,16 @@ analysis_methods = {
     "load_experiment_condition_from_database": True,
     "select_animals_by_condition": False,
     "analysis_by_stimulus_type": True,
-    "duration_for_optomotor_index": 16,
+    "duration_for_optomotor_index": 30,
     "yaw_axis":"z",
     "camera_fps": 144,
-    "trackball_radius": 50,
+    "trackball_radius": 5,
     "monitor_fps": 144,
-    "prestim_duration": 180,
+    "prestim_duration": 60,
     "stim_duration": [30],
-    "interval_duration": [25,30,35],
+    "interval_duration": [20,30,40],
     "analysis_window": [
-        -10,
+        -2,
         30
     ],
 }  # plue value representing clockwise, counterclockwise is minus, then the rest is coherence leve
