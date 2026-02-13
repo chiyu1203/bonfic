@@ -135,6 +135,8 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_in
     pre_stim_interval = analysis_methods.get("prestim_duration")
     interval_duration = analysis_methods.get("interval_duration")
     stim_duration = analysis_methods.get("stim_duration")
+    stim_duration = analysis_methods.get("stim_duration")
+    exp_place =analysis_methods.get("exp_place")
     if type(interval_duration) == list:
         min_interval= min(interval_duration)
     else:
@@ -146,7 +148,10 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_in
     min_phase_duration=[0.5,0.5]
     if 'PreMovDuration' in stim_info.columns:
         if stim_info['PreMovDuration'].unique()!=0:
-            min_phase_duration=[stim_info['PreMovDuration'].unique(),min(min_stim,min_interval)]
+            if exp_place=='MatrexVR':
+                min_phase_duration= [min_stim,min_interval]
+            else:    
+                min_phase_duration=[stim_info['PreMovDuration'].unique(),min(min_stim,min_interval)]
         else:
             min_phase_duration= [min_interval,min_stim]
     else:
@@ -254,8 +259,8 @@ def analyse_led_signal(thisDir, json_file, stim_info):
     [exp_date, exp_hour] = this_trial_info.stem.split("events")[1].split("T")
     exp_datetime = string2datetime(f"{exp_date}_{exp_hour}")
 
-    video_pattern = "*.avi"
-    this_video = find_file(thisDir, video_pattern)
+    video_pattern = ["*.avi","*.mp4"]
+    this_video = find_file_multiple_patterns(thisDir, video_pattern)
     # file_name, file_extension = os.path.splitext(file_path)
     # output_file_name = file_name + "_timestamp.csv"
 

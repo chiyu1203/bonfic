@@ -85,20 +85,20 @@ def analysis_stim_evoked_response_combo(
             temp_tbt=stimulus_info['temperature'][1::2].values
             humid_tbt=stimulus_info['humidity'][1::2].values
     elif len(tem_df_this_exp) > 0:
-        temp_tbt= extract_stim_locked_data(
+        tmp1= extract_stim_locked_data(
             stim_to_analyse,
             tem_df_this_exp[:, 0],
             analysis_window,
             camera_fps,
         )
-        humid_tbt= extract_stim_locked_data(
+        tmp2= extract_stim_locked_data(
             stim_to_analyse,
             tem_df_this_exp[:, 1],
             analysis_window,
             camera_fps,
         )
-        temp_tbt=np.nanmean(temp_tbt, axis=1),
-        humid_tbt=np.nanmean(humid_tbt, axis=1),
+        temp_tbt=np.nanmean(tmp1, axis=1)
+        humid_tbt=np.nanmean(tmp2, axis=1)
     else:
         temp_tbt = np.empty((stimulus_info.shape[0], 1))
         temp_tbt[:] = np.nan
@@ -793,7 +793,7 @@ def main(thisDir, json_file):
         stim_onset, isi_onset = analyse_led_signal(thisDir, analysis_methods, stim_info)
         if visual_paradigm_name in ["gratings","sweeploom","conflict","looming","sweeping","densities"]:
             if 'PreMovDuration' in stim_info.columns:
-                if stim_info['PreMovDuration'].unique()!=0:
+                if stim_info['PreMovDuration'].unique()!=0 and exp_place!='MatrexVR':
                     if stim_onset.shape[0]%2==1:
                         stim_onset=stim_onset[:-1]
                     if isi_onset.shape[0]%2==1:
@@ -805,9 +805,6 @@ def main(thisDir, json_file):
                     isi_onset=isi_onset[1::2]
                     print("stimulus duration + 0.5 sec")
                     print(isi_onset-stim_onset)
-                    stim_info["stim_onset"] = stim_onset
-                else:
-                    stim_info["stim_onset"] = stim_onset
             stim_info["stim_onset"] = stim_onset    
 
         else:
@@ -1086,7 +1083,7 @@ def main(thisDir, json_file):
             ax2.set_yticks([])
             ax2.set_ylabel("Trial#")
 
-        pcm = ax2.pcolormesh(velocity_arr, cmap="magma", vmin=0, vmax=100)
+        pcm = ax2.pcolormesh(velocity_arr, cmap="magma", vmin=0, vmax=10)
         # pcm=ax2.pcolormesh(velocity_tbt, cmap = 'magma') ##sometimes, we dont need a vmax
         ## add colorbar
         fig1.colorbar(pcm)
@@ -1419,6 +1416,7 @@ if __name__ == "__main__":
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22056/220905/densities"
     #thisDir = r"C:\Users\neuroLaptop\Documents\GN25040\250106\conflict\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN25026\250106\conflict\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN25040\250106\conflict\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\looming\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25101\250917\looming\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\coherence\session1"
@@ -1505,7 +1503,7 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26109\260127\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26114\260209\sweeping\session2"# tracking after 30000 frames has problem, increased threshold improved but can be better
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26113\260203\sweeping\session1"
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26115\260209\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26115\260209\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26118\260210\choices\session1"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
