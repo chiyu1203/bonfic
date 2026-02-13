@@ -447,11 +447,11 @@ def identify_behavioural_states(travel_distance_fbf,angular_velocity,filter_meth
 
     if skip_smoothing==True and filter_method=='rolling_median':
         walk_thresholds=[0.001,0.003]
-        turn_thresholds=[0.2,0.5]
+        turn_thresholds=[0.1,0.2]
         warnings.warn("rolling_median filter is not applied to speed. consider using use medfilt for that")
     elif skip_smoothing==False and filter_method=='rolling_median':
         walk_thresholds=[0.001,0.003]#stop here
-        turn_thresholds=[0.2,0.5]
+        turn_thresholds=[0.1,0.2]
     elif skip_smoothing==True and filter_method=="sg_filter":
         walk_thresholds=[0.001,0.003]
         turn_thresholds=[0.25,0.5]
@@ -634,12 +634,13 @@ def main(thisDir, json_file):
     PD_file_pattern1 = "lux*.csv"
     PD_file_pattern2 = f"{pd_start}*.csv"
     PD_file_directory = find_file(thisDir, PD_file_pattern2,PD_file_pattern1)
-    if PD_file_directory.stem.startswith("meta1"):
-        print("you probably use camera 1 to run this experiment. The default camera fps is 144 Hz")
-        analysis_methods.update({"camera_fps":144})
-    elif PD_file_directory.stem.startswith("meta2") or PD_file_directory.stem.startswith("meta"):
-        print("you probably use camera 2 to run this experiment. The default camera fps is 100 Hz")
-        analysis_methods.update({"camera_fps":100})
+    if PD_file_directory is not None:
+        if PD_file_directory.stem.startswith("meta1"):
+            print("you probably use camera 1 to run this experiment. The default camera fps is 144 Hz")
+            analysis_methods.update({"camera_fps":144})
+        elif PD_file_directory.stem.startswith("meta2") or PD_file_directory.stem.startswith("meta"):
+            print("you probably use camera 2 to run this experiment. The default camera fps is 100 Hz")
+            analysis_methods.update({"camera_fps":100})
     trial_file_pattern = "trial*.csv"
     trial_file_directory = find_file(thisDir, trial_file_pattern)
     tracking_file_pattern = "tracking*.csv"
@@ -955,15 +956,17 @@ def main(thisDir, json_file):
             heading_angle_discretised=[]
             ax = fig.add_subplot(1,8,i+1, polar=True)  # Create polar axes
             for this_index in list(np.where(stim_info['stim_type']==this_stim_type)[0]):
-                step_index = diskretize(distance=cum_distance_post_stim[this_index,:],diskretise_length=BODY_LENGTH*6)
+                step_index = diskretize(distance=cum_distance_post_stim[this_index,:],diskretise_length=BODY_LENGTH*3)
                 # angles = np.arctan2(np.diff(curated_Y), np.diff(curated_X)) ## in time series analysis, the angles should come from locustVR directly.
                 # angles = np.insert(angles, 0, np.nan)
                 these_heading_angles=heading_post_stim[this_index,step_index]
                 if these_heading_angles.shape[0]>1:
                     these_heading_angles = (these_heading_angles + np.pi) % (2 * np.pi) - np.pi
-                    heading_angle_discretised.extend(np.degrees(these_heading_angles[1:]))
-            ax.hist(heading_angle_discretised, bins=12, alpha=0.75)
-            ax.set(title=this_stim_type,yticks=[1,5])
+                    #heading_angle_discretised.extend(np.degrees(these_heading_angles[1:]))
+                    heading_angle_discretised.extend(these_heading_angles[1:])
+            ax.hist(heading_angle_discretised,bins=12)
+            ax.set(title=this_stim_type,yticks=[1,3])
+            ## negative radius is negative degree, is locust turning toward left object. In the case of glocust_null, that means toward glocust
                 # fig, (ax1, ax2,ax3) = plt.subplots(1, 3, figsize=(27, 7), tight_layout=True)
                 # ax1.scatter(np.arange(angles.shape[0]),angles)
                 # ax2.scatter(np.arange(heading_angle.shape[0]),heading_angle)
@@ -973,7 +976,8 @@ def main(thisDir, json_file):
                 # ax3.set_title("fictrac discritised based on new index")
                 # fig.savefig(f"check_angle_{i}th_trial.png")    
         fig.savefig(thisDir/"heading_distribution.png")
-        return
+        heading_angle=np.degrees(heading_angle)
+        #return
     else:
         heading_angle=np.degrees(heading_angle)
 
@@ -1490,7 +1494,7 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26107\260126\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26109\260127\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\sweeping\session2"
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\conflict\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\conflict\session1"
     #thisDir =r"Y:\GN26008\250727\gratings\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
@@ -1501,6 +1505,8 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26109\260127\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26114\260209\sweeping\session2"# tracking after 30000 frames has problem, increased threshold improved but can be better
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26113\260203\sweeping\session1"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26115\260209\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26118\260210\choices\session1"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
