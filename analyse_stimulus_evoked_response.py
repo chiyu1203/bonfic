@@ -446,12 +446,12 @@ def identify_behavioural_states(travel_distance_fbf,angular_velocity,filter_meth
         turn_signal =  medfilt(angular_velocity, int(smooth_window_length))
 
     if skip_smoothing==True and filter_method=='rolling_median':
-        walk_thresholds=[0.001,0.003]
+        walk_thresholds=[0.001,0.005]
         turn_thresholds=[0.1,0.2]
         warnings.warn("rolling_median filter is not applied to speed. consider using use medfilt for that")
     elif skip_smoothing==False and filter_method=='rolling_median':
-        walk_thresholds=[0.001,0.003]#stop here
-        turn_thresholds=[0.1,0.2]
+        walk_thresholds=[0.005,0.008]#stop here
+        turn_thresholds=[0.2,0.3]
     elif skip_smoothing==True and filter_method=="sg_filter":
         walk_thresholds=[0.001,0.003]
         turn_thresholds=[0.25,0.5]
@@ -471,24 +471,36 @@ def identify_behavioural_states(travel_distance_fbf,angular_velocity,filter_meth
     turn_states=find_states_with_debounce(abs(turn_signal),thresholds=turn_thresholds,min_length=consecutive_length[1])
     turn_cw=find_states_with_debounce(turn_signal,thresholds=turn_thresholds,min_length=consecutive_length[1])
     turn_ccw=find_states_with_debounce(turn_signal*-1,thresholds=turn_thresholds,min_length=consecutive_length[1])
+    #tmin_max=[280000,290000]#-1 for the entire trace or specify a frame number
     tmin_max=[0,-1]#-1 for the entire trace or specify a frame number
     run_time=np.arange(speed_signal.shape[0])
+    if tmin_max[1]==-1:
+        section_length=speed_signal.shape[0]-2
+    else:
+        section_length=tmin_max[1]-tmin_max[0]-1
+
     frame_no=run_time[tmin_max[0]:tmin_max[1]]
     fig, ((ax3,ax4),(ax5,ax6)) = plt.subplots(
             nrows=2, ncols=2, figsize=(18, 7), tight_layout=True
         )    
     ax3.scatter(frame_no,speed_signal[tmin_max[0]:tmin_max[1]],s=0.1)
+    #ax3.scatter(frame_no,speed_signal,s=0.1)
     ax3.set(title='after medfilt speed')
-    ax3.axhline(y=walk_thresholds[1],xmin=frame_no[tmin_max[0]],xmax=frame_no[tmin_max[1]-1],linewidth=3,color='r')
-    ax3.axhline(y=walk_thresholds[0],xmin=frame_no[tmin_max[0]],xmax=frame_no[tmin_max[1]-1],linewidth=3,color='k')
+    ax3.axhline(y=walk_thresholds[1],xmin=frame_no[0],xmax=frame_no[section_length],linewidth=3,color='r')
+    ax3.axhline(y=walk_thresholds[0],xmin=frame_no[0],xmax=frame_no[section_length],linewidth=3,color='k')
     ax5.scatter(np.where(walk_states[tmin_max[0]:tmin_max[1]]==0)[0],np.zeros((np.where(walk_states[tmin_max[0]:tmin_max[1]]==0)[0].shape)),s=0.1)
     ax5.scatter(np.where(walk_states[tmin_max[0]:tmin_max[1]]==1)[0],np.ones((np.where(walk_states[tmin_max[0]:tmin_max[1]]==1)[0].shape)),s=0.1)
     run_time=np.arange(turn_signal.shape[0])
+    if tmin_max[1]==-1:
+        section_length=turn_signal.shape[0]-2
+    else:
+        section_length=tmin_max[1]-tmin_max[0]-1
     frame_no=run_time[tmin_max[0]:tmin_max[1]]
     ax4.scatter(frame_no,abs(turn_signal[tmin_max[0]:tmin_max[1]]),s=0.1)
+    #ax4.scatter(frame_no,abs(turn_signal),s=0.1)
     ax4.set(title='after medfilt abs rotational velocity')
-    ax4.axhline(y=turn_thresholds[1],xmin=frame_no[tmin_max[0]],xmax=frame_no[tmin_max[1]-1],linewidth=3,color='r')
-    ax4.axhline(y=turn_thresholds[0],xmin=frame_no[tmin_max[0]],xmax=frame_no[tmin_max[1]-1],linewidth=3,color='k')
+    ax4.axhline(y=turn_thresholds[1],xmin=frame_no[0],xmax=frame_no[section_length],linewidth=3,color='r')
+    ax4.axhline(y=turn_thresholds[0],xmin=frame_no[0],xmax=frame_no[section_length],linewidth=3,color='k')
     ax6.scatter(np.where(turn_states[tmin_max[0]:tmin_max[1]]==0)[0],np.zeros((np.where(turn_states[tmin_max[0]:tmin_max[1]]==0)[0].shape)),s=0.1)
     ax6.scatter(np.where(turn_states[tmin_max[0]:tmin_max[1]]==1)[0],np.ones((np.where(turn_states[tmin_max[0]:tmin_max[1]]==1)[0].shape)),s=0.1)    
     return walk_states,turn_states,turn_cw,turn_ccw,fig
@@ -953,7 +965,7 @@ def main(thisDir, json_file):
             heading_angle_discretised=[]
             ax = fig.add_subplot(1,8,i+1, polar=True)  # Create polar axes
             for this_index in list(np.where(stim_info['stim_type']==this_stim_type)[0]):
-                step_index = diskretize(distance=cum_distance_post_stim[this_index,:],diskretise_length=BODY_LENGTH*3)
+                step_index = diskretize(distance=cum_distance_post_stim[this_index,:],diskretise_length=BODY_LENGTH*6)
                 # angles = np.arctan2(np.diff(curated_Y), np.diff(curated_X)) ## in time series analysis, the angles should come from locustVR directly.
                 # angles = np.insert(angles, 0, np.nan)
                 these_heading_angles=heading_post_stim[this_index,step_index]
@@ -1416,7 +1428,7 @@ if __name__ == "__main__":
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/VCCball/L22056/220905/densities"
     #thisDir = r"C:\Users\neuroLaptop\Documents\GN25040\250106\conflict\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN25026\250106\conflict\session1"
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN25040\250106\conflict\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN25040\250106\conflict\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\looming\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25101\250917\looming\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN25102\250929\coherence\session1"
@@ -1494,6 +1506,17 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\sweeping\session2"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\conflict\session1"
     #thisDir =r"Y:\GN26008\250727\gratings\session1"
+    #thisDir =r"Y:\GN26013\260214\sweeping\session1"
+    #thisDir =r"Y:\GN26014\260215\sweeping\session1"
+    #thisDir =r"Y:\GN26012\260208\sweeping\session1"
+    #thisDir =r"Y:\GN26011\260207\sweeping\session2"
+    #thisDir =r"Y:\GN26010\260201\sweeping\session2"
+    #thisDir =r"Y:\GN26007\260124\sweeping\session1"
+    #thisDir =r"Y:\GN26008\260125\sweeping\session1"
+    #thisDir =r"Y:\GN26009\260131\sweeping\session2"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26125\260223\sweeping\session2"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26119\260216\choices\session1"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26126\260223\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\choices\session1"
