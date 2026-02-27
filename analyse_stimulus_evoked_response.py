@@ -803,7 +803,7 @@ def main(thisDir, json_file):
     ### analyse LED signal to align the onset and offset of stimuli with video frames
     if fictrac_posthoc_analysis:
         stim_onset, isi_onset = analyse_led_signal(thisDir, analysis_methods, stim_info)
-        if visual_paradigm_name in ["gratings","sweeploom","conflict","looming","sweeping","densities"]:
+        if visual_paradigm_name in ["gratings","sweeploom","conflict","looming","sweeping","densities","choices"]:
             if 'PreMovDuration' in stim_info.columns:
                 if stim_info['PreMovDuration'].unique()!=0 and exp_place!='MatrexVR':
                     if stim_onset.shape[0]%2==1:
@@ -1516,7 +1516,10 @@ if __name__ == "__main__":
     #thisDir =r"Y:\GN26009\260131\sweeping\session2"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26125\260223\sweeping\session2"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26119\260216\choices\session1"
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26126\260223\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26126\260223\choices\session1"
+    #thisDir =r"Y:\GN26016\260221\choices\session1"
+    #thisDir =r"Y:\GN26017\260222\choices\session1"
+    thisDir =r"Y:\GN26015\260221\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\choices\session1"

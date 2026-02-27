@@ -247,7 +247,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
 
     visual_paradigm_name = analysis_methods.get("experiment_name")
     exp_place = analysis_methods.get("exp_place")
-    if visual_paradigm_name in ["sloom","conflict","looming","sweeping","densities","gratings"]:
+    if visual_paradigm_name in ["sloom","conflict","looming","sweeping","densities","gratings","choices"]:
         trial_num = stim_info.shape[0]
     else:
         trial_num = int(stim_info.shape[0] / 2)
