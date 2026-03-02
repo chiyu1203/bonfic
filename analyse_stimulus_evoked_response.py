@@ -431,7 +431,7 @@ def find_states_with_min_duration(signal,thresholds=[0.002,0.005],min_length=100
         state2_starts=np.nan
     return state1_starts,state2_starts
 
-def identify_behavioural_states(travel_distance_fbf,angular_velocity,filter_method,camera_fps,consecutive_duration=[0.25,0.25],smooth_window_length=51,skip_smoothing=None):
+def identify_behavioural_states(travel_distance_fbf,angular_velocity,filter_method,camera_fps,consecutive_duration=[0.25,0.25],smooth_window_length=51,skip_smoothing=None,walk_thresholds=None,turn_thresholds=None):
     consecutive_length=[camera_fps*consecutive_duration[0],camera_fps*consecutive_duration[1]]
     if skip_smoothing==None:
         if filter_method in ["sg_filter","rolling_median"]:
@@ -444,28 +444,31 @@ def identify_behavioural_states(travel_distance_fbf,angular_velocity,filter_meth
     else:
         speed_signal =  medfilt(travel_distance_fbf, int(smooth_window_length))
         turn_signal =  medfilt(angular_velocity, int(smooth_window_length))
-
-    if skip_smoothing==True and filter_method=='rolling_median':
-        walk_thresholds=[0.001,0.005]
-        turn_thresholds=[0.1,0.2]
-        warnings.warn("rolling_median filter is not applied to speed. consider using use medfilt for that")
-    elif skip_smoothing==False and filter_method=='rolling_median':
-        walk_thresholds=[0.005,0.008]#stop here
-        turn_thresholds=[0.2,0.3]
-    elif skip_smoothing==True and filter_method=="sg_filter":
-        walk_thresholds=[0.001,0.003]
-        turn_thresholds=[0.25,0.5]
-        warnings.warn("sg filter is not applied to angular velocity. consider using use medfilt for that")
-    elif skip_smoothing==False and filter_method=="sg_filter":
-        walk_thresholds=[0.001,0.003]
-        turn_thresholds=[0.25,0.5]
-    elif skip_smoothing==True:
-        warnings.warn("no smoothing method is applied before classified state. The result will be susceptible to noise")
-        walk_thresholds=[0.01,0.02]
-        turn_thresholds=[0.25,0.5]
+    if type(walk_thresholds)==list and type(turn_thresholds)==list:
+        print("use customised threshold")
+        pass
     else:
-        walk_thresholds=[0.003,0.01]
-        turn_thresholds=[0.2,0.5]
+        if skip_smoothing==True and filter_method=='rolling_median':
+            walk_thresholds=[0.001,0.005]
+            turn_thresholds=[0.1,0.2]
+            warnings.warn("rolling_median filter is not applied to speed. consider using use medfilt for that")
+        elif skip_smoothing==False and filter_method=='rolling_median':
+            walk_thresholds=[0.005,0.008]#stop here
+            turn_thresholds=[0.2,0.3]
+        elif skip_smoothing==True and filter_method=="sg_filter":
+            walk_thresholds=[0.001,0.003]
+            turn_thresholds=[0.25,0.5]
+            warnings.warn("sg filter is not applied to angular velocity. consider using use medfilt for that")
+        elif skip_smoothing==False and filter_method=="sg_filter":
+            walk_thresholds=[0.001,0.003]
+            turn_thresholds=[0.25,0.5]
+        elif skip_smoothing==True:
+            warnings.warn("no smoothing method is applied before classified state. The result will be susceptible to noise")
+            walk_thresholds=[0.01,0.02]
+            turn_thresholds=[0.25,0.5]
+        else:
+            walk_thresholds=[0.003,0.01]
+            turn_thresholds=[0.2,0.5]
 
     walk_states=find_states_with_debounce(speed_signal,thresholds=walk_thresholds,min_length=consecutive_length[0])
     turn_states=find_states_with_debounce(abs(turn_signal),thresholds=turn_thresholds,min_length=consecutive_length[1])
