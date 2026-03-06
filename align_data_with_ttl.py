@@ -135,7 +135,6 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_in
     pre_stim_interval = analysis_methods.get("prestim_duration")
     interval_duration = analysis_methods.get("interval_duration")
     stim_duration = analysis_methods.get("stim_duration")
-    stim_duration = analysis_methods.get("stim_duration")
     exp_place =analysis_methods.get("exp_place")
     if type(interval_duration) == list:
         min_interval= min(interval_duration)
@@ -149,9 +148,9 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_in
     if 'PreMovDuration' in stim_info.columns:
         if stim_info['PreMovDuration'].unique()!=0:
             if exp_place=='MatrexVR':
-                min_phase_duration= [min_stim,min_interval]
+                min_phase_duration= [min_stim,min_interval]## need to check why this is reverse. This is probably the conflict exeriment. The question is whether the logic of LED pulse was reversed.
             else:    
-                min_phase_duration=[stim_info['PreMovDuration'].unique(),min(min_stim,min_interval)]
+                min_phase_duration=[min(min_stim,min_interval),stim_info['PreMovDuration'].values[0]]
         else:
             min_phase_duration= [min_interval,min_stim]
     else:
@@ -412,7 +411,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
             w2b = fill_dropframe_ttl(w2b, stim_info, analysis_methods)
         if 'PreMovDuration' in stim_info.columns:
             if stim_info['PreMovDuration'].unique()!=0:
-                pass
+                pass# pass here is because if the pulse also log the appearance of stimuli, then the effect transition will be twice as trial number
             else:
                 b2w = b2w[:trial_num]
                 w2b = w2b[:trial_num] 
