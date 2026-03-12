@@ -962,11 +962,12 @@ def main(thisDir, json_file):
 
     print("ready to plot graph with some data and decompose those lists")
     COL = MplColorHelper(colormap_name, 0, len(stim_type)-1)
+    heading_angle_discretised_all=[]
     if visual_paradigm_name=='choices':        
         fig = plt.figure(figsize=[24, 18])
         for i, this_stim_type in enumerate(stim_type):
             heading_angle_discretised=[]
-            ax = fig.add_subplot(1,8,i+1, polar=True)  # Create polar axes
+            ax = fig.add_subplot(1,len(stim_type),i+1, polar=True)  # Create polar axes
             for this_index in list(np.where(stim_info['stim_type']==this_stim_type)[0]):
                 step_index = diskretize(distance=cum_distance_post_stim[this_index,:],diskretise_length=BODY_LENGTH*6)
                 # angles = np.arctan2(np.diff(curated_Y), np.diff(curated_X)) ## in time series analysis, the angles should come from locustVR directly.
@@ -986,10 +987,10 @@ def main(thisDir, json_file):
                 # ax1.set_title("discritised based on curated X and Y")
                 # ax2.set_title("fictrac raw")
                 # ax3.set_title("fictrac discritised based on new index")
-                # fig.savefig(f"check_angle_{i}th_trial.png")    
+                # fig.savefig(f"check_angle_{i}th_trial.png")
+            heading_angle_discretised_all.append(heading_angle_discretised)    
         fig.savefig(thisDir/"heading_distribution.png")
         heading_angle=np.degrees(heading_angle)
-        #return
     else:
         heading_angle=np.degrees(heading_angle)
 
@@ -1405,7 +1406,7 @@ def main(thisDir, json_file):
     else:
         print("dont save anything")
 
-    return summary_df, velocity_arr, angular_velocity_tbt, travel_distance_whole_session
+    return summary_df, velocity_arr, angular_velocity_tbt, travel_distance_whole_session,heading_angle_discretised_all
 
 
 if __name__ == "__main__":
@@ -1517,12 +1518,15 @@ if __name__ == "__main__":
     #thisDir =r"Y:\GN26007\260124\sweeping\session1"
     #thisDir =r"Y:\GN26008\260125\sweeping\session1"
     #thisDir =r"Y:\GN26009\260131\sweeping\session2"
+    #thisDir =r"Y:\GN25062\251206\looming\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26125\260223\sweeping\session2"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26119\260216\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26126\260223\choices\session1"
     #thisDir =r"Y:\GN26016\260221\choices\session1"
     #thisDir =r"Y:\GN26017\260222\choices\session1"
-    thisDir =r"Y:\GN26015\260221\choices\session1"
+    #thisDir =r"Y:\GN26015\260221\choices\session1"
+    #thisDir =r"Y:\GN26018\260228\choices\session2"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26134\260309\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\choices\session1"
