@@ -593,10 +593,9 @@ def preprocess_tracking_data(df,filtering_method,yaw_axis,smooth_window_length):
         y_all = df.loc[:, ["intergrated y position"]].values[:,0]
         yaw_angular_velocity = df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values[:,0]    
     
-    return x_all,y_all,yaw_angular_velocity*-1 # multiply by -1 to get animal's angular velocity. Otherwise, it is the angular velocity of the ball
+    return x_all,y_all,yaw_angular_velocity*-1 # multiply by -1 to get animal's angular velocity. Otherwise, it is the angular velocity of the ball. After multiplying by -1, positive value means animals making cw turn.
 
 def main(thisDir, json_file):
-    ## in the z ball, poisitive rotational velocity along jaw axis means animal is turning counterclockwise, 
     if type(thisDir)==str:
         thisDir = Path(thisDir)
     # Figuring out path and directory
@@ -1502,7 +1501,7 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260120\conflict\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26104\260119\sweeping\session2"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\sweeping\session2"
-    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\sweeping\session2"## negative angular velocity means ccw positive means cw
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\sweeping\session2"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26106\260126\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26107\260126\sweeping\session1"
