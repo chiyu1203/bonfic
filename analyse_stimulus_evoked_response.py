@@ -962,7 +962,10 @@ def main(thisDir, json_file):
     print("ready to plot graph with some data and decompose those lists")
     COL = MplColorHelper(colormap_name, 0, len(stim_type)-1)
     heading_angle_discretised_all=[]
-    if visual_paradigm_name=='choices':        
+    
+    if visual_paradigm_name in ["gratings","sweeploom","conflict",'coherence',"densities"]:
+        heading_angle=np.degrees(heading_angle)
+    else:        
         fig = plt.figure(figsize=[24, 18])
         for i, this_stim_type in enumerate(stim_type):
             heading_angle_discretised=[]
@@ -978,7 +981,6 @@ def main(thisDir, json_file):
                     heading_angle_discretised.extend(these_heading_angles[1:])
             ax.hist(heading_angle_discretised,bins=12)
             ax.set(title=this_stim_type,yticks=[1,3])
-            ## negative radius is negative degree, is locust turning toward left object. In the case of glocust_null, that means toward glocust
                 # fig, (ax1, ax2,ax3) = plt.subplots(1, 3, figsize=(27, 7), tight_layout=True)
                 # ax1.scatter(np.arange(angles.shape[0]),angles)
                 # ax2.scatter(np.arange(heading_angle.shape[0]),heading_angle)
@@ -989,8 +991,6 @@ def main(thisDir, json_file):
                 # fig.savefig(f"check_angle_{i}th_trial.png")
             heading_angle_discretised_all.append(heading_angle_discretised)    
         fig.savefig(thisDir/"heading_distribution.png")
-        heading_angle=np.degrees(heading_angle)
-    else:
         heading_angle=np.degrees(heading_angle)
 
     if analysis_methods.get("plotting_tbt_overview") == True:
