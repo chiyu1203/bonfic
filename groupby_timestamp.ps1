@@ -52,7 +52,10 @@ Get-ChildItem -LiteralPath $SourceFolder -File -Recurse | ForEach-Object {
         $currentDir = $file.Directory.FullName
 
         if ($currentDir -ne $targetFolder) {
-            Move-Item -LiteralPath $file.FullName -Destination $targetFolder
+            $destinationPath = Join-Path $targetFolder $file.Name
+
+            Move-Item -LiteralPath $file.FullName -Destination $destinationPath -Force
+
             Write-Host "Moved: $($file.Name) -> $timestampFolder/"
         }
     }
