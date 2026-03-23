@@ -27,7 +27,7 @@ analysis_methods = {
     "duration_for_optomotor_index": 5,
     "yaw_axis":"z",
     "camera_fps": 100,
-    "trackball_radius": 50,
+    "trackball_radius": 5,
     "monitor_fps": 144,
     "prestim_duration": 185,
     "stim_duration": [8],
