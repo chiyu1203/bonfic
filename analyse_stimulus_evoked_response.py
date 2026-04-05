@@ -667,7 +667,10 @@ def main(thisDir, json_file):
     ##here to load tracking data
     if database2 is None and fictrac_posthoc_analysis is False:
         df=pd.read_csv(tracking_file_directory,skiprows=0)
-        columns_name=["intergrated x position","intergrated y position",f"delta rotation vector lab {yaw_axis}","pd_phase"]
+        if df.shape[1]==4:
+            columns_name=["intergrated x position","intergrated y position",f"delta rotation vector lab {yaw_axis}","pd_phase"]
+        elif df.shape[1]==5:
+            columns_name=["intergrated x position","intergrated y position",f"delta rotation vector lab {yaw_axis}","frame_count","pd_phase"]
         df.columns=columns_name
         df[["intergrated x position","intergrated y position"]]=df[["intergrated x position","intergrated y position"]]*trackball_radius
         df[f"delta rotation vector lab {yaw_axis}"] = df[f"delta rotation vector lab {yaw_axis}"] * camera_fps
@@ -1525,7 +1528,10 @@ if __name__ == "__main__":
     #thisDir =r"Y:\GN26017\260222\choices\session1"
     #thisDir =r"Y:\GN26015\260221\choices\session1"
     #thisDir =r"Y:\GN26018\260228\choices\session2"
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26134\260309\choices\session1"
+    #thisDir =r"Y:\GN26017\260222\choices\session1"
+    #thisDir =r"Y:\GN26029\260327\looming\session1"
+    thisDir =r"Y:\GN26035\260405\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26134\260309\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260120\choices\session1"
