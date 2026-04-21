@@ -29,8 +29,10 @@
     "plotting_optomotor_response": true,
     "load_experiment_condition_from_database": true,
     "select_animals_by_condition": false,
-    "analysis_by_stimulus_type": true,
-    "duration_for_optomotor_index": 15,
+    "analysis_by_stimulus_type": false,
+    "create_null_null_condition": true,
+    "num_step_per_decision": 3,
+    "duration_for_optomotor_index": 20,
     "yaw_axis": "z",
     "camera_fps": 144,
     "trackball_radius": 5,
@@ -46,6 +48,6 @@
     ],
     "analysis_window": [
         -2,
-        30
+        20
     ]
 }

@@ -24,6 +24,8 @@ analysis_methods = {
     "load_experiment_condition_from_database": True,
     "select_animals_by_condition": False,
     "analysis_by_stimulus_type": True,
+    "create_null_null_condition": True,
+    "num_step_per_decision": 6,
     "duration_for_optomotor_index": 30,
     "yaw_axis":"z",
     "camera_fps": 144,

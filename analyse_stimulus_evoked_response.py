@@ -639,10 +639,12 @@ def main(thisDir, json_file):
     interval_duration= analysis_methods.get("interval_duration")
     visual_paradigm_name = analysis_methods.get("experiment_name")
     align_with_isi_onset = analysis_methods.get("align_with_isi_onset")
+    create_null_null_condition=analysis_methods.get("create_null_null_condition",False)
 
     ## Here to load environmental variables about the behaviour
     mark_jump_as_nan = analysis_methods.get("mark_jump_as_nan", False)
     duration_for_optomotor_index=analysis_methods.get("duration_for_optomotor_index",0)
+    num_step_per_decision=analysis_methods.get("num_step_per_decision",6)
     yaw_axis=analysis_methods.get("yaw_axis","z").lower()# define which axis to use to examine animal's rotational velocity
     filtering_method=analysis_methods.get("filtering_method")
     smooth_window_length = round(0.5*camera_fps)
@@ -878,7 +880,6 @@ def main(thisDir, json_file):
         )
         return
     ##probably need to add some function here to deal with the situation when isi_onset_log is True
-    
     log_stim_ISI_duration=True### cam not remember what this option means. Remove it in the next update.
     if align_with_isi_onset:
         ##this was designed for RDK experiment but it is not yet used
@@ -929,6 +930,25 @@ def main(thisDir, json_file):
             else:
                 preStim_ISI_duration=stim_info
             num_stim=int(stim_info.shape[0]/2)
+    if create_null_null_condition:
+        print("create null null condition if previous ISI is 40 sec. Set the 20th ISI as the start of null null trial")
+        stim_info['ISI']=ISI_duration
+        index_to_insert=stim_to_analyse[ISI_duration==40].index
+        null_null_starting_frame=np.floor((stim_to_analyse[ISI_duration==40].values+stim_to_analyse[stim_to_analyse[ISI_duration==40].index+1].values)/2)
+        null_columns = stim_info.loc[index_to_insert+1]
+        null_columns['stim_onset']=null_null_starting_frame.astype(int)
+        null_columns['stim_type']='null_null'
+        tmp=pd.concat([stim_info,null_columns])
+        stim_info = tmp.sort_values(by='stim_onset').reset_index(drop=True)
+        stim_to_analyse=stim_info['stim_onset']
+        stim_onset=stim_to_analyse.values
+        stim_info.loc[stim_info['stim_type']=='null_null','ISI']=np.nan
+        num_stim=stim_to_analyse.shape[0]
+        ISI_duration=stim_info['ISI'].values
+        preStim_ISI_duration = np.append(analysis_methods.get("prestim_duration"), ISI_duration[:-1])
+        isi_onset=np.insert(isi_onset, index_to_insert+1,-1)
+        stim_type=['black_black','glocust_glocust','black_glocust','glocust_black','black_null', 'glocust_null', 'null_black', 'null_glocust','null_null']
+
     stim_name_arr = np.array(stim_info["stim_type"][stim_to_analyse.index])
     if any(stim_info["Duration"].values<0):
         if visual_paradigm_name=='coherence':
@@ -986,13 +1006,13 @@ def main(thisDir, json_file):
     
     if visual_paradigm_name in ["gratings","sweeploom","conflict",'coherence',"densities","looming"]:
         heading_angle=np.degrees(heading_angle)
-    else:        
+    else:            
         fig = plt.figure(figsize=[24, 18])
         for i, this_stim_type in enumerate(stim_type):
             heading_angle_discretised=[]
             ax = fig.add_subplot(1,len(stim_type),i+1, polar=True)  # Create polar axes
             for this_index in list(np.where(stim_info['stim_type']==this_stim_type)[0]):
-                step_index = diskretize(distance=cum_distance_post_stim[this_index,:],diskretise_length=BODY_LENGTH*6)
+                step_index = diskretize(distance=cum_distance_post_stim[this_index,:],diskretise_length=BODY_LENGTH*num_step_per_decision)
                 # angles = np.arctan2(np.diff(curated_Y), np.diff(curated_X)) ## in time series analysis, the angles should come from locustVR directly.
                 # angles = np.insert(angles, 0, np.nan)
                 these_heading_angles=heading_post_stim[this_index,step_index]
@@ -1012,6 +1032,7 @@ def main(thisDir, json_file):
                 # fig.savefig(f"check_angle_{i}th_trial.png")
             heading_angle_discretised_all.append(heading_angle_discretised)    
         fig.savefig(thisDir/"heading_distribution.png")
+        fig.savefig(thisDir/"heading_distribution.svg")
         heading_angle=np.degrees(heading_angle)
     shortened_isi=5
     if shortened_isi>abs(analysis_window[0]):
@@ -1101,7 +1122,10 @@ def main(thisDir, json_file):
                 )
             tmp = np.hstack(velocity_sorted_list)
             velocity_arr_for_colour_map = tmp[0, :, :]
-            yticks = np.arange(int(num_stim/len(stim_type)/2),num_stim,int(num_stim/len(stim_type)))
+            if create_null_null_condition:
+                yticks = np.arange(1,num_stim,len(stim_type)-1)
+            else:
+                yticks = np.arange(int(num_stim/len(stim_type)/2),num_stim,int(num_stim/len(stim_type)))
             if type(stim_type[0])==str:
                 yticklabels = stim_type
             else:
@@ -1118,6 +1142,7 @@ def main(thisDir, json_file):
         else:
             ax2.set_yticks([])
             ax2.set_ylabel("Trial#")
+            velocity_arr_for_colour_map = velocity_arr
 
         pcm = ax2.pcolormesh(velocity_arr_for_colour_map, cmap="magma", vmin=0, vmax=10)
         # pcm=ax2.pcolormesh(velocity_tbt, cmap = 'magma') ##sometimes, we dont need a vmax
@@ -1551,7 +1576,7 @@ if __name__ == "__main__":
     #thisDir =r"Y:\GN26017\260222\choices\session1"
     #thisDir =r"Y:\GN26040\260411\looming\session1"
     #thisDir =r"Y:\GN26042\260412\looming\session2"
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26113\260203\choices\session1"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26171\260419\looming\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26165\260405\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26134\260309\choices\session1"
