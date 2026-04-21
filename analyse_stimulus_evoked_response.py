@@ -214,17 +214,18 @@ def recovery_detection(dev_trial, dev_timing_from_analysis_window):
     return index_list
 
 def plotting_visual_guided_response(metrics_arr,stim_type,summary_df,analysis_methods,running_trial_distance_threshold,COL):
+    running_trial_distance_threshold=1
     analysis_window=analysis_methods.get("analysis_window")
     camera_fps = analysis_methods.get("camera_fps")
     stim_duration=analysis_methods.get("stim_duration")
+    plot_tbt=analysis_methods.get("plotting_tbt_overview")
+    
     fig_stationary, axes_stationary = plt.subplots(
         nrows=len(stim_duration), ncols=1, figsize=(18, 7), tight_layout=True
     )
     fig_running, axes_running = plt.subplots(
         nrows=len(stim_duration), ncols=1, figsize=(18, 7), tight_layout=True
     )
-    use_mean=False
-    use_median=True
     if len(stim_duration)==1:
         for i in range(len(stim_type)):
             this_duration=stim_duration[0]
@@ -232,27 +233,31 @@ def plotting_visual_guided_response(metrics_arr,stim_type,summary_df,analysis_me
             these_velocities_running = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']>running_trial_distance_threshold),:]
             these_velocities_stationary = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']<running_trial_distance_threshold),:]
             num_sample=(abs(analysis_window[0])+this_duration)*camera_fps
-            if use_median:
+            if plot_tbt:
                 if these_velocities_stationary.shape[0]>0:
-                    axes_stationary.plot(np.arange(num_sample),np.median(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                    for this_trial in range(these_velocities_stationary.shape[0]):
+                        axes_stationary.plot(np.arange(num_sample),these_velocities_stationary[this_trial,:num_sample],color=COL.get_rgb(i), linewidth=0.2)
+                    # x_value=np.tile(np.arange(num_sample),(these_velocities_stationary.shape[0],1))
+                    # axes_stationary.scatter(x_value,these_velocities_stationary[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
                 if these_velocities_running.shape[0]>0:
-                    axes_running.plot(np.arange(num_sample),np.median(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
-            elif use_mean:
-                if these_velocities_stationary.shape[0]>0:
-                    axes_stationary.plot(np.arange(num_sample),np.mean(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
-                if these_velocities_running.shape[0]>0:
-                    axes_running.plot(np.arange(num_sample),np.mean(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                    for this_trial in range(these_velocities_running.shape[0]):
+                    #x_value=np.tile(np.arange(num_sample),(these_velocities_running.shape[0],1))
+                    #axes_running.scatter(x_value,these_velocities_running[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
+                        axes_running.plot(np.arange(num_sample),these_velocities_running[this_trial,:num_sample],color=COL.get_rgb(i), linewidth=0.2)
+                    
             else:
                 if these_velocities_stationary.shape[0]>0:
-                    x_value=np.tile(np.arange(num_sample),(these_velocities_stationary.shape[0],1))
-                    axes_stationary.scatter(x_value,these_velocities_stationary[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
-                if these_velocities_running.shape[0]>0:    
-                    x_value=np.tile(np.arange(num_sample),(these_velocities_running.shape[0],1))
-                    axes_running.scatter(x_value,these_velocities_running[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
-        axes_stationary.legend()
-        axes_running.legend()
-        axes_stationary.set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
-        axes_running.set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
+                    #axes_stationary.plot(np.arange(num_sample),np.mean(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                    axes_stationary.plot(np.arange(num_sample),np.median(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,linestyle='dotted',color=COL.get_rgb(i))
+                    
+                if these_velocities_running.shape[0]>0:
+                    #axes_running.plot(np.arange(num_sample),np.mean(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                    axes_running.plot(np.arange(num_sample),np.median(these_velocities_running[:,:num_sample],axis=0),label=this_type,linestyle='dotted',color=COL.get_rgb(i))
+        if plot_tbt==False:
+            axes_stationary.legend()
+            axes_running.legend()
+        axes_stationary.set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps],ylim=[0,5])
+        axes_running.set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps],ylim=[0,5])
     else:
         for j in range(len(stim_duration)):
             for i in range(len(stim_type)):
@@ -261,23 +266,26 @@ def plotting_visual_guided_response(metrics_arr,stim_type,summary_df,analysis_me
                 these_velocities_running = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']>running_trial_distance_threshold),:]
                 these_velocities_stationary = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']<running_trial_distance_threshold),:]
                 num_sample=(abs(analysis_window[0])+this_duration)*camera_fps
-                if use_median:
-                    axes_stationary[j].plot(np.arange(num_sample),np.median(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
-                    axes_running[j].plot(np.arange(num_sample),np.median(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
-                elif use_mean:
-                    axes_stationary[j].plot(np.arange(num_sample),np.mean(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
-                    axes_running[j].plot(np.arange(num_sample),np.mean(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                if plot_tbt:
+                    if these_velocities_stationary.shape[0]>0:
+                        x_value=np.tile(np.arange(num_sample),(these_velocities_stationary.shape[0],1))
+                        axes_stationary[j].scatter(x_value,these_velocities_stationary[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
+                    if these_velocities_running.shape[0]>0:
+                        x_value=np.tile(np.arange(num_sample),(these_velocities_running.shape[0],1))
+                        axes_running[j].scatter(x_value,these_velocities_running[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
                 else:
-                    x_value=np.tile(np.arange(num_sample),(these_velocities_stationary.shape[0],1))
-                    axes_stationary[j].scatter(x_value,these_velocities_stationary[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
-                    x_value=np.tile(np.arange(num_sample),(these_velocities_running.shape[0],1))
-                    axes_running[j].scatter(x_value,these_velocities_running[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
+                    if these_velocities_stationary.shape[0]>0:
+                        axes_stationary[j].plot(np.arange(num_sample),np.mean(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                        axes_stationary[j].plot(np.arange(num_sample),np.median(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,linestyle='dotted',color=COL.get_rgb(i))
+                    if these_velocities_running.shape[0]>0:
+                        axes_running[j].plot(np.arange(num_sample),np.mean(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                        axes_running[j].plot(np.arange(num_sample),np.median(these_velocities_running[:,:num_sample],axis=0),label=this_type,linestyle='dotted',color=COL.get_rgb(i))
             if j==0:
                 axes_stationary[j].legend()
                 axes_running[j].legend()
             axes_stationary[j].set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
             axes_running[j].set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
-    return fig_stationary,fig_running
+    return fig_stationary,fig_running,plot_tbt
 
 def extract_events(array, min_length=10, threshold=0.5):
     """
@@ -839,10 +847,20 @@ def main(thisDir, json_file):
 
             stim_info["stim_onset"] = transition_onset
     elif "pd_phase" in df.columns:##this was created for closed-loop choices assay
-        transition_onsets=np.where(np.diff(df['pd_phase'].values))[0]
-        stim_onset=transition_onsets[::2]
-        isi_onset=transition_onsets[1::2]
-        stim_info["stim_onset"] = stim_onset
+        transition_values=np.diff(df['pd_phase'].values)
+        if stim_info['PreMovDuration'].unique()==0:
+            transition_onsets=np.where(transition_values)[0]
+            stim_onset=transition_onsets[::2]
+            isi_onset=transition_onsets[1::2]
+            stim_info["stim_onset"] = stim_onset
+        else:
+            transition_to_on=np.where(transition_values==1)[0]
+            transition_to_off=np.where(transition_values==-1)[0]
+            stim_appearance_onset=transition_to_on[::2]
+            stim_motion_stop_onset=transition_to_on[1::2]
+            stim_onset=transition_to_off[::2]
+            isi_onset=transition_to_off[1::2]
+            stim_info["stim_onset"] = stim_onset
 
     elif df["timestamp"][1] != df["timestamp"][2]:
         # compare the timestamp between event file and dat file
@@ -966,7 +984,7 @@ def main(thisDir, json_file):
     COL = MplColorHelper(colormap_name, 0, len(stim_type)-1)
     heading_angle_discretised_all=[]
     
-    if visual_paradigm_name in ["gratings","sweeploom","conflict",'coherence',"densities"]:
+    if visual_paradigm_name in ["gratings","sweeploom","conflict",'coherence',"densities","looming"]:
         heading_angle=np.degrees(heading_angle)
     else:        
         fig = plt.figure(figsize=[24, 18])
@@ -995,12 +1013,12 @@ def main(thisDir, json_file):
             heading_angle_discretised_all.append(heading_angle_discretised)    
         fig.savefig(thisDir/"heading_distribution.png")
         heading_angle=np.degrees(heading_angle)
-
+    shortened_isi=5
+    if shortened_isi>abs(analysis_window[0]):
+        shortened_isi=abs(analysis_window[0])
+    running_trial_distance_threshold=1*shortened_isi #this threshold is defined based on travel distance 5-sec prior to stimulus onset     
     if analysis_methods.get("plotting_tbt_overview") == True:
-        shortened_isi=5
-        if shortened_isi>abs(analysis_window[0]):
-            shortened_isi=abs(analysis_window[0])
-        running_trial_distance_threshold=1*shortened_isi #this threshold is defined based on travel distance 5-sec prior to stimulus onset        
+   
         fig1 = plt.figure(figsize=(18, 7), tight_layout=True)
         ax = plt.subplot(241)
         if "opto_index" in summary_df.columns:
@@ -1082,7 +1100,7 @@ def main(thisDir, json_file):
                     ]
                 )
             tmp = np.hstack(velocity_sorted_list)
-            velocity_arr = tmp[0, :, :]
+            velocity_arr_for_colour_map = tmp[0, :, :]
             yticks = np.arange(int(num_stim/len(stim_type)/2),num_stim,int(num_stim/len(stim_type)))
             if type(stim_type[0])==str:
                 yticklabels = stim_type
@@ -1093,7 +1111,7 @@ def main(thisDir, json_file):
                 yticklabels=yticklabels,
             )
             for this_y_mark in np.arange(int(num_stim/len(stim_type)),num_stim,int(num_stim/len(stim_type))):
-                ax2.axhline(y=this_y_mark,xmin=0,xmax=velocity_arr.shape[1],linewidth=0.3,color='w')
+                ax2.axhline(y=this_y_mark,xmin=0,xmax=velocity_arr_for_colour_map.shape[1],linewidth=0.3,color='w')
             #trans=mt.blended_transform_factory(ax2.transData,ax2.transAxes)
             #ax2.pylab.gca()
             #ax2.hlines(y=np.arange(int(num_stim/len(stim_type)),num_stim,int(num_stim/len(stim_type))),xmin=0,xmax=velocity_arr.shape[1],linewidth=10,color='w',transform=trans)
@@ -1101,7 +1119,7 @@ def main(thisDir, json_file):
             ax2.set_yticks([])
             ax2.set_ylabel("Trial#")
 
-        pcm = ax2.pcolormesh(velocity_arr, cmap="magma", vmin=0, vmax=10)
+        pcm = ax2.pcolormesh(velocity_arr_for_colour_map, cmap="magma", vmin=0, vmax=10)
         # pcm=ax2.pcolormesh(velocity_tbt, cmap = 'magma') ##sometimes, we dont need a vmax
         ## add colorbar
         fig1.colorbar(pcm)
@@ -1155,17 +1173,19 @@ def main(thisDir, json_file):
             fig1.savefig(thisDir / plot_name)
 
     if visual_paradigm_name=='sweeping' or visual_paradigm_name=='looming':
-        fig_stationary,fig_running=plotting_visual_guided_response(velocity_arr,stim_type,summary_df,analysis_methods,running_trial_distance_threshold,COL)    
+        fig_stationary,fig_running,plot_tbt=plotting_visual_guided_response(velocity_arr,stim_type,summary_df,analysis_methods,running_trial_distance_threshold,COL)
+        file_suffix = "_tbt" if plot_tbt else ""  
         if save_output == True:
-            plot_name = f"visual_guided_velocity_different_duration_stationary.png"
+            plot_name = f"visual_guided_velocity_different_duration_stationary{file_suffix}.png"
             fig_stationary.savefig(thisDir / plot_name)
-            plot_name = f"visual_guided_velocity_different_duration_running.png"
+            plot_name = f"visual_guided_velocity_different_duration_running{file_suffix}.png"
             fig_running.savefig(thisDir / plot_name)
-        fig_stationary,fig_running=plotting_visual_guided_response(heading_angle,stim_type,summary_df,analysis_methods,running_trial_distance_threshold,COL)   
+        fig_stationary,fig_running,plot_tbt=plotting_visual_guided_response(heading_angle,stim_type,summary_df,analysis_methods,running_trial_distance_threshold,COL)
+        file_suffix = "_tbt" if plot_tbt else "" 
         if save_output == True:
-            plot_name = f"visual_guided_angular_velocity_{yaw_axis}axis_different_duration_stationary.png"
+            plot_name = f"visual_guided_angular_velocity_{yaw_axis}axis_different_duration_stationary{file_suffix}.png"
             fig_stationary.savefig(thisDir / plot_name)
-            plot_name = f"visual_guided_angular_velocit_{yaw_axis}axis_different_duration_running.png"
+            plot_name = f"visual_guided_angular_velocit_{yaw_axis}axis_different_duration_running{file_suffix}.png"
             fig_running.savefig(thisDir / plot_name)
 
     if analysis_methods.get("plotting_position_dependant_fixation") == True:
@@ -1529,8 +1549,11 @@ if __name__ == "__main__":
     #thisDir =r"Y:\GN26015\260221\choices\session1"
     #thisDir =r"Y:\GN26018\260228\choices\session2"
     #thisDir =r"Y:\GN26017\260222\choices\session1"
-    #thisDir =r"Y:\GN26029\260327\looming\session1"
-    thisDir =r"Y:\GN26035\260405\choices\session1"
+    #thisDir =r"Y:\GN26040\260411\looming\session1"
+    #thisDir =r"Y:\GN26042\260412\looming\session2"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26113\260203\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26171\260419\looming\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26165\260405\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26134\260309\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
