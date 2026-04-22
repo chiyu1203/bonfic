@@ -25,8 +25,8 @@ analysis_methods = {
     "select_animals_by_condition": False,
     "analysis_by_stimulus_type": True,
     "create_null_null_condition": True,
-    "num_step_per_decision": 6,
-    "duration_for_optomotor_index": 30,
+    "num_step_per_decision": 3,
+    "duration_for_optomotor_index": 20,
     "yaw_axis":"z",
     "camera_fps": 144,
     "trackball_radius": 5,
@@ -36,7 +36,7 @@ analysis_methods = {
     "interval_duration": [20,30,40],
     "analysis_window": [
         -2,
-        30
+        20
     ],
 }  # plue value representing clockwise, counterclockwise is minus, then the rest is coherence leve
 json_string = json.dumps(analysis_methods, indent=1)

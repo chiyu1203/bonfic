@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 from scipy.io import savemat
 from scipy.signal import savgol_filter,medfilt
+from scipy.stats import circmean
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -1021,7 +1022,10 @@ def main(thisDir, json_file):
                     #heading_angle_discretised.extend(np.degrees(these_heading_angles[1:]))
                     heading_angle_discretised.extend(these_heading_angles[1:])
             ax.hist(heading_angle_discretised,bins=12)
-            ax.set(title=this_stim_type,yticks=[1,3])
+            ax.plot(circmean(heading_angle_discretised),7,marker='*',color='r',label='circular mean')
+            #ax.set(title=title,ylim=[0,8],yticks=[4],yticklabels=[''])
+            ax.set(title=this_stim_type,ylim=[0,8],yticks=[4],yticklabels=[''])
+            #ax.set(title=this_stim_type,yticks=[1,3])
                 # fig, (ax1, ax2,ax3) = plt.subplots(1, 3, figsize=(27, 7), tight_layout=True)
                 # ax1.scatter(np.arange(angles.shape[0]),angles)
                 # ax2.scatter(np.arange(heading_angle.shape[0]),heading_angle)
@@ -1030,7 +1034,8 @@ def main(thisDir, json_file):
                 # ax2.set_title("fictrac raw")
                 # ax3.set_title("fictrac discritised based on new index")
                 # fig.savefig(f"check_angle_{i}th_trial.png")
-            heading_angle_discretised_all.append(heading_angle_discretised)    
+            heading_angle_discretised_all.append(heading_angle_discretised)
+        #ax.legend()    
         fig.savefig(thisDir/"heading_distribution.png")
         fig.savefig(thisDir/"heading_distribution.svg")
         heading_angle=np.degrees(heading_angle)
@@ -1123,7 +1128,7 @@ def main(thisDir, json_file):
             tmp = np.hstack(velocity_sorted_list)
             velocity_arr_for_colour_map = tmp[0, :, :]
             if create_null_null_condition:
-                yticks = np.arange(1,num_stim,len(stim_type)-1)
+                yticks = np.linspace(2, num_stim, num=len(stim_type),dtype=int)#np.arange(5,num_stim,len(stim_type)-1)
             else:
                 yticks = np.arange(int(num_stim/len(stim_type)/2),num_stim,int(num_stim/len(stim_type)))
             if type(stim_type[0])==str:
@@ -1576,7 +1581,7 @@ if __name__ == "__main__":
     #thisDir =r"Y:\GN26017\260222\choices\session1"
     #thisDir =r"Y:\GN26040\260411\looming\session1"
     #thisDir =r"Y:\GN26042\260412\looming\session2"
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26137\260318\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26171\260419\looming\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26165\260405\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26134\260309\choices\session1"
