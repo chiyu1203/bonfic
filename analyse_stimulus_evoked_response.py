@@ -78,7 +78,7 @@ def analysis_stim_evoked_response_combo(
         analysis_window,
         camera_fps,
     )
-    if analysis_methods.get("temperature_data_options").lower() == "trial":
+    if analysis_methods.get("temperature_data_options") == "trial":
         if analysis_methods.get("experiment_name").lower() !="coherence":
             temp_tbt=stimulus_info['temperature'].values
             humid_tbt=stimulus_info['humidity'].values
@@ -101,9 +101,9 @@ def analysis_stim_evoked_response_combo(
         temp_tbt=np.nanmean(tmp1, axis=1)
         humid_tbt=np.nanmean(tmp2, axis=1)
     else:
-        temp_tbt = np.empty((stimulus_info.shape[0], 1))
+        temp_tbt = np.empty((stimulus_info.shape[0]))
         temp_tbt[:] = np.nan
-        humid_tbt = np.empty((stimulus_info.shape[0], 1))
+        humid_tbt = np.empty((stimulus_info.shape[0]))
         humid_tbt[:] = np.nan
 
     #######Note: opto_index_isi and travel_distance_isi is defined based either the first element of analysis window or 5 sec, depends on which one is shorter.
@@ -671,12 +671,12 @@ def main(thisDir, json_file):
     tracking_file_pattern = "tracking*.csv"
     tracking_file_directory = find_file(thisDir, tracking_file_pattern)
     database_file_pattern ="database*.parquet.gzip"
-    database2 = find_file(thisDir, database_file_pattern)
+    database = find_file(thisDir, database_file_pattern)
     temperature_file_pattern = "temperature_humidity.npy.gz"
     this_temp_directory = find_file(thisDir, temperature_file_pattern)
 
     ##here to load tracking data
-    if database2 is None and fictrac_posthoc_analysis is False:
+    if database is None and fictrac_posthoc_analysis is False:
         df=pd.read_csv(tracking_file_directory,skiprows=0)
         if df.shape[1]==4:
             columns_name=["intergrated x position","intergrated y position",f"delta rotation vector lab {yaw_axis}","pd_phase"]
@@ -686,7 +686,7 @@ def main(thisDir, json_file):
         df[["intergrated x position","intergrated y position"]]=df[["intergrated x position","intergrated y position"]]*trackball_radius
         df[f"delta rotation vector lab {yaw_axis}"] = df[f"delta rotation vector lab {yaw_axis}"] * camera_fps
     else:
-        df=pd.read_parquet(database2)
+        df=pd.read_parquet(database)
 
     x_all,y_all,yaw_angular_velocity=preprocess_tracking_data(df,filtering_method,yaw_axis,smooth_window_length)
     travel_distance_fbf = euclidean_distance(x_all,y_all)
@@ -874,6 +874,7 @@ def main(thisDir, json_file):
         stim_onset = np.where(np.roll(timestamp_diff, 1, axis=1) != timestamp_diff)[1][
             1::2
         ]
+        isi_onset=stim_onset+(stim_info['Duration'].values+presence_duration*2)*camera_fps
         stim_info["stim_onset"] = stim_onset
     else:
         warnings.warn(
@@ -910,8 +911,11 @@ def main(thisDir, json_file):
                     ISI_duration = np.repeat(
                         analysis_methods.get("interval_duration"), stim_to_analyse.shape[0]
                     )
-            else:
+            elif 'isi_onset' in locals():
                 ISI_duration=np.round((stim_onset[1:]-isi_onset[:-1])/camera_fps)#I am curious which one uses here besides densities
+            else:
+                stim_isi_duration=np.round(np.diff(stim_onset)/camera_fps)
+                ISI_duration=np.append(stim_isi_duration, [np.nan])-stim_info['Duration'].values-presence_duration*2
             num_stim=stim_info.shape[0]
             if ISI_duration.shape[0]==num_stim:### this mean the duration before stimulus. In a typical workflow, the duration of post-stimulus interval was logged
                 preStim_ISI_duration = np.append(
@@ -999,7 +1003,8 @@ def main(thisDir, json_file):
     summary_df["present_trial_duration"] = present_duration_arr
     summary_df["preStim_ISI_duration"] = preStim_ISI_duration
     summary_df["stim_onset_thframe"]=stim_onset
-    summary_df["isi_onset_thframe"]=isi_onset
+    if "isi_onset" in locals():
+        summary_df["isi_onset_thframe"]=isi_onset
 
     print("ready to plot graph with some data and decompose those lists")
     COL = MplColorHelper(colormap_name, 0, len(stim_type)-1)
@@ -1159,8 +1164,30 @@ def main(thisDir, json_file):
             x=init_frame,
             color="white",
             linestyle="--",
-            label="Stimulus Starts",
+            label="Stimulus Onset",
         )
+        if visual_paradigm_name == "sweeploom":
+            approach_duration=np.unique(stim_info['Duration'].values)
+            ax2.axvline(
+            x=init_frame+presence_duration*monitor_fps,
+            color="red",
+            linestyle="--",
+            label="Approach Onset",
+        )
+            ax2.axvline(
+            x=init_frame+(presence_duration+approach_duration[0])*monitor_fps,
+            color="red",
+            linestyle="--",
+            label="1st Approach Offset",
+        )
+            if approach_duration.shape[0]>1:
+                ax2.axvline(
+                x=init_frame+(presence_duration+approach_duration[1])*monitor_fps,
+                color="red",
+                linestyle="--",
+                label="2nd Approach Offset",
+            )
+
         if type(stim_duration) == list and align_with_isi_onset==False:
             pass
         elif align_with_isi_onset==True:
@@ -1581,7 +1608,9 @@ if __name__ == "__main__":
     #thisDir =r"Y:\GN26017\260222\choices\session1"
     #thisDir =r"Y:\GN26040\260411\looming\session1"
     #thisDir =r"Y:\GN26042\260412\looming\session2"
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26137\260318\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L22117\221015\sweeploom"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23063\230831\sweeploom"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26170\260419\looming\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26171\260419\looming\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26165\260405\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26134\260309\choices\session1"

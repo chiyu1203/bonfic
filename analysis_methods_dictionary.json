@@ -1,9 +1,9 @@
 {
-    "exp_place": "Zball",
-    "experiment_name": "looming",
-    "temperature_data_options": "trial",
+    "exp_place": "VCCball",
+    "experiment_name": "sweeploom",
+    "temperature_data_options": null,
     "overwrite_curated_dataset": true,
-    "load_previous_methods": false,
+    "load_previous_methods": true,
     "graph_colour_code": [
         "r",
         "y",
@@ -21,29 +21,41 @@
     "mark_jump_as_nan": false,
     "active_trials_only": true,
     "filtering_method": "sg_filter",
-    "plotting_tbt_overview": false,
+    "plotting_tbt_overview": true,
     "plotting_trajectory": true,
-    "plotting_event_related_trajectory": true,
-    "plotting_deceleration_accerleration": false,
+    "plotting_event_related_trajectory": false,
+    "plotting_deceleration_accerleration": true,
     "plotting_position_dependant_fixation": false,
     "plotting_optomotor_response": false,
     "load_experiment_condition_from_database": true,
-    "select_animals_by_condition": false,
+    "select_animals_by_condition": true,
     "analysis_by_stimulus_type": true,
     "duration_for_optomotor_index": 0,
     "yaw_axis": "z",
-    "camera_fps": 100,
-    "trackball_radius": 5,
+    "camera_fps": 144,
+    "trackball_radius": 4,
     "monitor_fps": 144,
-    "prestim_duration": 60,
     "stim_duration": [
-        4
+        3
     ],
     "interval_duration": [
-        30
+        5,
+        10,
+        15,
+        20,
+        25
     ],
+    "prestim_duration": 60,
     "analysis_window": [
-        -2,
-        6
+        -1,
+        5
+    ],
+    "stim_type": [
+        "c2b_f_sloom",
+        "c2b_s_sloom",
+        "c2f_f_sloom",
+        "c2f_s_sloom",
+        "c2c_f_loom",
+        "c2c_s_loom"
     ]
 }
