@@ -238,12 +238,8 @@ def plotting_visual_guided_response(metrics_arr,stim_type,summary_df,analysis_me
                 if these_velocities_stationary.shape[0]>0:
                     for this_trial in range(these_velocities_stationary.shape[0]):
                         axes_stationary.plot(np.arange(num_sample),these_velocities_stationary[this_trial,:num_sample],color=COL.get_rgb(i), linewidth=0.2)
-                    # x_value=np.tile(np.arange(num_sample),(these_velocities_stationary.shape[0],1))
-                    # axes_stationary.scatter(x_value,these_velocities_stationary[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
                 if these_velocities_running.shape[0]>0:
                     for this_trial in range(these_velocities_running.shape[0]):
-                    #x_value=np.tile(np.arange(num_sample),(these_velocities_running.shape[0],1))
-                    #axes_running.scatter(x_value,these_velocities_running[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
                         axes_running.plot(np.arange(num_sample),these_velocities_running[this_trial,:num_sample],color=COL.get_rgb(i), linewidth=0.2)
                     
             else:
@@ -269,19 +265,23 @@ def plotting_visual_guided_response(metrics_arr,stim_type,summary_df,analysis_me
                 num_sample=(abs(analysis_window[0])+this_duration)*camera_fps
                 if plot_tbt:
                     if these_velocities_stationary.shape[0]>0:
-                        x_value=np.tile(np.arange(num_sample),(these_velocities_stationary.shape[0],1))
-                        axes_stationary[j].scatter(x_value,these_velocities_stationary[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
+                        for this_trial in range(these_velocities_stationary.shape[0]):
+                            axes_stationary[j].plot(np.arange(num_sample),these_velocities_stationary[this_trial,:num_sample],color=COL.get_rgb(i), linewidth=0.2)
                     if these_velocities_running.shape[0]>0:
-                        x_value=np.tile(np.arange(num_sample),(these_velocities_running.shape[0],1))
-                        axes_running[j].scatter(x_value,these_velocities_running[:,:num_sample],label=this_type,color=COL.get_rgb(i),s=0.2)
+                        for this_trial in range(these_velocities_running.shape[0]):
+                            axes_running[j].plot(np.arange(num_sample),these_velocities_running[this_trial,:num_sample],color=COL.get_rgb(i), linewidth=0.2)
+                        
                 else:
                     if these_velocities_stationary.shape[0]>0:
-                        axes_stationary[j].plot(np.arange(num_sample),np.mean(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                        #axes_stationary[j].plot(np.arange(num_sample),np.mean(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
                         axes_stationary[j].plot(np.arange(num_sample),np.median(these_velocities_stationary[:,:num_sample],axis=0),label=this_type,linestyle='dotted',color=COL.get_rgb(i))
                     if these_velocities_running.shape[0]>0:
-                        axes_running[j].plot(np.arange(num_sample),np.mean(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
+                        #axes_running[j].plot(np.arange(num_sample),np.mean(these_velocities_running[:,:num_sample],axis=0),label=this_type,color=COL.get_rgb(i))
                         axes_running[j].plot(np.arange(num_sample),np.median(these_velocities_running[:,:num_sample],axis=0),label=this_type,linestyle='dotted',color=COL.get_rgb(i))
-            if j==0:
+            # if j==0:
+            #     axes_stationary[j].legend()
+            #     axes_running[j].legend()
+            if plot_tbt==False:
                 axes_stationary[j].legend()
                 axes_running[j].legend()
             axes_stationary[j].set(xlim=[0,(abs(analysis_window[0])+max(stim_duration)+1)*camera_fps])
@@ -1609,9 +1609,9 @@ if __name__ == "__main__":
     #thisDir =r"Y:\GN26040\260411\looming\session1"
     #thisDir =r"Y:\GN26042\260412\looming\session2"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L22117\221015\sweeploom"
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23063\230831\sweeploom"
-    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26170\260419\looming\session1"
-    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26171\260419\looming\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23063\230831\sweeploom"
+    #thisDir =r"Y:\GN26056\260509\looming\session1"
+    thisDir =r"Y:\GN26058\260510\looming\session2"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26165\260405\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26134\260309\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\coherence\session1"
