@@ -153,43 +153,75 @@ def define_analysis_window(stim_duration,interval_duration):
     return analysis_window
 
 
-def deceleration_detection(v_array=[], *args):
-    # Set initial values for variables
-    init_frame = args[0]
-    camera_fps = args[1]
-    presence_duration = args[2]
-    fir_half = int(init_frame + 0.5 * camera_fps)
+def detect_stop_events(arr, analysis_methods,response_window=[-0.5,4],sustained_time_for_behaviour=0.5,save_path=Path.cwd()):
+    analysis_window=analysis_methods.get("analysis_window")
+    camera_fps=analysis_methods.get("camera_fps")
+    plotting_tbt_overview=analysis_methods.get("plotting_tbt_overview")
+    n_trials = arr.shape[0]
+    event_detected = np.zeros(n_trials, dtype=bool)
+    event_index = np.full(n_trials, -1, dtype=int)
+    event_time = np.full(n_trials, np.nan)
+    # Define frame number for analysis windows
+    relative_time=np.arange(start=analysis_window[0],stop=analysis_window[1],step=(analysis_window[1]-analysis_window[0])/arr.shape[1])
+    sustain_samples = int(sustained_time_for_behaviour*camera_fps)
+    analysis_mask = (relative_time > response_window[0]) & (relative_time <= response_window[1])
+    analysis_indices = np.where(analysis_mask)[0]
+    if arr.dtype == 'float64':## feed raw velocity data. Otherwises, use boolean value of walk/stop states
+        varying_deceleration_threshold=False
+        if varying_deceleration_threshold:
+            baseline_mask = (relative_time >= -1.5) & (relative_time < response_window[0])
+            baseline_data = arr[:, baseline_mask]
+            baseline_mean = baseline_data.mean(axis=1)
+            baseline_std2 = 2 * baseline_data.std(axis=1, ddof=1)
+            threshold = baseline_mean - baseline_std2
+        else:
+            threshold = 0.5*np.ones(n_trials)
+        # ------------------------------------------------------------------
+        # Detect sustained threshold crossing
+        # ------------------------------------------------------------------
+        for trial in range(n_trials):
 
-    # Calculate mean and standard deviation of initial velocity values
-    V0 = v_array[:, init_frame:fir_half]
-    meanV0 = np.mean(V0, axis=1)
-    stdV0 = np.std(V0, axis=1, ddof=1)
+            th = threshold[trial]
+            trace = arr[trial]
+            if plotting_tbt_overview:
+                plt.figure(figsize=(8, 6))
+                plt.plot(np.arange(trace.shape[0]),trace, linewidth=0.2)
+                plt.savefig(save_path / f'velocity_trial{trial}.png')
+                plt.close()
+            for idx in analysis_indices:
 
-    # Calculate deceleration threshold
-    deceleration_threshold = meanV0 - 2 * stdV0
+                # Not enough samples left for confirmation
+                # if idx + sustain_samples >= len(trace):
+                #     break
 
-    # Calculate velocity of interest and create a threshold matrix
-    velocity_of_interest = v_array[
-        :, fir_half : fir_half + presence_duration * camera_fps
-    ]
-    dece_big = np.reshape(
-        np.repeat(deceleration_threshold, presence_duration * camera_fps, axis=0),
-        (len(deceleration_threshold), presence_duration * camera_fps),
-    )
+                if trace[idx] < th:
 
-    # Check for deceleration onset and return the onset time
-    dec = np.less(dece_big, velocity_of_interest)
-
-    # In theory, chatGPT's method has no problem but it needs some additional work to sort out all True and all False condition
-    # last_true_indices = dec.shape[1] - np.argmax(dec[:, ::-1], axis=1) - 1
-    # Create a new array with only the first "True" value from each row
-    # result_array = np.zeros(dec.shape[0], dtype=bool)
-    # result_array[last_true_indices != dec.shape[1]-1] = dec[np.arange(dec.shape[0]), last_true_indices[last_true_indices != dec.shape[1]-1]]
-
-    rev = np.fliplr(dec)
-    rev_t_seq_onset = np.where(a_guest(rev) == True)
-    return rev_t_seq_onset
-
+                    # Require all following samples (0.5 sec) remain below threshold
+                    if np.all(trace[idx:idx + sustain_samples + 1] < th):
+                        event_detected[trial] = True
+                        event_index[trial] = idx
+                        event_time[trial] = relative_time[idx]
+                        if plotting_tbt_overview:
+                            plt.figure(figsize=(8, 6))
+                            plt.plot(np.arange(trace.shape[0]),trace, linewidth=0.2)
+                            plt.plot(idx,trace[idx],'o',color='r')
+                            plt.savefig(save_path / f'velocity_trial{trial}.png')
+                            plt.close()
+                        break
+    else:
+        walk_state=arr[:,analysis_indices]
+        (id,frame_number)=np.where(np.diff(walk_state))
+        event_index[id]=frame_number
+        if plotting_tbt_overview:
+            for trial in range(n_trials):
+                trace = arr[trial]
+                plt.figure(figsize=(8, 6))
+                plt.plot(np.arange(trace.shape[0]),trace, linewidth=0.2)
+                if trial in id:
+                    plt.plot(event_index[trial]+int(camera_fps*(abs(analysis_window[0])+response_window[0])),0.5,'o',color='r')
+                plt.savefig(save_path / f'walk_state_trial{trial}.png')
+                plt.close()
+    return event_index
 
 def recovery_detection(dev_trial, dev_timing_from_analysis_window):
     velocity_threshold = 5
@@ -215,12 +247,11 @@ def recovery_detection(dev_trial, dev_timing_from_analysis_window):
     return index_list
 
 def plotting_visual_guided_response(metrics_arr,stim_type,summary_df,analysis_methods,running_trial_distance_threshold,COL):
-    running_trial_distance_threshold=1
     analysis_window=analysis_methods.get("analysis_window")
     camera_fps = analysis_methods.get("camera_fps")
     stim_duration=analysis_methods.get("stim_duration")
     plot_tbt=analysis_methods.get("plotting_tbt_overview")
-    
+    color_code=analysis_methods.get("graph_colour_code")
     fig_stationary, axes_stationary = plt.subplots(
         nrows=len(stim_duration), ncols=1, figsize=(18, 7), tight_layout=True
     )
@@ -233,6 +264,11 @@ def plotting_visual_guided_response(metrics_arr,stim_type,summary_df,analysis_me
             this_type=stim_type[i]
             these_velocities_running = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']>running_trial_distance_threshold),:]
             these_velocities_stationary = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']<running_trial_distance_threshold),:]
+            # if these_velocities_stationary.shape[0]>these_velocities_running.shape[0]:
+            #     num_trials_to_plot=these_velocities_stationary.shape[0]
+            # else:
+            #     num_trials_to_plot=these_velocities_running.shape[0]
+            # COL = MplColorHelper('viridis', 0, num_trials_to_plot-1)
             num_sample=(abs(analysis_window[0])+this_duration)*camera_fps
             if plot_tbt:
                 if these_velocities_stationary.shape[0]>0:
@@ -262,6 +298,11 @@ def plotting_visual_guided_response(metrics_arr,stim_type,summary_df,analysis_me
                 this_type=stim_type[i]
                 these_velocities_running = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']>running_trial_distance_threshold),:]
                 these_velocities_stationary = metrics_arr[(summary_df["stim_type"] == this_type) & (summary_df['present_trial_duration']==this_duration) & (summary_df['travel_distance_isi']<running_trial_distance_threshold),:]
+                # if these_velocities_stationary.shape[0]>these_velocities_running.shape[0]:
+                #     num_trials_to_plot=these_velocities_stationary.shape[0]
+                # else:
+                #     num_trials_to_plot=these_velocities_running.shape[0]
+                # COL = MplColorHelper('viridis', 0, num_trials_to_plot-1)
                 num_sample=(abs(analysis_window[0])+this_duration)*camera_fps
                 if plot_tbt:
                     if these_velocities_stationary.shape[0]>0:
@@ -1140,10 +1181,10 @@ def main(thisDir, json_file):
                 yticklabels = stim_type
             else:
                 yticklabels = [str(this_stim_type) for this_stim_type in stim_type]
-            ax2.set(
-                yticks=yticks,
-                yticklabels=yticklabels,
-            )
+            # ax2.set(
+            #     yticks=yticks,
+            #     yticklabels=yticklabels,
+            # )
             for this_y_mark in np.arange(int(num_stim/len(stim_type)),num_stim,int(num_stim/len(stim_type))):
                 ax2.axhline(y=this_y_mark,xmin=0,xmax=velocity_arr_for_colour_map.shape[1],linewidth=0.3,color='w')
             #trans=mt.blended_transform_factory(ax2.transData,ax2.transAxes)
@@ -1413,55 +1454,47 @@ def main(thisDir, json_file):
             fig2.savefig(thisDir / plot_name)
 
     if analysis_methods.get("plotting_deceleration_accerleration") == True:
-        travel_distance_after_stim_presence = cum_travel_distance[
-            :, init_frame + presence_duration * camera_fps
-        ]
-        travel_distance_1sec_prior_stim = (
-            cum_travel_distance[:, init_frame] - cum_travel_distance[:, 0]
+        (
+            _,
+            walk_states_tbt,
+            turn_states_tbt,
+            _,
+            _,
+        ) = analysis_stim_evoked_response_combo(
+            stim_to_analyse,
+            stim_info,
+            walk_states,
+            turn_states,
+            tem_df_this_exp,
+            analysis_methods
         )
-        running_trial = travel_distance_1sec_prior_stim > velocity_threshold
-        running_velocity = velocity_arr[running_trial, :]
-        running_travel_distance_after_stim_presence = (
-            travel_distance_after_stim_presence[running_trial]
-        )
-        travel_distance_1sec_post_stim = (
-            cum_travel_distance[running_trial, init_frame + 1 * camera_fps]
-            - cum_travel_distance[running_trial, init_frame]
-        )
-        run_type1 = running_velocity[
-            travel_distance_1sec_post_stim > velocity_threshold, :
-        ]
-        running_travel_distance_after_stim_presence_type1 = (
-            running_travel_distance_after_stim_presence[
-                travel_distance_1sec_post_stim > velocity_threshold
-            ]
-        )
-        trial_to_analyse = run_type1
-        detected_bool = deceleration_detection(
-            trial_to_analyse, init_frame, camera_fps, presence_duration
-        )
-        dec_trial_id = detected_bool[0]
-        # this reverse the frame number back so the output is the frame number no. at the detection window
-        de_test = camera_fps * presence_duration - detected_bool[1]
-        ##remove trials that the true value is outside this 1-sec window
-        dev_timing = de_test[de_test != camera_fps * presence_duration]
-        dev_trial_id = dec_trial_id[de_test != camera_fps * presence_duration]
-        dev_timing_from_analysis_window = (
-            dev_timing
-            + init_frame
-            + (0.5 * presence_duration + abs(analysis_window[0])) * camera_fps
-        )
-        # dev_timing_from_stim_presence = (
-        #     dev_timing / monitor_fps + 0.5 * presence_duration + init_time
-        # )
-        # dev_timing_y = 10 * np.ones_like(dev_timing_from_stim_presence)
-        ##When analysing recover epochs, focus on the trials has similar deceleration dynamics
-        dev_trial = trial_to_analyse[dev_trial_id, :]
-        ##apply these velocity traces with velocity threshold
-        index_list = recovery_detection(dev_trial, dev_timing_from_analysis_window)
-        rec_array = (
-            index_list - dev_timing_from_analysis_window
-        )  # this normalise the recovery duration from the first deceleration
+        walk_states_tbt=walk_states_tbt.astype(bool)
+        turn_states_tbt=turn_states_tbt.astype(bool)
+        #or use velocity_arr
+        stop_index = detect_stop_events(arr=walk_states_tbt, analysis_methods=analysis_methods,response_window=[-0.5,4],sustained_time_for_behaviour=0.5,save_path=thisDir)
+        summary_df['stop_index']=stop_index
+        fig5, ax5 = plt.subplots(nrows=1, ncols=1, figsize=(36, 14), tight_layout=True)
+        i=0
+        for name, group in summary_df.groupby('stim_type'):
+            if analysis_methods.get("active_trials_only")==True:
+                trial_to_analyse=stop_index[group.index][group['travel_distance_isi']>running_trial_distance_threshold]
+            else:
+                trial_to_analyse=stop_index[group.index]
+            stop_to_analyse=trial_to_analyse[trial_to_analyse>init_frame]
+            stop_ratio=stop_to_analyse.shape[0]/trial_to_analyse.shape[0]
+            print(f'stop/deceleration events for stimulus {name} is {stop_ratio}')
+            ax5.scatter(np.ones(stop_to_analyse.shape[0])*i,stop_to_analyse/camera_fps)
+            i=i+1
+        plot_name = f"stop_distribution.png"
+        if save_output == True:
+            fig5.savefig(thisDir / plot_name)
+           #(summary_df['travel_distance_isi']>running_trial_distance_threshold)        
+        # dev_trial = trial_to_analyse[dev_trial_id, :]
+        # ##When analysing recover epochs, focus on the trials has similar deceleration dynamics
+        # index_list = recovery_detection(dev_trial, dev_timing_from_analysis_window)
+        # rec_array = (
+        #     index_list - dev_timing_from_analysis_window
+        # )  # this normalise the recovery duration from the first deceleration
 
     if save_output == True and overwrite_curated_dataset == True:
         parquet_directory = thisDir / "behavioural_summary.parquet.gzip"
@@ -1611,8 +1644,11 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L22117\221015\sweeploom"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23063\230831\sweeploom"
     #thisDir =r"Y:\GN26056\260509\looming\session1"
-    thisDir =r"Y:\GN26058\260510\looming\session2"
-    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26165\260405\choices\session1"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26195\260726\looming\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26192\260718\looming\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26187\260613\looming\session1"
+    #thisDir =r"Y:\GN26063\260523\choices\session1"
+    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26186\260604\looming\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26134\260309\choices\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26105\260119\choices\session1"
