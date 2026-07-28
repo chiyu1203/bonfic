@@ -1471,7 +1471,7 @@ def main(thisDir, json_file):
         walk_states_tbt=walk_states_tbt.astype(bool)
         turn_states_tbt=turn_states_tbt.astype(bool)
         #or use velocity_arr
-        stop_index = detect_stop_events(arr=walk_states_tbt, analysis_methods=analysis_methods,response_window=[-0.5,4],sustained_time_for_behaviour=0.5,save_path=thisDir)
+        stop_index = detect_stop_events(arr=velocity_arr, analysis_methods=analysis_methods,response_window=[-0.5,4.5],sustained_time_for_behaviour=0.5,save_path=thisDir)
         summary_df['stop_index']=stop_index
         fig5, ax5 = plt.subplots(nrows=1, ncols=1, figsize=(36, 14), tight_layout=True)
         i=0
@@ -1481,14 +1481,14 @@ def main(thisDir, json_file):
             else:
                 trial_to_analyse=stop_index[group.index]
             stop_to_analyse=trial_to_analyse[trial_to_analyse>init_frame]
-            stop_ratio=stop_to_analyse.shape[0]/trial_to_analyse.shape[0]
-            print(f'stop/deceleration events for stimulus {name} is {stop_ratio}')
-            ax5.scatter(np.ones(stop_to_analyse.shape[0])*i,stop_to_analyse/camera_fps)
+            if trial_to_analyse.shape[0]>0:
+                stop_ratio=stop_to_analyse.shape[0]/trial_to_analyse.shape[0]
+                print(f'stop/deceleration events for stimulus {name} is {stop_ratio}')
+                ax5.scatter(np.ones(stop_to_analyse.shape[0])*i,stop_to_analyse/camera_fps)
             i=i+1
         plot_name = f"stop_distribution.png"
         if save_output == True:
-            fig5.savefig(thisDir / plot_name)
-           #(summary_df['travel_distance_isi']>running_trial_distance_threshold)        
+            fig5.savefig(thisDir / plot_name)      
         # dev_trial = trial_to_analyse[dev_trial_id, :]
         # ##When analysing recover epochs, focus on the trials has similar deceleration dynamics
         # index_list = recovery_detection(dev_trial, dev_timing_from_analysis_window)

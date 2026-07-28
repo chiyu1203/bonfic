@@ -32,7 +32,7 @@ analysis_methods = {
     "prestim_duration": 60,
     "stim_duration": [4],
     "interval_duration": [30],
-    "analysis_window": [-2,6],
+    "analysis_window": [-2,5],
 }  # plue value representing clockwise, counterclockwise is minus, then the rest is coherence leve
 json_string = json.dumps(analysis_methods, indent=1)
 with open(file_name, "w") as f:
