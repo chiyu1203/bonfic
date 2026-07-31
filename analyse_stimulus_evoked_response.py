@@ -682,6 +682,7 @@ def main(thisDir, json_file):
     visual_paradigm_name = analysis_methods.get("experiment_name")
     align_with_isi_onset = analysis_methods.get("align_with_isi_onset")
     create_null_null_condition=analysis_methods.get("create_null_null_condition",False)
+    prestim_duration=analysis_methods.get("prestim_duration")
 
     ## Here to load environmental variables about the behaviour
     mark_jump_as_nan = analysis_methods.get("mark_jump_as_nan", False)
@@ -874,11 +875,19 @@ def main(thisDir, json_file):
                     isi_onset=isi_onset[1::2]
                     print("stimulus duration + 0.5 sec")
                     print(isi_onset-stim_onset)
-            stim_info["stim_onset"] = stim_onset    
-
+            stim_info["stim_onset"] = stim_onset
+        elif visual_paradigm_name =='combo':
+            num_TTL_1stset=stim_info[stim_info['stim_type']=='combo_colour'].shape[0]
+            TTL_2ndset1=stim_onset[num_TTL_1stset:]
+            TTL_2ndset2=isi_onset[num_TTL_1stset:]
+            stim_appearance_onset=TTL_2ndset1[::2][:stim_info[stim_info['stim_type']=='combo_size'].shape[0]]
+            stim_motion_stop_onset=TTL_2ndset1[1::2]
+            stim_onset_frame=np.concatenate((stim_onset[:num_TTL_1stset], TTL_2ndset2[::2][:TTL_2ndset2[1::2].shape[0]]))
+            isi_onset_frame=np.concatenate((isi_onset[:num_TTL_1stset], TTL_2ndset2[1::2]))
+            isi_onset=isi_onset_frame
+            stim_info["stim_onset"] = stim_onset=stim_onset_frame
         else:
             transition_onset = np.ones((len(stim_onset) + len(isi_onset),), dtype=int)
-            
             transition_onset[1::2] = stim_onset
             transition_onset[::2] = isi_onset
             if -1 in stim_info['Duration'].unique():
@@ -937,14 +946,17 @@ def main(thisDir, json_file):
         else:
             preStim_ISI_duration=stim_info
     else:
-        if visual_paradigm_name in ["gratings","sweeploom","conflict","looming","sweeping","choices","densities"]:
+        if visual_paradigm_name in ["gratings","sweeploom","conflict","looming","sweeping","choices","densities","combo"]:
             stim_to_analyse = stim_info["stim_onset"]
             if "ISI" in stim_info.columns:
                 if type(analysis_methods.get("interval_duration")) == list and any(stim_info["ISI"].values>0):## for the situation where ISI is pre-defiend
                     ISI_duration = stim_info["ISI"].values
                 elif any(stim_info["ISI"].values<0):## for the situation where ISI is not pre-defined
                     if 'stim_appearance_onset' in locals():## for the situation there is stimulus appearance and motion are seperated action
-                        ISI_duration=np.round((stim_appearance_onset[1:]-isi_onset[:-1])/camera_fps)
+                        if visual_paradigm_name=="combo":
+                            ISI_duration=np.concatenate((stim_onset[1:num_TTL_1stset+1]-isi_onset[:num_TTL_1stset],stim_appearance_onset[1:]-isi_onset[num_TTL_1stset:-1]))
+                        else:
+                            ISI_duration=np.round((stim_appearance_onset[1:]-isi_onset[:-1])/camera_fps)
                     else:
                         ISI_duration=np.round((stim_onset[1:]-isi_onset[:-1])/camera_fps)
                     ISI_duration=np.append(ISI_duration, np.nan)
@@ -958,6 +970,7 @@ def main(thisDir, json_file):
                 stim_isi_duration=np.round(np.diff(stim_onset)/camera_fps)
                 ISI_duration=np.append(stim_isi_duration, [np.nan])-stim_info['Duration'].values-presence_duration*2
             num_stim=stim_info.shape[0]
+            analysis_methods.update({"prestim_duration":prestim_duration})
             if ISI_duration.shape[0]==num_stim:### this mean the duration before stimulus. In a typical workflow, the duration of post-stimulus interval was logged
                 preStim_ISI_duration = np.append(
                     analysis_methods.get("prestim_duration"), ISI_duration[:-1]
@@ -1051,7 +1064,7 @@ def main(thisDir, json_file):
     COL = MplColorHelper(colormap_name, 0, len(stim_type)-1)
     heading_angle_discretised_all=[]
     
-    if visual_paradigm_name in ["gratings","sweeploom","conflict",'coherence',"densities","looming"]:
+    if visual_paradigm_name in ["gratings","sweeploom","conflict",'coherence',"densities","looming","combo"]:
         heading_angle=np.degrees(heading_angle)
     else:            
         fig = plt.figure(figsize=[24, 18])
@@ -1644,7 +1657,7 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L22117\221015\sweeploom"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23063\230831\sweeploom"
     #thisDir =r"Y:\GN26056\260509\looming\session1"
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26195\260726\looming\session1"
+    thisDir =r"Y:\GN26081\260718\sweeping\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26192\260718\looming\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26187\260613\looming\session1"
     #thisDir =r"Y:\GN26063\260523\choices\session1"

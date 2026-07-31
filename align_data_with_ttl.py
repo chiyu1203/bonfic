@@ -144,15 +144,21 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_in
         min_stim= min(stim_duration)
     else:
         min_stim= stim_duration
-    min_phase_duration=[0.5,0.5]
+
     if 'PreMovDuration' in stim_info.columns:
-        if stim_info['PreMovDuration'].unique()!=0:
-            if exp_place=='MatrexVR':
-                min_phase_duration= [min_stim,min_interval]## need to check why this is reverse. This is probably the conflict exeriment. The question is whether the logic of LED pulse was reversed.
-            else:    
-                min_phase_duration=[min(min_stim,min_interval),stim_info['PreMovDuration'].values[0]]
+        if 'combo_size' in stim_info['stim_type'].unique():
+            if pre_stim_interval < 1000:
+                min_phase_duration=[min_interval,min_stim]
+            else:
+                min_phase_duration=[min(min_stim,min_interval),0.5]
         else:
-            min_phase_duration= [min_interval,min_stim]
+            if stim_info['PreMovDuration'].unique()!=0:
+                if exp_place=='MatrexVR':
+                    min_phase_duration= [min_stim,min_interval]## need to check why this is reverse. This is probably the conflict exeriment. The question is whether the logic of LED pulse was reversed.
+                else:    
+                    min_phase_duration=[min(min_stim,min_interval),stim_info['PreMovDuration'].values[0]]
+            else:
+                min_phase_duration= [min_interval,min_stim]
     else:
         min_phase_duration= [min_interval,min_stim]
     pass_threshold = arr > on_threshold
@@ -245,6 +251,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
             analysis_methods = json.loads(f.read())
 
     visual_paradigm_name = analysis_methods.get("experiment_name")
+    camera_fps = analysis_methods.get("camera_fps")
     exp_place = analysis_methods.get("exp_place")
     if visual_paradigm_name in ["sloom","conflict","looming","sweeping","densities","gratings","choices"]:
         trial_num = stim_info.shape[0]
@@ -346,15 +353,12 @@ def analyse_led_signal(thisDir, json_file, stim_info):
                 else:
                     on_thresholds.append(int(np.mean(sort_arr)))
                     off_thresholds.append(int(np.mean(sort_arr)))
-                    # on_thresholds.append(35000)
-                    # off_thresholds.append(35000)
             else:
                 # on_thresholds.append(int(higher_mean - higher_std * std_weight))
                 # off_thresholds.append(int(lower_mean + lower_std * std_weight))
                 on_thresholds.append(int(np.mean(sort_arr)))
                 off_thresholds.append(int(np.mean(sort_arr)))
-                # on_thresholds.append(35000)
-                # off_thresholds.append(35000)
+
             led_value.append(arr)
     elif len(led_files.stem) > 0:
         print(f"using led file {led_files}, extracted from bonsai or elsewhere")
@@ -382,9 +386,19 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         )
         ax.scatter(np.arange(arr.shape[0]), arr)
         ax.axhline(y=on_thresholds[i], color="red", linestyle="--", label="Threshold")
-
-        b2w, w2b = detect_transition(
-            led_value[i], on_thresholds[i], off_thresholds[i], analysis_methods,stim_info)
+        if 'combo_size' in stim_info['stim_type'].unique():
+            analysis_methods.update({"stim_duration":[2]})
+            b2w_color, w2b_color = detect_transition(
+                led_value[i], on_thresholds[i], off_thresholds[i], analysis_methods,stim_info)
+            #w2b_color-b2w_color[:w2b_color.shape[0]]stim interval
+            #b2w_color[1:w2b_color.shape[0]]-w2b_color[:200] ISI duration
+            analysis_methods.update({"stim_duration":[0.5,6]})
+            analysis_methods.update({"prestim_duration":b2w_color[w2b_color.shape[0]-1]/camera_fps})
+            b2w, w2b = detect_transition(
+                led_value[i], on_thresholds[i], off_thresholds[i], analysis_methods,stim_info)#w2b-b2w pre-stim motion interval so that means the stim is #tmp=b2w[1:]-w2b[:-1] #tmp[1::2]ISI duration tmp[::2] stim duration
+        else:
+            b2w, w2b = detect_transition(
+                led_value[i], on_thresholds[i], off_thresholds[i], analysis_methods,stim_info)
         if visual_paradigm_name=='coherence' and exp_date=='2025-09-29':
             w2b=np.delete(w2b, 9)
         ax1.scatter(np.arange(b2w.shape[0] - 1), np.diff(b2w), c="b")
@@ -410,11 +424,14 @@ def analyse_led_signal(thisDir, json_file, stim_info):
             b2w = fill_dropframe_ttl(b2w, stim_info, analysis_methods)
             w2b = fill_dropframe_ttl(w2b, stim_info, analysis_methods)
         if 'PreMovDuration' in stim_info.columns:
-            if stim_info['PreMovDuration'].unique()!=0:
-                pass# pass here is because if the pulse also log the appearance of stimuli, then the effect transition will be twice as trial number
+            if 'combo_size' in stim_info['stim_type'].unique():
+                pass
             else:
-                b2w = b2w[:trial_num]
-                w2b = w2b[:trial_num] 
+                if stim_info['PreMovDuration'].unique()!=0:
+                    pass# pass here is because if the pulse also log the appearance of stimuli, then the effect transition will be twice as trial number
+                else:
+                    b2w = b2w[:trial_num]
+                    w2b = w2b[:trial_num] 
 
         elif w2b[0]<b2w[0]:
             b2w = b2w[: trial_num + 1]
@@ -434,6 +451,11 @@ def analyse_led_signal(thisDir, json_file, stim_info):
     elif visual_paradigm_name == "gratings":
         stim_onset_frame = b2w[: len(w2b)]
         isi_onset_frame = w2b
+    elif 'combo_size' in stim_info['stim_type'].unique():
+        #w2b-b2w pre-stim motion interval so that means the stim is #tmp=b2w[1:]-w2b[:-1] #tmp[1::2]ISI duration tmp[::2] stim duration
+        #b2w_color[:w2b_color.shape[0]-1] stim onset b2w_color[:w2b_color.shape[0]-1] isi onset w2b_color[:-1]
+        stim_onset_frame=np.concatenate((b2w_color[:w2b_color.shape[0]-1], b2w))
+        isi_onset_frame=np.concatenate((w2b_color[:-1], w2b))
     else:
         sync_change_date=datetime(2025, 4, 1, 12, 0, 0)
         if exp_datetime>sync_change_date:
