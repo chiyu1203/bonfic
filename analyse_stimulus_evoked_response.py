@@ -6,7 +6,8 @@ event evoked response: need to output the trial id (both within the same stimulu
 velocity vector across time in a trial plus optomotor response
 analyis methods needs to tell us what to analye. For example optomotor response, acceleration epochs, deceleration epochs, transition between stationary to walk and walk to stationary
 """
-
+import matplotlib
+matplotlib.use("Agg")
 import json, sys, re, time, warnings, gzip
 import pandas as pd
 import numpy as np
@@ -14,6 +15,7 @@ from scipy.io import savemat
 from scipy.signal import savgol_filter,medfilt
 from scipy.stats import circmean
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib import cm
@@ -40,7 +42,6 @@ class MplColorHelper:
 
     def get_rgb(self, val):
         return self.scalarMap.to_rgba(val)
-
 
 def a_guest(x):
     # Initialize an array of zeros with the same shape as x
@@ -601,6 +602,52 @@ def classify_trial_type(summary_df, turning_threshold, running_speed_threshold):
         follow_count_coherence = tmp.index.values
         follow_count = tmp.values[:, 0]
     return running_trials,stationary_trials,straight_walk_trials,turning_trials
+def plotting_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_marker=[],end_marker=[]):
+    markers_size=400
+    trajectory_size=60
+    colormap_name = "viridis"
+    COL = MplColorHelper(colormap_name, 0, 6)
+    visualise_section_by_colour=True
+    fig = plt.figure()  # a new figure window
+    ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+    if end_frame==None:
+        ax.scatter(y_all[start_frame:],x_all[start_frame:],c=np.arange(len(y_all[start_frame:])), marker=".", alpha=0.5)
+    else:
+        if visualise_section_by_colour==True:
+            ax.scatter(y_all[start_frame:start_marker[0]],x_all[start_frame:start_marker[0]],s=trajectory_size,c='grey',marker=".", alpha=0.5)
+            ax.scatter(y_all[start_marker[0]:end_marker[0]],x_all[start_marker[0]:end_marker[0]],s=trajectory_size,c='blue', marker=".", alpha=0.5)
+            ax.scatter(y_all[end_marker[0]:start_marker[1]],x_all[end_marker[0]:start_marker[1]],s=trajectory_size,c='grey',marker=".", alpha=0.5)
+            ax.scatter(y_all[start_marker[1]:end_marker[1]],x_all[start_marker[1]:end_marker[1]],s=trajectory_size,c='red', marker=".", alpha=0.5)
+            ax.scatter(y_all[end_marker[1]:end_frame],x_all[end_marker[1]:end_frame],s=trajectory_size,c='grey',marker=".", alpha=0.5)
+        else:
+            '''
+            cols = np.linspace(0,1,len(x_all[start_frame:end_frame]))
+            points = np.array([x_all[start_frame:end_frame], y_all[start_frame:end_frame]]).T.reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            lc = LineCollection(segments, cmap='viridis')
+            lc.set_array(cols)
+            lc.set_linewidth(2)
+            line = ax.add_collection(lc)
+            fig.colorbar(line,ax=ax)
+            '''
+            ax.scatter(y_all[start_frame:end_frame],x_all[start_frame:end_frame],s=trajectory_size,c=np.arange(len(y_all[start_frame:end_frame])), marker=".", alpha=0.5)
+        ax.axis('off')
+    if type(start_marker) == list:
+        if len(start_marker) > 0:
+            for i in range(len(start_marker)):
+                ax.scatter(y_all[start_marker[i]],x_all[start_marker[i]],s=markers_size,c=COL.get_rgb(6), marker="*",edgecolors='black')
+    else:
+        if start_marker > 0:
+            ax.scatter(y_all[start_marker],x_all[start_marker],s=markers_size,c=COL.get_rgb(6), marker="*",edgecolors='black')
+
+    if type(end_marker) == list:
+        if len(end_marker) > 0:
+            for i in range(len(end_marker)):
+                ax.scatter(y_all[end_marker[i]],x_all[end_marker[i]],s=markers_size,c=COL.get_rgb(0), marker="*",edgecolors='black')
+    else:
+        if end_marker > 0:
+            ax.scatter(y_all[end_marker],x_all[end_marker],s=markers_size,c=COL.get_rgb(0), marker="*",edgecolors='black')
+    return fig
 
 
 def generate_index_points(stim_to_analyse, analysis_window, camera_fps):
@@ -713,6 +760,7 @@ def main(thisDir, json_file):
     tracking_file_pattern = "tracking*.csv"
     tracking_file_directory = find_file(thisDir, tracking_file_pattern)
     database_file_pattern ="database*.parquet.gzip"
+    #database_file_pattern ="database*.pickle"
     database = find_file(thisDir, database_file_pattern)
     temperature_file_pattern = "temperature_humidity.npy.gz"
     this_temp_directory = find_file(thisDir, temperature_file_pattern)
@@ -727,8 +775,10 @@ def main(thisDir, json_file):
         df.columns=columns_name
         df[["intergrated x position","intergrated y position"]]=df[["intergrated x position","intergrated y position"]]*trackball_radius
         df[f"delta rotation vector lab {yaw_axis}"] = df[f"delta rotation vector lab {yaw_axis}"] * camera_fps
-    else:
+    elif database_file_pattern.endswith(".parquet.gzip"):
         df=pd.read_parquet(database)
+    else:
+        df=pd.read_pickle(database)
 
     x_all,y_all,yaw_angular_velocity=preprocess_tracking_data(df,filtering_method,yaw_axis,smooth_window_length)
     travel_distance_fbf = euclidean_distance(x_all,y_all)
@@ -762,16 +812,15 @@ def main(thisDir, json_file):
         pass
     travel_distance_whole_session = np.nansum(travel_distance_fbf)/camera_fps
     if analysis_methods.get("plotting_trajectory") == True:
-        fig = plt.figure()  # a new figure window
-        ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
-        ax.scatter(y_all,x_all,c=np.arange(len(y_all)), marker=".", alpha=0.5)
-        fig.savefig(thisDir / "trajectory_plot.png")
+        fig=plotting_example_trajectory(x_all,y_all)
+        #fig=plotting_example_trajectory(x_all,y_all,start_frame=154892,end_frame=163473,start_marker=[155901,159436],end_marker=[158426,161961])
+        fig.savefig(thisDir / "trajectory_plot_example_trials.png")
     if analysis_methods.get("analyse_spontaneous_activity")==True:
         
         return
 
     # Here to load time based on one of the files created by bonsai such as PD file or events files
-    if PD_file_directory:
+    if PD_file_directory:   
         file_name = PD_file_directory.stem
         if pd_start=='meta':
             [_,this_date_hour,this_min,this_sec]=re.split("[\d]{0}_", file_name)
@@ -1098,10 +1147,10 @@ def main(thisDir, json_file):
         fig.savefig(thisDir/"heading_distribution.png")
         fig.savefig(thisDir/"heading_distribution.svg")
         heading_angle=np.degrees(heading_angle)
-    shortened_isi=5
-    if shortened_isi>abs(analysis_window[0]):
-        shortened_isi=abs(analysis_window[0])
-    running_trial_distance_threshold=1*shortened_isi #this threshold is defined based on travel distance 5-sec prior to stimulus onset     
+    # shortened_isi=5
+    # if shortened_isi>abs(analysis_window[0]):
+    #     shortened_isi=abs(analysis_window[0])
+    running_trial_distance_threshold=1*abs(analysis_window[0])#this threshold is defined based on travel distance 5-sec prior to stimulus onset     
     if analysis_methods.get("plotting_tbt_overview") == True:
    
         fig1 = plt.figure(figsize=(18, 7), tight_layout=True)
@@ -1120,17 +1169,17 @@ def main(thisDir, json_file):
             ax3.hist(summary_df["opto_index_isi"].values, bins=20)
         ax3.set_xlabel("optomotor index")
         ax3.set_ylabel("count")
-        ax3.set_title(f"{shortened_isi} sec prior to the stimulus")
+        ax3.set_title(f"{abs(analysis_window[0])} sec prior to the stimulus")
         ax4 = plt.subplot(246)
         ax4.hist(summary_df["travel_distance_isi"].values, bins=20)
         ax4.set_xlabel("travel distance (cm)")
         ax4.set_ylabel("count")
-        ax4.set_title(f"{shortened_isi} sec prior to the stimulus")
+        ax4.set_title(f"{abs(analysis_window[0])} sec prior to the stimulus")
         
         ax_stationary = plt.subplot(243)
         ax_runnning = plt.subplot(247)
-        ax_stationary.set_title(f"stationary trial (based on {shortened_isi} sec prior to the stimulus)")
-        ax_runnning.set_title(f"running trial (based on {shortened_isi} sec prior to the stimulus)")
+        ax_stationary.set_title(f"stationary trial (based on {abs(analysis_window[0])} sec prior to the stimulus)")
+        ax_runnning.set_title(f"running trial (based on {abs(analysis_window[0])} sec prior to the stimulus)")
         for i in range(len(stim_type)):
             this_stim_type = stim_type[i]
             if type(stim_duration)==list:
@@ -1138,7 +1187,7 @@ def main(thisDir, json_file):
                 these_travel_distance_isi=summary_df["travel_distance_isi"][(summary_df["stim_type"] == this_stim_type) & (summary_df['present_trial_duration']>=duration_for_optomotor_index)].values
             else:
                 these_velocities = velocity_arr[summary_df["stim_type"] == this_stim_type, :]
-                these_travel_distance_isi=summary_df["travel_distance_isi"][summary_df["stim_type"] == this_stim_type, :].values
+                these_travel_distance_isi=summary_df[summary_df["stim_type"] == this_stim_type]["travel_distance_isi"].values
             
             V_stationary=these_velocities[these_travel_distance_isi<running_trial_distance_threshold]
             time_points = np.arange(these_velocities.shape[1])
@@ -1208,8 +1257,8 @@ def main(thisDir, json_file):
             ax2.set_ylabel("Trial#")
             velocity_arr_for_colour_map = velocity_arr
 
-        pcm = ax2.pcolormesh(velocity_arr_for_colour_map, cmap="magma", vmin=0, vmax=10)
-        # pcm=ax2.pcolormesh(velocity_tbt, cmap = 'magma') ##sometimes, we dont need a vmax
+        pcm = ax2.pcolormesh(velocity_arr_for_colour_map, cmap="magma", vmin=0, vmax=30)
+        #pcm=ax2.pcolormesh(velocity_arr_for_colour_map, cmap = 'magma') ##sometimes, we dont need a vmax
         ## add colorbar
         fig1.colorbar(pcm)
 
@@ -1432,7 +1481,7 @@ def main(thisDir, json_file):
             label="Stimulus Ends",
         )
 
-        yaw_orientation_limit = 180
+        yaw_orientation_limit = 180#only feasible if the animal turn a lot and the unit is in radian 
         y_axis_lim = [yaw_orientation_limit * -1, yaw_orientation_limit]
         # ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
         # if stim duration is a list, plot the max and min values
@@ -1450,8 +1499,8 @@ def main(thisDir, json_file):
             xticks = [0, init_frame, end_frame]
             xticklabels = [str(analysis_window[0]), "0", str(stim_duration)]
         ax4.set(
-            yticks=[y_axis_lim[0], 0, y_axis_lim[1]],
-            ylim=[y_axis_lim[0], y_axis_lim[1]],
+            #yticks=[y_axis_lim[0], 0, y_axis_lim[1]],
+            #ylim=[y_axis_lim[0], y_axis_lim[1]],
             ylabel="Orientation (degree)",
             xticks=xticks,
             xticklabels=xticklabels,
@@ -1657,7 +1706,7 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L22117\221015\sweeploom"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23063\230831\sweeploom"
     #thisDir =r"Y:\GN26056\260509\looming\session1"
-    thisDir =r"Y:\GN26081\260718\sweeping\session1"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24114\240811\coherence\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26192\260718\looming\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26187\260613\looming\session1"
     #thisDir =r"Y:\GN26063\260523\choices\session1"

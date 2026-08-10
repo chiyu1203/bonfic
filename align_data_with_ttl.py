@@ -42,6 +42,7 @@ def hardcode_customised_thresholds(on_thresholds, off_thresholds, animal_id):
         "GN24085",
         "GN24066",
         "GN24034",
+        "GN24114"
     ]:
         on_thresholds.append(430000)
         off_thresholds.append(430000)
@@ -136,6 +137,7 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_in
     interval_duration = analysis_methods.get("interval_duration")
     stim_duration = analysis_methods.get("stim_duration")
     exp_place =analysis_methods.get("exp_place")
+    stimulus_paradigm=analysis_methods.get("experiment_name")
     if type(interval_duration) == list:
         min_interval= min(interval_duration)
     else:
@@ -159,6 +161,8 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_in
                     min_phase_duration=[min(min_stim,min_interval),stim_info['PreMovDuration'].values[0]]
             else:
                 min_phase_duration= [min_interval,min_stim]
+    elif exp_place=='MatrexVR' and stimulus_paradigm=='coherence':
+        min_phase_duration= [min_stim,min_interval]
     else:
         min_phase_duration= [min_interval,min_stim]
     pass_threshold = arr > on_threshold
@@ -345,6 +349,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
                     "GN24090",
                     "GN24095",
                     "GN24102",
+                    "GN24114",
                     "GN24136"
                 ]:
                     on_thresholds, off_thresholds = hardcode_customised_thresholds(
@@ -436,7 +441,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
         elif w2b[0]<b2w[0]:
             b2w = b2w[: trial_num + 1]
             w2b = w2b[:trial_num]        
-        elif w2b[0]>b2w[0] and visual_paradigm_name=='coherence':#coherence w2b is prior to ISI; b2w is prior to stimulus w2b-b2w shows stimulus duration b2w[1:]-w2b[:-1] shows ISI duration but b2w[:-1]-w2b[:] in r"Y:\GN25052\251102\coherence\session1" and r"Y:\GN25053\251108\coherence\session1" 
+        elif w2b[0]>b2w[0] and visual_paradigm_name=='coherence' and exp_place!='MatrexVR':#coherence w2b is prior to ISI; b2w is prior to stimulus w2b-b2w shows stimulus duration b2w[1:]-w2b[:-1] shows ISI duration but b2w[:-1]-w2b[:] in r"Y:\GN25052\251102\coherence\session1" and r"Y:\GN25053\251108\coherence\session1" 
             b2w = b2w[1:trial_num + 1]## The stimulus selectivity takes 160 secs in full screen. The stimulus selectivity takes 175 secs in single monitor protocol.
             w2b = w2b[:trial_num]
         else:
