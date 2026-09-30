@@ -26,12 +26,13 @@ from align_data_with_ttl import analyse_led_signal
 ##need to add this additional cell because useful tools are in another folder. Need to integrate these two folders one day
 current_working_directory = Path.cwd()
 parent_dir = current_working_directory.resolve().parents[0]
-sys.path.insert(0, str(parent_dir) + "\\utilities")
-sys.path.insert(0, str(parent_dir) + "\\ephys_behavior")
+if sys.platform == "darwin":
+    utilities_string = "/utilities"
+else:
+    utilities_string = "\\utilities"
+sys.path.insert(0, str(parent_dir) + utilities_string)
 from useful_tools import find_file, find_nearest, calculate_fft
 from data_cleaning import sorting_trial_info, load_temperature_data,euclidean_distance,diskretize,bfill
-#from analysis_utils import find_run_transitions
-
 
 class MplColorHelper:
     def __init__(self, cmap_name, start_val, stop_val):
@@ -822,18 +823,21 @@ def main(thisDir, json_file):
     # Here to load time based on one of the files created by bonsai such as PD file or events files
     if PD_file_directory:   
         file_name = PD_file_directory.stem
-        if pd_start=='meta':
-            [_,this_date_hour,this_min,this_sec]=re.split("[\d]{0}_", file_name)
-            exp_time=this_date_hour + "_" + this_min + "_" + this_sec
+        if pd_start == "meta":
+            _, this_date_hour, this_min, this_sec = file_name.split("_")
+            exp_time = f"{this_date_hour}_{this_min}_{this_sec}"
         else:
-            [_, exp_time] = re.split(f"{pd_start}\d_", file_name)
-
-        [exp_date, exp_hour] = re.split("T", exp_time)
-        test_dt = pd.to_datetime(exp_time, format="%Y-%m-%dT%H_%M_%S")
+            _, exp_time = re.split(
+                rf"{re.escape(pd_start)}\d_",
+                file_name,
+                maxsplit=1
+            )
+        exp_date, exp_hour = exp_time.split("T", maxsplit=1)
+        time_in_pd_timestamp = pd.to_datetime(exp_time, format="%Y-%m-%dT%H_%M_%S")
     else:
         [exp_date, exp_hour] = trial_file_directory.stem.split("events")[1].split("T")
         exp_time = exp_date + " " + exp_hour
-        test_dt = pd.to_datetime(exp_time, format="%Y-%m-%d %H_%M_%S")
+        time_in_pd_timestamp = pd.to_datetime(exp_time, format="%Y-%m-%d %H_%M_%S")
     # Here to load temperature data if possible
     tem_df_this_exp = []
     if temperature_data_options == None: 
@@ -868,7 +872,7 @@ def main(thisDir, json_file):
             this_temp_directory = find_file(thisDir, temperature_file_pattern)
             try:
                 tem_df = load_temperature_data(txt_path=this_temp_directory)
-                start_time_tem = find_nearest(tem_df.index, test_dt)
+                start_time_tem = find_nearest(tem_df.index, time_in_pd_timestamp)
                 print(
                     tem_df[tem_df.index == start_time_tem]
                 )  # find the start of EL-USB data that might be used for further data analysis. For example, oversampling to align with existing data size
@@ -1706,7 +1710,7 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L22117\221015\sweeploom"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23063\230831\sweeploom"
     #thisDir =r"Y:\GN26056\260509\looming\session1"
-    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24114\240811\coherence\session1"
+    thisDir ="/Users/chiyu_lee/OpenEphys/GN26063/260523/sweeping/session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26192\260718\looming\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26187\260613\looming\session1"
     #thisDir =r"Y:\GN26063\260523\choices\session1"

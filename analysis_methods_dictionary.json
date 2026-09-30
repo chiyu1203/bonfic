@@ -1,7 +1,7 @@
 {
- "exp_place": "MatrexVR",
- "experiment_name": "coherence",
- "temperature_data_options": "el_usb",
+ "exp_place": "Zball",
+ "experiment_name": "combo",
+ "temperature_data_options": "trial",
  "overwrite_curated_dataset": true,
  "load_previous_methods": false,
  "graph_colour_code": [
@@ -23,26 +23,29 @@
  "filtering_method": "sg_filter",
  "plotting_tbt_overview": true,
  "plotting_trajectory": true,
- "plotting_event_related_trajectory": false,
+ "plotting_event_related_trajectory": true,
  "plotting_deceleration_accerleration": false,
  "plotting_position_dependant_fixation": false,
  "plotting_optomotor_response": true,
  "load_experiment_condition_from_database": true,
- "select_animals_by_condition": true,
- "analysis_by_stimulus_type": false,
- "duration_for_optomotor_index": 25,
+ "select_animals_by_condition": false,
+ "analysis_by_stimulus_type": true,
+ "duration_for_optomotor_index": 5,
  "yaw_axis": "z",
  "camera_fps": 100,
  "trackball_radius": 5,
- "monitor_fps": 60,
- "stim_duration": 25,
+ "monitor_fps": 144,
+ "prestim_duration": 225,
+ "stim_duration": [
+  2
+ ],
  "interval_duration": [
-  10,
-  15
+  4,
+  5,
+  6
  ],
  "analysis_window": [
-  -10,
-  30
- ],
- "prestim_duration": 300
+  -2,
+  6
+ ]
 }

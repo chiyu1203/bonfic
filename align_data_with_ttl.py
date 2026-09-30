@@ -1,4 +1,4 @@
-import os, fnmatch, sys, time, json, cv2, warnings
+import os, fnmatch, sys, time, json, warnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -7,7 +7,11 @@ from datetime import datetime
 
 current_working_directory = Path.cwd()
 parent_dir = current_working_directory.resolve().parents[0]
-sys.path.insert(0, str(parent_dir) + "\\utilities")
+if sys.platform == "darwin":
+    utilities_string = "/utilities"
+else:
+    utilities_string = "\\utilities"
+sys.path.insert(0, str(parent_dir) + utilities_string)
 from useful_tools import find_file, find_file_multiple_patterns
 
 def string2datetime(date_time):
