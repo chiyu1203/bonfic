@@ -44,6 +44,214 @@ class MplColorHelper:
     def get_rgb(self, val):
         return self.scalarMap.to_rgba(val)
 
+def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500,vr_no="all",colormap_name="coolwarm"):
+    save_output= analysis_methods.get("save_output",False)
+    visual_paradigm_name= analysis_methods.get("experiment_name")
+    camera_fps=analysis_methods.get("camera_fps")
+    active_trial_only=analysis_methods.get("active_trial_only",False)
+    COL = MplColorHelper(colormap_name, 0, len(df["stim_type"].unique())-1)
+    sm = cm.ScalarMappable(cmap=colormap_name)
+    using_bs_ci=False
+    use_mean=True
+    stimulus_velocity=64 #unit degree/s
+    walk_threshold_tbt=25
+    premature_turn=0.25#set this criteria to remove animals starting to make turn turing ISI
+    fig, axes = plt.subplots(
+        nrows=1, ncols=2, figsize=(12, 10))
+    ax1, ax2, = axes.flatten()
+
+    fig_1by1, subplots = plt.subplots(
+        nrows=1, ncols=len(df["stim_type"].unique())+1, figsize=(20, 4), tight_layout=True
+    )
+    if active_trial_only==True:
+        df_selected=df[(df['travel_distance_isi']>walk_threshold_tbt) & (abs(df["opto_index_isi"])<premature_turn)]
+    else:
+        df_selected=df
+    i=0
+    for this_stim, entries in df_selected.groupby('stim_type'):
+        this_dif_w=entries.loc[:,'angular_velocity_f0':].values
+        this_w=np.cumsum(this_dif_w,axis=1)
+        #this_dif_w=np.diff(this_w,axis=1)
+        time_points = np.arange(this_w.shape[1])
+        time_points_b = np.tile(time_points, (this_w.shape[0], 1))
+        #define the stimulus speed in the first iteration
+        if i ==0:
+            xticks = [0, init_frame, end_frame]
+            xticklabels = [str(analysis_window[0]), "0", str(stim_duration)]
+            y_range=150
+            tmp = np.full(this_w.shape[1],np.nan)
+            dif_tmp= np.full(this_dif_w.shape[1],np.nan)
+            stim_w_array=np.ones(end_frame-init_frame)*stimulus_velocity*np.pi/180
+            tmp[init_frame:end_frame]=np.cumsum(stim_w_array)
+            dif_tmp[init_frame:end_frame]=stim_w_array
+        #ax1.plot(time_points_b, this_w, linestyle='-',linewidth=0.1,color=COL.get_rgb(i))
+
+        #plot trial-by-trial response
+        ax1.scatter(time_points_b, this_w, s=0.01,alpha=0.1,color=COL.get_rgb(i))
+        subplots[i].scatter(time_points_b, this_w, s=0.01,alpha=0.1,color=COL.get_rgb(i))
+        subplots[i].plot(time_points,tmp,color='k',linewidth=0.8)
+        subplots[i].plot(time_points,tmp*-1,color='k',linewidth=0.8)
+        subplots[i].axvline(
+        x=init_frame,
+        color="black",
+        linestyle="--",
+        label="Stimulus Starts",
+        )
+        subplots[i].axvline(
+            x=end_frame,
+            color="black",
+            linestyle="--",
+            label="Stimulus Ends",
+        )
+        subplots[i].set(
+        ylabel="Orientation (rad)",
+        yticks=[-y_range,0,y_range],
+        ylim=[-y_range,y_range],
+        xticks=xticks,
+        xticklabels=xticklabels,
+        xlabel="Time (s)",
+    )
+        #plot average response
+        if use_mean==True:
+            Ws = np.mean(this_w, axis=0)
+            diff_Ws = np.mean(this_dif_w, axis=0)
+        else:
+            Ws=np.median(this_w, axis=0)
+            diff_Ws=np.median(this_dif_w, axis=0)
+        #ax2.plot(time_points,median_response,color=COL.get_rgb(i))
+        ax2.plot(time_points[1:],diff_Ws,color=COL.get_rgb(i))
+        subplots[len(df["stim_type"].unique())].plot(time_points,Ws,color=COL.get_rgb(i))
+
+        ##to plot distribution with bootstrap 95% confidence interval
+        if using_bs_ci:
+            # data=(this_w,)
+            # res=st.bootstrap(data,np.std,n_resamples=99,vectorized=True,random_state=1)
+            # y1=res.confidence_interval[0]
+            # y2=res.confidence_interval[1]
+            # del data
+            # data=(this_dif_w,)
+            # res=st.bootstrap(data,np.std,n_resamples=99,vectorized=True,random_state=1)
+            # dif_y1=res.confidence_interval[0]
+            # dif_y2=res.confidence_interval[1]
+            confidence_level = 0.95
+            ##to plot distribution with 95% confidence interval with normal distribution
+            cl95=st.norm.interval(confidence_level,loc=Ws,scale=st.sem(this_w))
+            y1=cl95[0][:]
+            y2=cl95[1][:]
+            cl95=st.norm.interval(confidence_level,loc=diff_Ws,scale=st.sem(this_dif_w))
+            dif_y1=cl95[0][:]
+            dif_y2=cl95[1][:]
+
+        else:
+            ##to plot distribution with sem
+            sem_response = np.std(this_w, axis=0, ddof=1) / np.sqrt(this_w.shape[0])
+            y1 = Ws + sem_response
+            y2 = Ws - sem_response
+            sem_response = np.std(this_dif_w, axis=0, ddof=1) / np.sqrt(this_dif_w.shape[0])
+            dif_y1=diff_Ws + sem_response
+            dif_y2=diff_Ws - sem_response
+        #ax2.fill_between(time_points,y1,y2, alpha=0.5,color=COL.get_rgb(i))
+        ax2.fill_between(time_points[1:],dif_y1,dif_y2, alpha=0.5,color=COL.get_rgb(i))
+        subplots[len(df["stim_type"].unique())].fill_between(time_points,y1,y2, alpha=0.5,color=COL.get_rgb(i))
+
+        i=i+1
+
+    ax1.plot(time_points,tmp,color='k',linewidth=0.8)
+    ax1.plot(time_points,tmp*-1,color='k',linewidth=0.8)
+    ax2.plot(time_points[1:],dif_tmp,color='k',linewidth=0.8)
+    ax2.plot(time_points[1:],dif_tmp*-1,color='k',linewidth=0.8)
+    subplots[len(df["stim_type"].unique())].plot(time_points,tmp,color='k',linewidth=0.8)
+    subplots[len(df["stim_type"].unique())].plot(time_points,tmp*-1,color='k',linewidth=0.8)
+    ax1.axvline(
+        x=init_frame,
+        color="black",
+        linestyle="--",
+        label="Stimulus Starts",
+    )
+    ax1.axvline(
+        x=end_frame,
+        color="black",
+        linestyle="--",
+        label="Stimulus Ends",
+    )
+    ax2.axvline(
+        x=init_frame,
+        color="black",
+        linestyle="--",
+        label="Stimulus Starts",
+    )
+    ax2.axvline(
+        x=end_frame,
+        color="black",
+        linestyle="--",
+        label="Stimulus Ends",
+    )
+    subplots[len(df["stim_type"].unique())].axvline(
+        x=init_frame,
+        color="black",
+        linestyle="--",
+        label="Stimulus Starts",
+    )
+    subplots[len(df["stim_type"].unique())].axvline(
+        x=end_frame,
+        color="black",
+        linestyle="--",
+        label="Stimulus Ends",
+    )
+    ax1.set(
+        ylabel="Orientation (rad)",
+        yticks=[-y_range,0,y_range],
+        ylim=[-y_range,y_range],
+        xticks=xticks,
+        xticklabels=xticklabels,
+        xlabel="Time (s)",
+    )
+    ax2.set(
+        ylabel="Angular velocity (rad/s)",
+        xticks=xticks,
+        yticks=[-0.1,0,0.1],
+        #ylim=[-0.005,0.02],
+        ylim=[-2.5,2.5],
+        xticklabels=xticklabels,
+        xlabel="Time (s)",
+    )
+    #     ax1.set(
+    #     ylabel="Orientation (rad)",
+    #     #yticks=[-y_range,0,y_range],
+    #     #ylim=[-y_range,y_range],
+    #     xticks=xticks,
+    #     xticklabels=xticklabels,
+    #     xlabel="Time (s)",
+    # )
+    # ax2.set(
+    #     #ylabel="Angular velocity (rad/s)",
+    #     xticks=xticks,
+    #     xticklabels=xticklabels,
+    #     #xlabel="Time (s)",
+    # )
+    # ax2.set_xlabel("Time (s)", fontsize=14)
+    # ax2.set_ylabel("Angular velocity (rad/s)", fontsize=14)
+    # ax2.tick_params(axis='x', which='major', labelsize=14)
+    # ax2.tick_params(axis='y', which='major', labelsize=14)
+    subplots[len(df["stim_type"].unique())].set(
+        xticks=xticks,
+        yticks=[-20,0,20],
+        xticklabels=xticklabels,
+        xlabel="Time (s)")
+    tick_positions = np.linspace(0, 1, len(df["stim_type"].unique()))
+    these_coherence=df["stim_type"].unique()
+    these_coherence.sort()
+    tick_labels = [str(value) for value in these_coherence]
+    #cbar = plt.colorbar(sm, ax=[ax1,ax2], orientation="horizontal", location='top',ticks=tick_positions,aspect=80)
+    cbar = plt.colorbar(sm, ax=[ax1,ax2], orientation="horizontal", location='top',ticks=tick_positions,aspect=80)
+    cbar.set_ticklabels(tick_labels)
+    #cbar.ax.tick_params(labelsize=14)
+    if save_output==True:
+        fig_name=f"{vr_no}_bonfic_{visual_paradigm_name}_orientation_dynamics.png"
+        fig.savefig(Path(this_dataset_dir)/fig_name)
+        fig_name=f"{vr_no}_bonfic_{visual_paradigm_name}_orientation_dynamics_tbt.png"
+        fig_1by1.savefig(Path(this_dataset_dir)/fig_name)
+
 def a_guest(x):
     # Initialize an array of zeros with the same shape as x
     b = np.zeros_like(x, dtype=bool)
@@ -603,14 +811,15 @@ def classify_trial_type(summary_df, turning_threshold, running_speed_threshold):
         follow_count_coherence = tmp.index.values
         follow_count = tmp.values[:, 0]
     return running_trials,stationary_trials,straight_walk_trials,turning_trials
-def plotting_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_marker=[],end_marker=[]):
+def plotting_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_marker=[],end_marker=[],yaw_angular_velocity=[]):
     markers_size=400
+    camera_fps=100
     trajectory_size=60
     colormap_name = "viridis"
     COL = MplColorHelper(colormap_name, 0, 6)
     visualise_section_by_colour=True
-    fig = plt.figure()  # a new figure window
-    ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+    fig, ax= plt.subplots(1, 1, figsize=(27, 7), tight_layout=True)
+    fig2,(ax2,ax3)= plt.subplots(2, 1, figsize=(27, 7),sharex=True,tight_layout=True)
     if end_frame==None:
         ax.scatter(y_all[start_frame:],x_all[start_frame:],c=np.arange(len(y_all[start_frame:])), marker=".", alpha=0.5)
     else:
@@ -620,6 +829,44 @@ def plotting_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_m
             ax.scatter(y_all[end_marker[0]:start_marker[1]],x_all[end_marker[0]:start_marker[1]],s=trajectory_size,c='grey',marker=".", alpha=0.5)
             ax.scatter(y_all[start_marker[1]:end_marker[1]],x_all[start_marker[1]:end_marker[1]],s=trajectory_size,c='red', marker=".", alpha=0.5)
             ax.scatter(y_all[end_marker[1]:end_frame],x_all[end_marker[1]:end_frame],s=trajectory_size,c='grey',marker=".", alpha=0.5)
+            #travel_distance_tbt=euclidean_distance(x_all[start_frame:start_marker[0]],y_all[start_frame:start_marker[0]])
+            #velocity_arr = travel_distance_tbt * camera_fps
+            angular_velocity_interest=yaw_angular_velocity[start_frame:start_marker[0]]
+            #delta_angular_velocity=np.diff(angular_velocity_interest)
+            delta_angular_velocity=np.gradient(angular_velocity_interest, 1/camera_fps)
+            ax2.plot(np.arange(angular_velocity_interest.shape[0])/camera_fps,angular_velocity_interest,color='grey')
+            ax3.plot(np.arange(delta_angular_velocity.shape[0])/camera_fps,delta_angular_velocity,color='grey')
+            angular_velocity_interest=yaw_angular_velocity[start_marker[0]:end_marker[0]]
+            delta_angular_velocity=np.gradient(angular_velocity_interest, 1/camera_fps)
+            
+            relative_start=start_marker[0]-start_frame
+            ax2.plot(np.arange(relative_start,angular_velocity_interest.shape[0]+relative_start)/camera_fps,angular_velocity_interest,color='blue')
+            ax3.plot(np.arange(relative_start,delta_angular_velocity.shape[0]+relative_start)/camera_fps,delta_angular_velocity,color='blue')
+            angular_velocity_interest=yaw_angular_velocity[end_marker[0]:start_marker[1]]
+            delta_angular_velocity=np.gradient(angular_velocity_interest, 1/camera_fps)
+            relative_start=end_marker[0]-start_frame
+            ax2.plot(np.arange(relative_start,angular_velocity_interest.shape[0]+relative_start)/camera_fps,angular_velocity_interest,color='grey')
+            ax3.plot(np.arange(relative_start,delta_angular_velocity.shape[0]+relative_start)/camera_fps,delta_angular_velocity,color='grey')
+            angular_velocity_interest=yaw_angular_velocity[start_marker[1]:end_marker[1]]
+            delta_angular_velocity=np.gradient(angular_velocity_interest, 1/camera_fps)
+            relative_start=start_marker[1]-start_frame
+            ax2.plot(np.arange(relative_start,angular_velocity_interest.shape[0]+relative_start)/camera_fps,angular_velocity_interest,color='red')
+            ax3.plot(np.arange(relative_start,delta_angular_velocity.shape[0]+relative_start)/camera_fps,delta_angular_velocity,color='red')
+            angular_velocity_interest=yaw_angular_velocity[end_marker[1]:end_frame]
+            delta_angular_velocity=np.gradient(angular_velocity_interest, 1/camera_fps)
+            relative_start=end_marker[1]-start_frame
+            ax2.plot(np.arange(relative_start,angular_velocity_interest.shape[0]+relative_start)/camera_fps,angular_velocity_interest,color='grey')
+            ax3.plot(np.arange(relative_start,delta_angular_velocity.shape[0]+relative_start)/camera_fps,delta_angular_velocity,color='grey')
+            ax2.set_ylim(-5.4, 5.4)
+            #ax2.set_yticks([-4,0,4])
+            ax2.set(yticks=[-4, 0, 4])
+            ax2.set_ylabel(r'Angular velocity (rad s$^{-1}$)')
+            ax3.set_ylim(-350,350)
+            #ax3.set_yticks([-300,0,300])
+            ax3.set(yticks=[-300, 0, 300])
+            ax3.set_ylabel(r'Angular acceleration (rad s$^{-2}$)')
+            ax3.set_xlabel("Time (s)")
+            fig2.savefig("angular_velocity_example_trials.png")
         else:
             '''
             cols = np.linspace(0,1,len(x_all[start_frame:end_frame]))
@@ -631,23 +878,23 @@ def plotting_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_m
             line = ax.add_collection(lc)
             fig.colorbar(line,ax=ax)
             '''
-            ax.scatter(y_all[start_frame:end_frame],x_all[start_frame:end_frame],s=trajectory_size,c=np.arange(len(y_all[start_frame:end_frame])), marker=".", alpha=0.5)
+            ax.scatter(y_all[start_frame:end_frame],x_all[start_frame:end_frame],s=trajectory_size,color=np.arange(len(y_all[start_frame:end_frame])), marker=".", alpha=0.5)
         ax.axis('off')
     if type(start_marker) == list:
         if len(start_marker) > 0:
             for i in range(len(start_marker)):
-                ax.scatter(y_all[start_marker[i]],x_all[start_marker[i]],s=markers_size,c=COL.get_rgb(6), marker="*",edgecolors='black')
+                ax.scatter(y_all[start_marker[i]],x_all[start_marker[i]],s=markers_size,color=COL.get_rgb(6), marker="*",edgecolors='black')
     else:
         if start_marker > 0:
-            ax.scatter(y_all[start_marker],x_all[start_marker],s=markers_size,c=COL.get_rgb(6), marker="*",edgecolors='black')
+            ax.scatter(y_all[start_marker],x_all[start_marker],s=markers_size,color=COL.get_rgb(6), marker="*",edgecolors='black')
 
     if type(end_marker) == list:
         if len(end_marker) > 0:
             for i in range(len(end_marker)):
-                ax.scatter(y_all[end_marker[i]],x_all[end_marker[i]],s=markers_size,c=COL.get_rgb(0), marker="*",edgecolors='black')
+                ax.scatter(y_all[end_marker[i]],x_all[end_marker[i]],s=markers_size,color=COL.get_rgb(0), marker="*",edgecolors='black')
     else:
         if end_marker > 0:
-            ax.scatter(y_all[end_marker],x_all[end_marker],s=markers_size,c=COL.get_rgb(0), marker="*",edgecolors='black')
+            ax.scatter(y_all[end_marker],x_all[end_marker],s=markers_size,color=COL.get_rgb(0), marker="*",edgecolors='black')
     return fig
 
 
@@ -813,8 +1060,8 @@ def main(thisDir, json_file):
         pass
     travel_distance_whole_session = np.nansum(travel_distance_fbf)/camera_fps
     if analysis_methods.get("plotting_trajectory") == True:
-        fig=plotting_example_trajectory(x_all,y_all)
-        #fig=plotting_example_trajectory(x_all,y_all,start_frame=154892,end_frame=163473,start_marker=[155901,159436],end_marker=[158426,161961])
+        #fig=plotting_example_trajectory(x_all,y_all)
+        fig=plotting_example_trajectory(x_all,y_all,start_frame=154892,end_frame=163473,start_marker=[155901,159436],end_marker=[158426,161961],yaw_angular_velocity=yaw_angular_velocity)
         fig.savefig(thisDir / "trajectory_plot_example_trials.png")
     if analysis_methods.get("analyse_spontaneous_activity")==True:
         
@@ -1397,12 +1644,6 @@ def main(thisDir, json_file):
                     linestyle="--",
                     label="Stimulus Starts",
                 )
-                # axes.axvline(
-                #     x=init_frame + camera_fps * name[1],
-                #     color="black",
-                #     linestyle="--",
-                #     label="Stimulus Ends",
-                # )
                 axes.set(title=f'locust texture{name[1]}, R{name[0]}',yticks=[y_axis_lim[0], 0, y_axis_lim[1]],ylim=y_axis_lim,ylabel="angular velocity (rad/s)")
             else:
                 axes[j].axvline(
@@ -1411,12 +1652,6 @@ def main(thisDir, json_file):
                     linestyle="--",
                     label="Stimulus Starts",
                 )
-                # axes[j].axvline(
-                #     x=init_frame + camera_fps * name[0],
-                #     color="black",
-                #     linestyle="--",
-                #     label="Stimulus Ends",
-                # )
                 axes[j].set(title=f'locust texture{name[1]}, R{name[0]}',yticks=[y_axis_lim[0], 0, y_axis_lim[1]],ylim=y_axis_lim,ylabel="angular velocity (rad/s)")
             j=j+1
         plot_name = f"conflict_analysis_overview.png"
@@ -1428,8 +1663,9 @@ def main(thisDir, json_file):
         #     colormap_name = "gnuplot"
         #     sm = cm.ScalarMappable(cmap=colormap_name)            
         #     COL = MplColorHelper(colormap_name, 0, len(stim_type)-1)
-        fig2, (ax3, ax4) = plt.subplots(
-            nrows=1, ncols=2, figsize=(36, 14), tight_layout=True
+        target_speed=64*np.pi/180 #unit in radian/s
+        fig2, (ax3,ax4,ax5,ax6) = plt.subplots(
+            nrows=1, ncols=4, figsize=(72, 14), tight_layout=True
         )
         for i in range(len(stim_type)):
             this_stim_type = stim_type[i]
@@ -1455,13 +1691,30 @@ def main(thisDir, json_file):
                 capsize=3,
             )
             if type(stim_duration)==list:
-                this_rotational_velocity = heading_angle[(summary_df["stim_type"] == this_stim_type) & (summary_df['present_trial_duration']>=duration_for_optomotor_index),:]
+                this_heading_angle = heading_angle[(summary_df["stim_type"] == this_stim_type) & (summary_df['present_trial_duration']>=duration_for_optomotor_index),:]
+                this_angular_velocity=angular_velocity_tbt[(summary_df["stim_type"] == this_stim_type) & (summary_df['present_trial_duration']>=duration_for_optomotor_index),:]
             else:
-                this_rotational_velocity = heading_angle[summary_df["stim_type"] == this_stim_type, :]
-            time_points = np.arange(this_rotational_velocity.shape[1])
-            time_points_b = np.tile(time_points, (this_rotational_velocity.shape[0], 1))
-            ax4.scatter(time_points_b, this_rotational_velocity, s=0.5, color=COL.get_rgb(i),label=this_stim_type)
-
+                this_heading_angle = heading_angle[summary_df["stim_type"] == this_stim_type, :]
+                this_angular_velocity=angular_velocity_tbt[summary_df["stim_type"] == this_stim_type, :]
+            time_points = np.arange(this_heading_angle.shape[1])
+            time_points_b = np.tile(time_points, (this_heading_angle.shape[0], 1))
+            ax4.scatter(time_points_b, this_heading_angle, s=0.5, color=COL.get_rgb(i),label=this_stim_type)
+            #this_angular_velocity=np.diff(this_heading_angle)
+            
+            time_points = np.arange(this_angular_velocity.shape[1])
+            time_points_b = np.tile(time_points, (this_angular_velocity.shape[0], 1))
+            ax5.plot(time_points, np.median(this_angular_velocity,axis=0),color=COL.get_rgb(i),label=this_stim_type)
+            #this_angular_acceleration=np.diff(this_angular_velocity)
+            this_angular_acceleration=np.gradient(this_angular_velocity, 1/camera_fps,axis=1)
+            time_points = np.arange(this_angular_acceleration.shape[1])
+            time_points_b = np.tile(time_points, (this_angular_acceleration.shape[0], 1))
+            ax6.plot(time_points, np.median(this_angular_acceleration,axis=0),color=COL.get_rgb(i),label=this_stim_type)
+        
+        dif_tmp= np.full(this_angular_velocity.shape[1],np.nan)
+        stimulus_end_frame=(abs(analysis_window[0])+stim_duration)*camera_fps
+        stim_w_array=np.ones(stim_duration*camera_fps)*target_speed
+        dif_tmp[init_frame:stimulus_end_frame]=stim_w_array
+        
         ax3.set_ylim(-1, 1)
         if visual_paradigm_name=='sweeping' or visual_paradigm_name=='gratings':
             ax3.tick_params("x", labelrotation=45)
@@ -1479,12 +1732,43 @@ def main(thisDir, json_file):
             label="Stimulus Starts",
         )
         ax4.axvline(
-            x=end_frame,
+            x=stimulus_end_frame,
             color="black",
             linestyle="--",
             label="Stimulus Ends",
         )
-
+        ax5.axvline(
+            x=init_frame,
+            color="black",
+            linestyle="--",
+            label="Stimulus Starts",
+        )
+        ax5.axvline(
+            x=stimulus_end_frame,
+            color="black",
+            linestyle="--",
+            label="Stimulus Ends",
+        )
+        ax6.axvline(
+            x=init_frame,
+            color="black",
+            linestyle="--",
+            label="Stimulus Starts",
+        )
+        ax6.axvline(
+            x=stimulus_end_frame,
+            color="black",
+            linestyle="--",
+            label="Stimulus Ends",
+        )
+        ax5.set_ylim(-4,4)
+        ax6.set_ylim(-40, 40)
+        ax5.plot(time_points,dif_tmp,color='k',linewidth=0.8)
+        ax5.plot(time_points,dif_tmp*-1,color='k',linewidth=0.8)
+        ax5.set(yticks=[-4, 0, 4])
+        ax5.set_ylabel(r'Median angular velocity (rad s$^{-1}$)')
+        ax6.set(yticks=[-50, 0, 50])
+        ax6.set_ylabel(r'Median angular acceleration (rad s$^{-2}$)')
         yaw_orientation_limit = 180#only feasible if the animal turn a lot and the unit is in radian 
         y_axis_lim = [yaw_orientation_limit * -1, yaw_orientation_limit]
         # ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
@@ -1594,10 +1878,10 @@ if __name__ == "__main__":
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft, where 2 comes from
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24076/240804/coherence/session1"
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24084/240805/coherence/session1"# good for checking fft, where false nagative show up
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24114\240811\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24114\240811\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24098\240810\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24089\240810\coherence\session1"
-    # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24064\240803\coherence\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24036\240801\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24133\241210\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24126\241209\coherence\session1"
     # thisDir = "Z:\\DATA\\experiment_trackball_Optomotor\\MatrexVR\\GN24133\\241210\\coherence\\session1"
@@ -1705,12 +1989,13 @@ if __name__ == "__main__":
     #thisDir =r"Y:\GN26015\260221\choices\session1"
     #thisDir =r"Y:\GN26018\260228\choices\session2"
     #thisDir =r"Y:\GN26017\260222\choices\session1"
+    #thisDir =r"Y:\GN26090\260801\looming\session1"
     #thisDir =r"Y:\GN26040\260411\looming\session1"
     #thisDir =r"Y:\GN26042\260412\looming\session2"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L22117\221015\sweeploom"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23063\230831\sweeploom"
     #thisDir =r"Y:\GN26056\260509\looming\session1"
-    thisDir ="/Users/chiyu_lee/OpenEphys/GN26063/260523/sweeping/session1"
+    #thisDir ="/Users/chiyu_lee/OpenEphys/GN26063/260523/sweeping/session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26192\260718\looming\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26187\260613\looming\session1"
     #thisDir =r"Y:\GN26063\260523\choices\session1"
