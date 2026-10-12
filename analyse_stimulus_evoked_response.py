@@ -14,6 +14,7 @@ import numpy as np
 from scipy.io import savemat
 from scipy.signal import savgol_filter,medfilt
 from scipy.stats import circmean
+import scipy.stats as st
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
@@ -45,12 +46,14 @@ class MplColorHelper:
         return self.scalarMap.to_rgba(val)
 
 def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500,vr_no="all",colormap_name="coolwarm"):
-    save_output= analysis_methods.get("save_output",False)
+    save_output= analysis_methods.get("save_output")
     visual_paradigm_name= analysis_methods.get("experiment_name")
-    camera_fps=analysis_methods.get("camera_fps")
-    active_trial_only=analysis_methods.get("active_trial_only",False)
+    #camera_fps=analysis_methods.get("camera_fps")
+    active_trial_only=analysis_methods.get("active_trial_only")
     COL = MplColorHelper(colormap_name, 0, len(df["stim_type"].unique())-1)
     sm = cm.ScalarMappable(cmap=colormap_name)
+    analysis_window=analysis_methods.get("analysis_window")
+    stim_duration=analysis_methods.get("stim_duration")
     using_bs_ci=False
     use_mean=True
     stimulus_velocity=64 #unit degree/s
@@ -87,8 +90,9 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         #ax1.plot(time_points_b, this_w, linestyle='-',linewidth=0.1,color=COL.get_rgb(i))
 
         #plot trial-by-trial response
-        ax1.scatter(time_points_b, this_w, s=0.01,alpha=0.1,color=COL.get_rgb(i))
-        subplots[i].scatter(time_points_b, this_w, s=0.01,alpha=0.1,color=COL.get_rgb(i))
+        #ax1.scatter(time_points_b, this_w, s=0.01,alpha=0.1,color=COL.get_rgb(i))
+        #ax1.plot(time_points_b, this_w,color=COL.get_rgb(i))
+        #subplots[i].scatter(time_points_b, this_w, s=0.01,alpha=0.1,color=COL.get_rgb(i))
         subplots[i].plot(time_points,tmp,color='k',linewidth=0.8)
         subplots[i].plot(time_points,tmp*-1,color='k',linewidth=0.8)
         subplots[i].axvline(
@@ -118,8 +122,7 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         else:
             Ws=np.median(this_w, axis=0)
             diff_Ws=np.median(this_dif_w, axis=0)
-        #ax2.plot(time_points,median_response,color=COL.get_rgb(i))
-        ax2.plot(time_points[1:],diff_Ws,color=COL.get_rgb(i))
+        ax2.plot(time_points,diff_Ws,color=COL.get_rgb(i))
         subplots[len(df["stim_type"].unique())].plot(time_points,Ws,color=COL.get_rgb(i))
 
         ##to plot distribution with bootstrap 95% confidence interval
@@ -151,15 +154,14 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
             dif_y1=diff_Ws + sem_response
             dif_y2=diff_Ws - sem_response
         #ax2.fill_between(time_points,y1,y2, alpha=0.5,color=COL.get_rgb(i))
-        ax2.fill_between(time_points[1:],dif_y1,dif_y2, alpha=0.5,color=COL.get_rgb(i))
+        ax2.fill_between(time_points,dif_y1,dif_y2, alpha=0.5,color=COL.get_rgb(i))
         subplots[len(df["stim_type"].unique())].fill_between(time_points,y1,y2, alpha=0.5,color=COL.get_rgb(i))
 
         i=i+1
-
     ax1.plot(time_points,tmp,color='k',linewidth=0.8)
     ax1.plot(time_points,tmp*-1,color='k',linewidth=0.8)
-    ax2.plot(time_points[1:],dif_tmp,color='k',linewidth=0.8)
-    ax2.plot(time_points[1:],dif_tmp*-1,color='k',linewidth=0.8)
+    ax2.plot(time_points,dif_tmp,color='k',linewidth=0.8)
+    ax2.plot(time_points,dif_tmp*-1,color='k',linewidth=0.8)
     subplots[len(df["stim_type"].unique())].plot(time_points,tmp,color='k',linewidth=0.8)
     subplots[len(df["stim_type"].unique())].plot(time_points,tmp*-1,color='k',linewidth=0.8)
     ax1.axvline(
@@ -246,11 +248,12 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
     cbar = plt.colorbar(sm, ax=[ax1,ax2], orientation="horizontal", location='top',ticks=tick_positions,aspect=80)
     cbar.set_ticklabels(tick_labels)
     #cbar.ax.tick_params(labelsize=14)
+    plt.show()
     if save_output==True:
         fig_name=f"{vr_no}_bonfic_{visual_paradigm_name}_orientation_dynamics.png"
-        fig.savefig(Path(this_dataset_dir)/fig_name)
+        #fig.savefig(Path(this_dataset_dir)/fig_name)
         fig_name=f"{vr_no}_bonfic_{visual_paradigm_name}_orientation_dynamics_tbt.png"
-        fig_1by1.savefig(Path(this_dataset_dir)/fig_name)
+        #fig_1by1.savefig(Path(this_dataset_dir)/fig_name)
 
 def a_guest(x):
     # Initialize an array of zeros with the same shape as x
