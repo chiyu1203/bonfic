@@ -1,17 +1,13 @@
 clear;
 close all;
-
-%to do list: using Time-binned analysis to plot individual's AUC (or probability of
-%correct) and overlay that with the mean response of AUC (pool across animals)
-%to do list2: classify animals based on walking distance during isi or
-%pre-stim interval and compare that classification with walking distance
-%during the entire experiment or trial by trial
-%to do list3: plot AUC values over time with different lengh of ISI
-
+jsonText = fileread('analysis_methods_dictionary.json');
+analysis_methods = jsondecode(jsonText);
 analysis_methods.example_data=0;
-analysis_methods.target_angular_velocity=64*pi/180;
+analysis_methods.camera_fps=100;
+%analysis_methods.target_angular_velocity=64*pi/180;
+analysis_methods.target_angular_velocity=0.3;
+analysis_methods.target_consecutive_frame=1;
 analysis_methods.loop_analysis_animal_by_animal=1;
-analysis_methods.save_fig=0;
 analysis_methods.saveas_svg_file=0;
 analysis_methods.saveas_jpg_file=0;
 analysis_methods.analyse_angular_velocity=1;
@@ -19,16 +15,18 @@ analysis_methods.apply_subsampling=1;
 analysis_methods.use_best_threshold=1;
 analysis_methods.stim_onset_frame=1000;
 analysis_methods.stim_offset_frame=3500;
-analysis_methods.bin_length=500;
+analysis_methods.analysis_window=[-5,35];
+
+analysis_methods.bin_length=100;
 
 analyse_angular_velocity=analysis_methods.analyse_angular_velocity;
 use_best_threshold=analysis_methods.use_best_threshold;
 stim_onset_frame=analysis_methods.stim_onset_frame;
 stim_offset_frame=analysis_methods.stim_offset_frame;
+camera_fps=analysis_methods.camera_fps;
+analysis_window=analysis_methods.analysis_window;
 bin_length=analysis_methods.bin_length;
-
 active_animals_only=0;
-frame_rate=100;
 num_iteration=99;
 if analysis_methods.example_data
     % Define folder and file paths for example data
@@ -42,11 +40,11 @@ if analysis_methods.example_data
 else
     % Define folder and file paths for population data
     this_folder='Z:\DATA\experiment_trackball_Optomotor\MatrexVR';
-    matfile='matrex_vr_coherence_database.mat';
+    matfile='matrex_vr_coherence_database_rolling_median.mat';
     this_file=fullfile(this_folder,matfile);
     behavioural_summary=load(this_file);
     %filename ='rotation_summary.npy';
-    filename ='angular_velocity_summary.npy';
+    filename ='angular_velocity_summary_rolling_median.npy';
     this_file=fullfile(this_folder,filename);
 end
 % Example implementation of memory mapping an NPY file using readNPYheader
@@ -116,7 +114,7 @@ if analysis_methods.loop_analysis_animal_by_animal
         Pathes=behavioural_summary.Path(animal_of_interest);
         total_travel_distance_across_animals(thisAnimal)=sum(behavioural_summary.travel_distance(animal_of_interest));%there was an adjustment in the unit of travel distance from 2024 to 2026
         [psycho,choices_across_stim]=reaching_target_angular_velocity(this_input,these_stim,char(Pathes(1)),analysis_methods);
-        %[AUCs,psycho,choices_across_stim,thresholds]=roc_analysis(this_input,these_stim,char(Pathes(1)),analysis_methods);
+        %[AUCs,psycho,choices_across_stim,~]=roc_analysis(this_input,these_stim,char(Pathes(1)),analysis_methods);
         if use_best_threshold
             disp('no AUCs across time when using best threshold in the experiment');
         else
@@ -151,8 +149,8 @@ if analysis_methods.loop_analysis_animal_by_animal
         hold off
     end
     time_binned_accuracy_width=bin_length; %default 500, now 700
-    time_binned_accuracy_onset= stim_onset_frame-time_binned_accuracy_width-1;%default 499 now 299
-    time_binned_accuracy_offset=size(input_variable,2);
+    time_binned_accuracy_onset=stim_onset_frame+analysis_window(1)*camera_fps-1;%default 499 now 299
+    time_binned_accuracy_offset=stim_onset_frame+analysis_window(2)*camera_fps;
     time_binned_timepoints=time_binned_accuracy_onset:time_binned_accuracy_width:time_binned_accuracy_offset;
 
     binCols = parula(num_type_stim);
@@ -191,7 +189,6 @@ if analysis_methods.loop_analysis_animal_by_animal
     set(gca,'xticklabel',{'0','25'})
     ylabel('Probability of Correct')
     ylim([0.4,1])
-    hold off
     %% sort out data for modeling work
     %plot psychomatric curve
     these_coherence_direction=unique(behavioural_summary.stim_type);
@@ -214,8 +211,9 @@ if analysis_methods.loop_analysis_animal_by_animal
     else
         disp("analyse all animals");
     end
-    fig=figure;binCols = parula(size(these_coherence_direction,2));
-    timepoints_title=(time_binned_timepoints+1-stim_onset_frame)/frame_rate;
+    fig=figure;
+    binCols = parula(size(these_coherence_direction,2));
+    timepoints_title=(time_binned_timepoints+1-stim_onset_frame)/camera_fps;
     for ibin = 1:numel(time_binned_timepoints)-1
         subplot(1,numel(time_binned_timepoints)-1,ibin);
         p_left=time_binned_boolean_reshape(:,:,ibin);
@@ -249,6 +247,7 @@ if analysis_methods.loop_analysis_animal_by_animal
            temp_this_response(i,j)=mean(this_response);
         end
     end
+    fig=figure;
     for i = 1:size(these_coherence_direction,2)
         plot(x(i,:),temp_this_response(i,:),'LineWidth',1,'Color',binCols(i,:))
         hold on
@@ -266,11 +265,11 @@ if analysis_methods.loop_analysis_animal_by_animal
     ylabel('Probability of Left')
     ylim([0,1])
     %save data for modeling work
-    save('boolean_all_tav.mat', 'time_binned_boolean_reshape');
-    save('threshold_across_animals.mat','threshold_across_animals')
-    save('stim_type_across_animals.mat', 'stim_type_across_animals');
-    save('time_binned_timepoints.mat', 'time_binned_timepoints');
-    save('boolean_across_animals_tav.mat', 'boolean_across_animals');
+    save('boolean_all_dynamic_threshold03.mat', 'time_binned_boolean_reshape');
+    save('threshold_across_animals_dynamic_threshold03.mat','threshold_across_animals')
+    save('stim_type_across_animals_dynamic_threshold03.mat', 'stim_type_across_animals');
+    save('time_binned_timepoints_dynamic_threshold03.mat', 'time_binned_timepoints');
+    save('boolean_across_animals_dynamic_threshold03.mat', 'boolean_across_animals');
 
     %use scatter plot if no line is prefered
     %scatter(repmat(1:numel(AUCs),[num_animals 1]),AUCs_across_animals,1,'k');

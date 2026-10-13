@@ -1,85 +1,26 @@
 function [psycho,choices]=reaching_target_angular_velocity(input,these_stim,this_dir,analysis_methods)
     close all;
-    % stim_type = unique(these_stim);
+    stim_type = unique(these_stim);
     % stims_for_thresh = unique(these_stim);
     % stims_for_thresh(stim_type==0) = [];
-    n_trial_per_animal=size(input,1);
+    num_iteration=99;
     stim_direction=these_stim./abs(these_stim);% Retrieve the stimulus direction irrespective to coherence level
-    save_fig=analysis_methods.save_fig;
+    save_output=analysis_methods.save_output;
     saveas_svg_file=analysis_methods.saveas_svg_file;
     saveas_jpg_file=analysis_methods.saveas_jpg_file;
+    target_consecutive_frame=analysis_methods.target_consecutive_frame;
     analyse_angular_velocity=analysis_methods.analyse_angular_velocity;
     apply_subsampling=analysis_methods.apply_subsampling;
-    num_iteration=99;
     use_best_threshold=analysis_methods.use_best_threshold;
     stim_onset_frame=analysis_methods.stim_onset_frame;
     stim_offset_frame=analysis_methods.stim_offset_frame;
+    camera_fps=analysis_methods.camera_fps;
+    analysis_window=analysis_methods.analysis_window*camera_fps;
+    target_consecutive_frame=analysis_methods.target_consecutive_frame;
     bin_length=analysis_methods.bin_length;
     [gc,~] = groupcounts(these_stim');%[~,~,ix] = unique(these_stim);C = accumarray(ix,1);  do the same trick
     min_trial_per_condition=min(gc);
 
-    %% Computing threshold and AUC for each frame
-    % myCols = parula(size(input,2));
-    % AUCs = nan(1,size(input,2));
-    % thresh = nan(1,size(input,2));
-    % inputStim = input(:,stim_onset_frame:stim_offset_frame);
-    %inputStim = input;
-%     if use_best_threshold && apply_subsampling
-%         Thresholds=nan(1,num_iteration);
-%         for this_iteration=1:num_iteration
-%             balanced_trials=nan(numel(stims_for_thresh),min_trial_per_condition);
-%             for istim=1:numel(stims_for_thresh)
-%                 cohIdx =these_stim==stims_for_thresh(istim);
-%                 tmp=find(cohIdx);
-%                 sub_sample=datasample(tmp,min_trial_per_condition,'Replace',false);
-%                 balanced_trials(istim,:)=sub_sample;
-%             end
-%         balanced_index=reshape(balanced_trials,1,[]);
-%         balanced_stim_direction=stim_direction(balanced_index);
-%         input_for_classification=inputStim(balanced_index,:);
-%         %balanced_stim_direction(balanced_stim_direction==0) = sign(randn(sum(balanced_stim_direction==0),1));
-% %         stim_directin_for_classification=balanced_stim_direction(balanced_stim_direction~=0);
-% %         input_for_classification=inputStim(balanced_stim_direction~=0,:);
-%         [FPR,TPR,T,~,opt]=perfcurve(repmat(balanced_stim_direction,1,size(inputStim,2)),reshape(double(input_for_classification),1,[]),1);
-%         balancedThresh = T(FPR==opt(1) & TPR==opt(2));% Get the best threshold from the ROC curve
-%         Thresholds(this_iteration)=balancedThresh;
-%         end
-%     theThresh=mean(Thresholds);
-%     elseif use_best_threshold
-%         [FPR,TPR,T,~,opt]=perfcurve(repmat(stim_direction,1,size(inputStim,2)),reshape(double(inputStim),1,[]),1);
-%         theThresh = T(FPR==opt(1) & TPR==opt(2));% Get the best threshold from the ROC curve
-%     else
-%         roc_ori_fig=figure;
-%         for iframe = 1: size(input,2)
-%             % Compute the ROC curve, AUC, and optimal classification threshold for each frame
-%             [FPR,TPR,T,AUC,opt]=perfcurve(stim_direction,double(input(:,iframe)),1);
-%             plot(FPR,TPR,'color',myCols(iframe,:));% Plot the ROC curve for each frame, to observe how classification performance evolves over time.
-%             AUCs(iframe) = AUC; % Store AUC value for each frame
-%             thresh(iframe) = T(FPR==opt(1) & TPR==opt(2));% Store the optimal threshold
-%             hold on
-%         end
-%         hold off
-%         xlabel('False Positive Rate')
-%         ylabel('True Positive Rate')
-%         title('ROC curve over time')
-%         theThresh=thresh(iframe);
-% 
-%         % Scatter plot of AUC values across frames
-%         auc_ori_fig=figure;
-%         scatter(1:numel(AUCs),AUCs,40,myCols)
-%         title('AUC values over time')
-%         xlabel('Time (sec)')
-%         set(gca,'xtick',[stim_onset_frame stim_offset_frame])
-%         set(gca,'xticklabel',{'0','25'})
-% 
-%         % Plot the threshold values across frames
-%         optimal_thres_ori_fig=figure;
-%         plot(thresh)
-%         title('optimal threshold values over time')
-%         xlabel('Time (sec)')
-%         set(gca,'xtick',[stim_onset_frame stim_offset_frame])
-%         set(gca,'xticklabel',{'0','25'})
-%     end
     %% Computing accuracy for each frame and each coherence using frame-based threshold
     theThresh=analysis_methods.target_angular_velocity;
     pCorr = nan(1,size(input,2));
@@ -95,49 +36,78 @@ function [psycho,choices]=reaching_target_angular_velocity(input,these_stim,this
     % Randomly shuffle the sequence
     %shuffled_sequence = sequence(randperm(sum(stim_direction==0)));
     psycho = nan(numel(myStims),size(input,2)); % Pre-allocate psychometric data
+    %psycho = nan(numel(myStims),analysis_window(2)-analysis_window(1));
+    %cumulative_follow_across_coherence= nan(numel(stim_type),analysis_window(2)-analysis_window(1));
+    cumulative_follow_across_coherence= nan(numel(stim_type),size(input,2));
+    choices=nan(size(input,1),size(input,2));
+    choices_follow=nan(size(input,1),size(input,2));
     correctClassifications_across_stim=nan(size(input));
-    choices=nan(size(input));
-    for iframe = 1:size(input,2)
-         % Classify the stimuli based on the threshold
-        choices(:,iframe) = input(:,iframe)>=theThresh;
-        correctClassifications = (input(:,iframe)>=theThresh) == (corrected_stim_dir==1)'; % including unfair stimuli!
-        pCorr(iframe) = mean(correctClassifications);% Store accuracy
-        correctClassifications_across_stim(:,iframe)=correctClassifications;
-%         histo_fig=figure;
-%         histogram(correctClassifications)
-    % Loop through each stimulus coherence level
-        for istim = 1:numel(myStims)
-            if apply_subsampling
-                sub_sample_psycho=nan(1,num_iteration);
-                for this_iteration=1:num_iteration
-                    if myStims(istim)==0
-                        cohIdx = abs(these_stim)==myStims(istim);
-                        tmp=find(cohIdx);
-                        sub_sample=datasample(tmp,min_trial_per_condition,'Replace',false);
-                    else
-                        cohIdx = these_stim==myStims(istim);
-                        tmp=find(cohIdx);
-                        sub_sample1=datasample(tmp,min_trial_per_condition,'Replace',false);
-                        cohIdx = these_stim==myStims(istim)*-1;
-                        tmp=find(cohIdx);
-                        sub_sample2=datasample(tmp,min_trial_per_condition,'Replace',false);
-                        sub_sample=cat(2,sub_sample2,sub_sample1);
-                    end
-                    theseDirs=corrected_stim_dir(sub_sample);
-                    theseAngles = input(sub_sample,iframe);
-                    sub_sample_psycho(this_iteration) = mean((theseAngles>=theThresh) == (theseDirs==1)');% Compute classification accuracy
-                end
-                psycho(istim,iframe) = mean(sub_sample_psycho);
+    %choices=nan(size(input,1),analysis_window(2)-analysis_window(1));
+    %choices_follow=nan(size(input,1),analysis_window(2)-analysis_window(1));
+    if target_consecutive_frame>1
+        for i = 1:size(stim_type,2)
+            this_stim_type=stim_type(i);
+            if this_stim_type<0
+                these_angular_velocity_flipped_direction=input(these_stim==this_stim_type,:)*-1;
             else
-                cohIdx = abs(these_stim)==myStims(istim);%%fix here to take coherence values irespective to direction
-                theseDirs = corrected_stim_dir(cohIdx);
-                % theseCoh = these_stim(cohIdx);
-                theseAngles = input(cohIdx,iframe);
-                stimCorrectClassifications = (theseAngles>=theThresh) == (theseDirs==1)';% Compute classification accuracy
-                psycho(istim,iframe) = mean(stimCorrectClassifications);
+                these_angular_velocity_flipped_direction=input(these_stim==this_stim_type,:);
             end
+            these_angular_velocity=input(these_stim==this_stim_type,:);
+            [follow_masks,~]=classify_angular_velocity(these_angular_velocity_flipped_direction(:,:),theThresh,target_consecutive_frame);
+            [cw_masks,~]=classify_angular_velocity(these_angular_velocity(:,:),theThresh,target_consecutive_frame);
+            follow_across_trial=sum(follow_masks,1);
+            cumulative_follow_across_trial=cumsum(follow_across_trial);
+            cumulative_follow_across_coherence(i,:)=cumulative_follow_across_trial;
+            choices(these_stim==this_stim_type,:)=cw_masks;
+            choices_follow(these_stim==this_stim_type,:)=follow_masks;
         end
-    
+        for i = 1:numel(myStims)
+            these_data=choices_follow(abs(these_stim)==myStims(i),:);
+            psycho(i,:)=sum(these_data,1)/(size(these_data,1)*size(these_data,2));
+        end
+    else
+        for iframe = 1:size(input,2)
+             % Classify the stimuli based on the threshold
+            choices(:,iframe) = input(:,iframe)>=theThresh;
+            correctClassifications = (input(:,iframe)>=theThresh) == (corrected_stim_dir==1)'; % including unfair stimuli!
+            pCorr(iframe) = mean(correctClassifications);% Store accuracy
+            correctClassifications_across_stim(:,iframe)=correctClassifications;
+    %         histo_fig=figure;
+    %         histogram(correctClassifications)
+        % Loop through each stimulus coherence level
+            for istim = 1:numel(myStims)
+                if apply_subsampling
+                    sub_sample_psycho=nan(1,num_iteration);
+                    for this_iteration=1:num_iteration
+                        if myStims(istim)==0
+                            cohIdx = abs(these_stim)==myStims(istim);
+                            tmp=find(cohIdx);
+                            sub_sample=datasample(tmp,min_trial_per_condition,'Replace',false);
+                        else
+                            cohIdx = these_stim==myStims(istim);
+                            tmp=find(cohIdx);
+                            sub_sample1=datasample(tmp,min_trial_per_condition,'Replace',false);
+                            cohIdx = these_stim==myStims(istim)*-1;
+                            tmp=find(cohIdx);
+                            sub_sample2=datasample(tmp,min_trial_per_condition,'Replace',false);
+                            sub_sample=cat(2,sub_sample2,sub_sample1);
+                        end
+                        theseDirs=corrected_stim_dir(sub_sample);
+                        theseAngles = input(sub_sample,iframe);
+                        sub_sample_psycho(this_iteration) = mean((theseAngles>=theThresh) == (theseDirs==1)');% Compute classification accuracy
+                    end
+                    psycho(istim,iframe) = mean(sub_sample_psycho);
+                else
+                    cohIdx = abs(these_stim)==myStims(istim);%%fix here to take coherence values irespective to direction
+                    theseDirs = corrected_stim_dir(cohIdx);
+                    % theseCoh = these_stim(cohIdx);
+                    theseAngles = input(cohIdx,iframe);
+                    stimCorrectClassifications = (theseAngles>=theThresh) == (theseDirs==1)';% Compute classification accuracy
+                    psycho(istim,iframe) = mean(stimCorrectClassifications);
+                end
+            end
+        
+        end
     end
     % Visualize the psychometric data to show the classification accuracy as a function of the stimulus coherence level across time.
 
@@ -180,7 +150,7 @@ function [psycho,choices]=reaching_target_angular_velocity(input,these_stim,this
 
     %%%
 
-    if save_fig
+    if save_output
         fig_ext='.fig';
         if analyse_angular_velocity
             name_suffix='_ori';
