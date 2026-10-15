@@ -48,51 +48,53 @@ class MplColorHelper:
 def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500,vr_no="all",colormap_name="coolwarm"):
     save_output= analysis_methods.get("save_output")
     visual_paradigm_name= analysis_methods.get("experiment_name")
-    #camera_fps=analysis_methods.get("camera_fps")
-    active_trial_only=analysis_methods.get("active_trial_only")
+    camera_fps=analysis_methods.get("camera_fps")
+    active_trials_only=analysis_methods.get("active_trials_only")
     COL = MplColorHelper(colormap_name, 0, len(df["stim_type"].unique())-1)
     sm = cm.ScalarMappable(cmap=colormap_name)
     analysis_window=analysis_methods.get("analysis_window")
     stim_duration=analysis_methods.get("stim_duration")
-    using_bs_ci=False
-    use_mean=True
+    using_bs_ci=True
+    use_mean=False
     stimulus_velocity=64 #unit degree/s
-    walk_threshold_tbt=25
+    walk_threshold_tbt=10
     premature_turn=0.25#set this criteria to remove animals starting to make turn turing ISI
     fig, axes = plt.subplots(
         nrows=1, ncols=2, figsize=(12, 10))
-    ax1, ax2, = axes.flatten()
+    ax1, ax2 = axes.flatten()
 
-    fig_1by1, subplots = plt.subplots(
+    fig_tbt, subplots = plt.subplots(
         nrows=1, ncols=len(df["stim_type"].unique())+1, figsize=(20, 4), tight_layout=True
     )
-    if active_trial_only==True:
-        df_selected=df[(df['travel_distance_isi']>walk_threshold_tbt) & (abs(df["opto_index_isi"])<premature_turn)]
+    if active_trials_only==True:
+        #df_selected=df[(df['travel_distance_isi']>walk_threshold_tbt) & (abs(df["opto_index_isi"])<premature_turn)]
+        df_selected=df[(df['travel_distance']>walk_threshold_tbt)]
     else:
         df_selected=df
     i=0
     for this_stim, entries in df_selected.groupby('stim_type'):
-        this_dif_w=entries.loc[:,'angular_velocity_f0':].values
-        this_w=np.cumsum(this_dif_w,axis=1)
-        #this_dif_w=np.diff(this_w,axis=1)
-        time_points = np.arange(this_w.shape[1])
-        time_points_b = np.tile(time_points, (this_w.shape[0], 1))
+        these_angular_velocity=entries.loc[:,'angular_velocity_f0':].values
+        these_angular_acceleration=np.gradient(these_angular_velocity,1/camera_fps,axis=1)
+        these_headings=np.cumsum(these_angular_velocity,axis=1)
+        time_points = np.arange(these_headings.shape[1])
+        time_points_2D = np.tile(time_points, (these_headings.shape[0], 1))
         #define the stimulus speed in the first iteration
         if i ==0:
             xticks = [0, init_frame, end_frame]
             xticklabels = [str(analysis_window[0]), "0", str(stim_duration)]
             y_range=150
-            tmp = np.full(this_w.shape[1],np.nan)
-            dif_tmp= np.full(this_dif_w.shape[1],np.nan)
+            tmp = np.full(these_headings.shape[1],np.nan)
+            dif_tmp= np.full(these_angular_velocity.shape[1],np.nan)
             stim_w_array=np.ones(end_frame-init_frame)*stimulus_velocity*np.pi/180
             tmp[init_frame:end_frame]=np.cumsum(stim_w_array)
             dif_tmp[init_frame:end_frame]=stim_w_array
-        #ax1.plot(time_points_b, this_w, linestyle='-',linewidth=0.1,color=COL.get_rgb(i))
+
 
         #plot trial-by-trial response
-        #ax1.scatter(time_points_b, this_w, s=0.01,alpha=0.1,color=COL.get_rgb(i))
-        #ax1.plot(time_points_b, this_w,color=COL.get_rgb(i))
-        #subplots[i].scatter(time_points_b, this_w, s=0.01,alpha=0.1,color=COL.get_rgb(i))
+        #ax.scatter(time_points_2D, these_headings, s=0.01,alpha=0.1,color=COL.get_rgb(i))
+        #plot the whole area (not recommended for tbt)
+        #ax.plot(time_points_2D, these_headings, linestyle='-',linewidth=0.1,color=COL.get_rgb(i)))
+        subplots[i].scatter(time_points_2D, these_headings, s=0.01,alpha=0.1,color=COL.get_rgb(i))
         subplots[i].plot(time_points,tmp,color='k',linewidth=0.8)
         subplots[i].plot(time_points,tmp*-1,color='k',linewidth=0.8)
         subplots[i].axvline(
@@ -109,61 +111,81 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         )
         subplots[i].set(
         ylabel="Orientation (rad)",
-        yticks=[-y_range,0,y_range],
-        ylim=[-y_range,y_range],
         xticks=xticks,
         xticklabels=xticklabels,
         xlabel="Time (s)",
     )
         #plot average response
         if use_mean==True:
-            Ws = np.mean(this_w, axis=0)
-            diff_Ws = np.mean(this_dif_w, axis=0)
+            headings_to_plot = np.mean(these_headings, axis=0)
+            velocity_to_plot = np.mean(these_angular_velocity, axis=0)
+            acceleration_to_plot=np.mean(these_angular_acceleration, axis=0)
         else:
-            Ws=np.median(this_w, axis=0)
-            diff_Ws=np.median(this_dif_w, axis=0)
-        ax2.plot(time_points,diff_Ws,color=COL.get_rgb(i))
-        subplots[len(df["stim_type"].unique())].plot(time_points,Ws,color=COL.get_rgb(i))
+            headings_to_plot=np.median(these_headings, axis=0)
+            velocity_to_plot=np.median(these_angular_velocity, axis=0)
+            acceleration_to_plot=np.median(these_angular_acceleration, axis=0)
+        #ax.plot(time_points,headings_to_plot,color=COL.get_rgb(i))
+        ax1.plot(time_points,velocity_to_plot,color=COL.get_rgb(i))
+        ax2.plot(time_points,acceleration_to_plot,color=COL.get_rgb(i))
+        subplots[len(df["stim_type"].unique())].plot(time_points,headings_to_plot,color=COL.get_rgb(i))
 
         ##to plot distribution with bootstrap 95% confidence interval
         if using_bs_ci:
-            # data=(this_w,)
+            # data=(these_headings,)
             # res=st.bootstrap(data,np.std,n_resamples=99,vectorized=True,random_state=1)
             # y1=res.confidence_interval[0]
             # y2=res.confidence_interval[1]
             # del data
-            # data=(this_dif_w,)
-            # res=st.bootstrap(data,np.std,n_resamples=99,vectorized=True,random_state=1)
-            # dif_y1=res.confidence_interval[0]
-            # dif_y2=res.confidence_interval[1]
             confidence_level = 0.95
-            ##to plot distribution with 95% confidence interval with normal distribution
-            cl95=st.norm.interval(confidence_level,loc=Ws,scale=st.sem(this_w))
+            #data=(these_angular_velocity,)
+            res=st.bootstrap(data=(these_angular_velocity,),statistic=np.median,n_resamples=999,vectorized=True,batch=100,random_state=1)
+            w_y1=res.confidence_interval[0]
+            w_y2=res.confidence_interval[1]
+            ##to plot distribution with 95% confidence interval with normal distribution because it is faster not because it is correct
+            cl95=st.norm.interval(confidence_level,loc=headings_to_plot,scale=st.sem(these_headings))
             y1=cl95[0][:]
             y2=cl95[1][:]
-            cl95=st.norm.interval(confidence_level,loc=diff_Ws,scale=st.sem(this_dif_w))
-            dif_y1=cl95[0][:]
-            dif_y2=cl95[1][:]
-
+            #cl95=st.norm.interval(confidence_level,loc=velocity_to_plot,scale=st.sem(these_angular_velocity))
+            # w_y1=cl95[0][:]
+            # w_y2=cl95[1][:]
+            cl95=st.norm.interval(confidence_level,loc=acceleration_to_plot,scale=st.sem(these_angular_acceleration))
+            acc_y1=cl95[0][:]
+            acc_y2=cl95[1][:]
         else:
             ##to plot distribution with sem
-            sem_response = np.std(this_w, axis=0, ddof=1) / np.sqrt(this_w.shape[0])
-            y1 = Ws + sem_response
-            y2 = Ws - sem_response
-            sem_response = np.std(this_dif_w, axis=0, ddof=1) / np.sqrt(this_dif_w.shape[0])
-            dif_y1=diff_Ws + sem_response
-            dif_y2=diff_Ws - sem_response
-        #ax2.fill_between(time_points,y1,y2, alpha=0.5,color=COL.get_rgb(i))
-        ax2.fill_between(time_points,dif_y1,dif_y2, alpha=0.5,color=COL.get_rgb(i))
+            sem_response = np.std(these_headings, axis=0, ddof=1) / np.sqrt(these_headings.shape[0])
+            y1 = headings_to_plot + sem_response
+            y2 = headings_to_plot - sem_response
+            sem_response = np.std(these_angular_velocity, axis=0, ddof=1) / np.sqrt(these_angular_velocity.shape[0])
+            w_y1=velocity_to_plot + sem_response
+            w_y2=velocity_to_plot - sem_response
+            sem_response = np.std(these_angular_acceleration, axis=0, ddof=1) / np.sqrt(these_angular_acceleration.shape[0])
+            acc_y1=acceleration_to_plot + sem_response
+            acc_y2=acceleration_to_plot - sem_response
+        #ax.fill_between(time_points,y1,y2, alpha=0.5,color=COL.get_rgb(i))
+        ax1.fill_between(time_points,w_y1,w_y2, alpha=0.5,color=COL.get_rgb(i))
+        ax2.fill_between(time_points,acc_y1,acc_y2, alpha=0.5,color=COL.get_rgb(i))
         subplots[len(df["stim_type"].unique())].fill_between(time_points,y1,y2, alpha=0.5,color=COL.get_rgb(i))
 
         i=i+1
-    ax1.plot(time_points,tmp,color='k',linewidth=0.8)
-    ax1.plot(time_points,tmp*-1,color='k',linewidth=0.8)
-    ax2.plot(time_points,dif_tmp,color='k',linewidth=0.8)
-    ax2.plot(time_points,dif_tmp*-1,color='k',linewidth=0.8)
+    # ax.plot(time_points,tmp,color='k',linewidth=0.8)
+    # ax.plot(time_points,tmp*-1,color='k',linewidth=0.8)
+    ax1.plot(time_points,dif_tmp,color='k',linewidth=0.8)
+    ax1.plot(time_points,dif_tmp*-1,color='k',linewidth=0.8)
     subplots[len(df["stim_type"].unique())].plot(time_points,tmp,color='k',linewidth=0.8)
     subplots[len(df["stim_type"].unique())].plot(time_points,tmp*-1,color='k',linewidth=0.8)
+    # ax.axvline(
+    #     x=init_frame,
+    #     color="black",
+    #     linestyle="--",
+    #     label="Stimulus Starts",
+    # )
+    # ax.axvline(
+    #     x=end_frame,
+    #     color="black",
+    #     linestyle="--",
+    #     label="Stimulus Ends",
+    # )
     ax1.axvline(
         x=init_frame,
         color="black",
@@ -200,60 +222,47 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         linestyle="--",
         label="Stimulus Ends",
     )
-    ax1.set(
-        ylabel="Orientation (rad)",
-        yticks=[-y_range,0,y_range],
-        ylim=[-y_range,y_range],
-        xticks=xticks,
-        xticklabels=xticklabels,
-        xlabel="Time (s)",
-    )
-    ax2.set(
-        ylabel="Angular velocity (rad/s)",
-        xticks=xticks,
-        yticks=[-0.1,0,0.1],
-        #ylim=[-0.005,0.02],
-        ylim=[-2.5,2.5],
-        xticklabels=xticklabels,
-        xlabel="Time (s)",
-    )
-    #     ax1.set(
+    # ax.set(
     #     ylabel="Orientation (rad)",
-    #     #yticks=[-y_range,0,y_range],
-    #     #ylim=[-y_range,y_range],
     #     xticks=xticks,
     #     xticklabels=xticklabels,
     #     xlabel="Time (s)",
     # )
-    # ax2.set(
-    #     #ylabel="Angular velocity (rad/s)",
-    #     xticks=xticks,
-    #     xticklabels=xticklabels,
-    #     #xlabel="Time (s)",
-    # )
-    # ax2.set_xlabel("Time (s)", fontsize=14)
-    # ax2.set_ylabel("Angular velocity (rad/s)", fontsize=14)
-    # ax2.tick_params(axis='x', which='major', labelsize=14)
-    # ax2.tick_params(axis='y', which='major', labelsize=14)
+    ax1.set(
+        ylabel=r'angular velocity (rad s$^{-1}$)',
+        xticks=xticks,
+        yticks=[-1,0,1],
+        #ylim=[-0.005,0.02],
+        ylim=[-1.2,1.2],
+        xticklabels=xticklabels,
+        xlabel="Time (s)",
+    )
+    ax2.set(
+        ylabel=r'angular acceleration (rad s$^{-2}$)',
+        xlabel="Time (s)",
+    )
     subplots[len(df["stim_type"].unique())].set(
         xticks=xticks,
-        yticks=[-20,0,20],
+        #yticks=[-2000,0,2000],
         xticklabels=xticklabels,
         xlabel="Time (s)")
     tick_positions = np.linspace(0, 1, len(df["stim_type"].unique()))
     these_coherence=df["stim_type"].unique()
     these_coherence.sort()
     tick_labels = [str(value) for value in these_coherence]
-    #cbar = plt.colorbar(sm, ax=[ax1,ax2], orientation="horizontal", location='top',ticks=tick_positions,aspect=80)
     cbar = plt.colorbar(sm, ax=[ax1,ax2], orientation="horizontal", location='top',ticks=tick_positions,aspect=80)
+    #cbar = plt.colorbar(sm, ax=[ax2], orientation="horizontal", location='top',ticks=tick_positions,aspect=60)
     cbar.set_ticklabels(tick_labels)
     #cbar.ax.tick_params(labelsize=14)
-    plt.show()
+    if use_mean:
+        fig_name=f"{vr_no}_bonfic_{visual_paradigm_name}_mean_dynamics.png"
+        fig_tbt_name=f"{vr_no}_bonfic_{visual_paradigm_name}_mean_heading.png"
+    else:
+        fig_name=f"{vr_no}_bonfic_{visual_paradigm_name}_median_dynamics.png"
+        fig_tbt_name=f"{vr_no}_bonfic_{visual_paradigm_name}_median_heading.png"
     if save_output==True:
-        fig_name=f"{vr_no}_bonfic_{visual_paradigm_name}_orientation_dynamics.png"
-        #fig.savefig(Path(this_dataset_dir)/fig_name)
-        fig_name=f"{vr_no}_bonfic_{visual_paradigm_name}_orientation_dynamics_tbt.png"
-        #fig_1by1.savefig(Path(this_dataset_dir)/fig_name)
+        fig.savefig(fig_name)
+        fig_tbt.savefig(fig_tbt_name)
 
 def a_guest(x):
     # Initialize an array of zeros with the same shape as x
@@ -737,8 +746,8 @@ def identify_behavioural_states(travel_distance_fbf,angular_velocity,filter_meth
     turn_states=find_states_with_debounce(abs(turn_signal),thresholds=turn_thresholds,min_length=consecutive_length[1])
     turn_cw=find_states_with_debounce(turn_signal,thresholds=turn_thresholds,min_length=consecutive_length[1])
     turn_ccw=find_states_with_debounce(turn_signal*-1,thresholds=turn_thresholds,min_length=consecutive_length[1])
-    #tmin_max=[280000,290000]#-1 for the entire trace or specify a frame number
-    tmin_max=[0,-1]#-1 for the entire trace or specify a frame number
+    tmin_max=[20000,30000]#-1 for the entire trace or specify a frame number
+    #tmin_max=[0,-1]#-1 for the entire trace or specify a frame number
     run_time=np.arange(speed_signal.shape[0])
     if tmin_max[1]==-1:
         section_length=speed_signal.shape[0]-2
@@ -1446,14 +1455,14 @@ def main(thisDir, json_file):
             V_stationary=these_velocities[these_travel_distance_isi<running_trial_distance_threshold]
             time_points = np.arange(these_velocities.shape[1])
             if V_stationary.shape[0]>0:
-                time_points_b = np.tile(time_points, (V_stationary.shape[0], 1))
-                ax_stationary.scatter(time_points_b, V_stationary, s=1, color=COL.get_rgb(i),label=str(this_stim_type))
-                #ax_stationary.plot(np.transpose(time_points_b),np.transpose(V_stationary), color=COL.get_rgb(i),label=str(this_stim_type),linewidth=0.2,alpha=0.5)
+                time_points_2D = np.tile(time_points, (V_stationary.shape[0], 1))
+                ax_stationary.scatter(time_points_2D, V_stationary, s=1, color=COL.get_rgb(i),label=str(this_stim_type))
+                #ax_stationary.plot(np.transpose(time_points_2D),np.transpose(V_stationary), color=COL.get_rgb(i),label=str(this_stim_type),linewidth=0.2,alpha=0.5)
             V_run=these_velocities[these_travel_distance_isi>running_trial_distance_threshold]
             if V_run.shape[0]>0:
-                time_points_b = np.tile(time_points, (V_run.shape[0], 1))
-                ax_runnning.scatter(time_points_b, V_run, s=1, color=COL.get_rgb(i),label=str(this_stim_type))
-                #ax_runnning.plot(np.transpose(time_points_b),np.transpose(V_run), color=COL.get_rgb(i),label=str(this_stim_type),linewidth=0.2,alpha=0.5)
+                time_points_2D = np.tile(time_points, (V_run.shape[0], 1))
+                ax_runnning.scatter(time_points_2D, V_run, s=1, color=COL.get_rgb(i),label=str(this_stim_type))
+                #ax_runnning.plot(np.transpose(time_points_2D),np.transpose(V_run), color=COL.get_rgb(i),label=str(this_stim_type),linewidth=0.2,alpha=0.5)
         ax_runnning.legend()
         ax_stationary.legend()
         ax_runnning.set(
@@ -1621,10 +1630,10 @@ def main(thisDir, json_file):
                 this_type_stim = stim_type[i]
                 this_response=angular_velocity_tbt[np.where(this_group["stim_type"]==this_type_stim)[0],:]
                 time_points = np.arange(this_response.shape[1])
-                time_points_b = np.tile(time_points, (this_response.shape[0], 1))
+                time_points_2D = np.tile(time_points, (this_response.shape[0], 1))
                 if num_indep_variables==1:
                     axes.plot(
-                        np.mean(time_points_b, axis=0),
+                        np.mean(time_points_2D, axis=0),
                         np.mean(this_response, axis=0),
                         color=colormap[i],
                         alpha=0.2,
@@ -1633,7 +1642,7 @@ def main(thisDir, json_file):
                     axes.legend()
                 else:
                     axes[j].plot(
-                        np.mean(time_points_b, axis=0),
+                        np.mean(time_points_2D, axis=0),
                         np.mean(this_response, axis=0),
                         color=colormap[i],
                         alpha=0.2,
@@ -1700,17 +1709,17 @@ def main(thisDir, json_file):
                 this_heading_angle = heading_angle[summary_df["stim_type"] == this_stim_type, :]
                 this_angular_velocity=angular_velocity_tbt[summary_df["stim_type"] == this_stim_type, :]
             time_points = np.arange(this_heading_angle.shape[1])
-            time_points_b = np.tile(time_points, (this_heading_angle.shape[0], 1))
-            ax4.scatter(time_points_b, this_heading_angle, s=0.5, color=COL.get_rgb(i),label=this_stim_type)
+            time_points_2D = np.tile(time_points, (this_heading_angle.shape[0], 1))
+            ax4.scatter(time_points_2D, this_heading_angle, s=0.5, color=COL.get_rgb(i),label=this_stim_type)
             #this_angular_velocity=np.diff(this_heading_angle)
             
             time_points = np.arange(this_angular_velocity.shape[1])
-            time_points_b = np.tile(time_points, (this_angular_velocity.shape[0], 1))
+            time_points_2D = np.tile(time_points, (this_angular_velocity.shape[0], 1))
             ax5.plot(time_points, np.median(this_angular_velocity,axis=0),color=COL.get_rgb(i),label=this_stim_type)
             #this_angular_acceleration=np.diff(this_angular_velocity)
             this_angular_acceleration=np.gradient(this_angular_velocity, 1/camera_fps,axis=1)
             time_points = np.arange(this_angular_acceleration.shape[1])
-            time_points_b = np.tile(time_points, (this_angular_acceleration.shape[0], 1))
+            time_points_2D = np.tile(time_points, (this_angular_acceleration.shape[0], 1))
             ax6.plot(time_points, np.median(this_angular_acceleration,axis=0),color=COL.get_rgb(i),label=this_stim_type)
         
         dif_tmp= np.full(this_angular_velocity.shape[1],np.nan)
@@ -1871,7 +1880,7 @@ def main(thisDir, json_file):
     else:
         print("dont save anything")
 
-    return summary_df, velocity_arr, angular_velocity_tbt, travel_distance_whole_session,heading_angle_discretised_all
+    return summary_df, velocity_arr, angular_velocity_tbt, travel_distance_whole_session,heading_angle_discretised_all,walk_states,turn_states,turn_cw,turn_ccw
 
 
 if __name__ == "__main__":
