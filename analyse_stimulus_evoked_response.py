@@ -32,7 +32,7 @@ if sys.platform == "darwin":
 else:
     utilities_string = "\\utilities"
 sys.path.insert(0, str(parent_dir) + utilities_string)
-from useful_tools import find_file, find_nearest, calculate_fft
+from useful_tools import find_file, find_nearest, calculate_fft,column_name_list
 from data_cleaning import sorting_trial_info, load_temperature_data,euclidean_distance,diskretize,bfill
 
 class MplColorHelper:
@@ -46,25 +46,29 @@ class MplColorHelper:
         return self.scalarMap.to_rgba(val)
 
 def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500,vr_no="all",colormap_name="coolwarm"):
-    save_output= analysis_methods.get("save_output")
-    visual_paradigm_name= analysis_methods.get("experiment_name")
     camera_fps=analysis_methods.get("camera_fps")
     active_trials_only=analysis_methods.get("active_trials_only")
     COL = MplColorHelper(colormap_name, 0, len(df["stim_type"].unique())-1)
     sm = cm.ScalarMappable(cmap=colormap_name)
     analysis_window=analysis_methods.get("analysis_window")
     stim_duration=analysis_methods.get("stim_duration")
-    using_bs_ci=True
+    if vr_no=='single':
+        ylim_w=(-5,5)
+        
+    else:
+        ylim_w=(-1.2,1.2)
+    ylim_heading=(-150,150)
+    using_bs_ci=False
     use_mean=False
     stimulus_velocity=64 #unit degree/s
     walk_threshold_tbt=10
     premature_turn=0.25#set this criteria to remove animals starting to make turn turing ISI
     fig, axes = plt.subplots(
-        nrows=1, ncols=2, figsize=(12, 10))
+        nrows=1, ncols=2, figsize=(12, 8))
     ax1, ax2 = axes.flatten()
 
     fig_tbt, subplots = plt.subplots(
-        nrows=1, ncols=len(df["stim_type"].unique())+1, figsize=(20, 4), tight_layout=True
+        nrows=1, ncols=len(df["stim_type"].unique())+1, figsize=(15, 3), tight_layout=True,sharey=False
     )
     if active_trials_only==True:
         #df_selected=df[(df['travel_distance_isi']>walk_threshold_tbt) & (abs(df["opto_index_isi"])<premature_turn)]
@@ -75,7 +79,11 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
     for this_stim, entries in df_selected.groupby('stim_type'):
         these_angular_velocity=entries.loc[:,'angular_velocity_f0':].values
         these_angular_acceleration=np.gradient(these_angular_velocity,1/camera_fps,axis=1)
-        these_headings=np.cumsum(these_angular_velocity,axis=1)
+        these_headings=np.cumsum(these_angular_velocity,axis=1)/camera_fps
+        heading_at_stim=these_headings[:,init_frame]
+        these_headings=these_headings-np.reshape(np.repeat(heading_at_stim,these_headings.shape[1]), these_headings.shape)# rezero the orientation at the start of stimuli
+        #heading_prev_stim=these_headings[:,:init_frame]-np.reshape(np.repeat(heading_at_stim,init_frame), these_headings[:,:init_frame].shape)
+        #heading_post_stim=these_headings[:,init_frame:]-np.reshape(np.repeat(heading_at_stim,end_frame), (these_headings.shape[0], end_frame))
         time_points = np.arange(these_headings.shape[1])
         time_points_2D = np.tile(time_points, (these_headings.shape[0], 1))
         #define the stimulus speed in the first iteration
@@ -86,7 +94,7 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
             tmp = np.full(these_headings.shape[1],np.nan)
             dif_tmp= np.full(these_angular_velocity.shape[1],np.nan)
             stim_w_array=np.ones(end_frame-init_frame)*stimulus_velocity*np.pi/180
-            tmp[init_frame:end_frame]=np.cumsum(stim_w_array)
+            tmp[init_frame:end_frame]=np.cumsum(stim_w_array)/camera_fps
             dif_tmp[init_frame:end_frame]=stim_w_array
 
 
@@ -110,11 +118,17 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
             label="Stimulus Ends",
         )
         subplots[i].set(
-        ylabel="Orientation (rad)",
+        #ylabel="Orientation (rad)",
         xticks=xticks,
         xticklabels=xticklabels,
-        xlabel="Time (s)",
+        #xlabel="Time (s)",
+        yticks=[-100,0,100],
+        ylim=ylim_heading,
     )
+        if i==0:
+            subplots[i].set_ylabel(r'sum of turn (rad)', fontsize=18)
+        if i==3:
+            subplots[i].set_xlabel("Time (s)", fontsize=18)
         #plot average response
         if use_mean==True:
             headings_to_plot = np.mean(these_headings, axis=0)
@@ -138,13 +152,17 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
             # del data
             confidence_level = 0.95
             #data=(these_angular_velocity,)
+            
             res=st.bootstrap(data=(these_angular_velocity,),statistic=np.median,n_resamples=999,vectorized=True,batch=100,random_state=1)
             w_y1=res.confidence_interval[0]
             w_y2=res.confidence_interval[1]
             ##to plot distribution with 95% confidence interval with normal distribution because it is faster not because it is correct
-            cl95=st.norm.interval(confidence_level,loc=headings_to_plot,scale=st.sem(these_headings))
-            y1=cl95[0][:]
-            y2=cl95[1][:]
+            res=st.bootstrap(data=(these_headings,),statistic=np.median,n_resamples=999,vectorized=True,batch=100,random_state=1)
+            #cl95=st.norm.interval(confidence_level,loc=headings_to_plot,scale=st.sem(these_headings))
+            # y1=cl95[0][:]
+            # y2=cl95[1][:]
+            y1=res.confidence_interval[0]
+            y2=res.confidence_interval[1]
             #cl95=st.norm.interval(confidence_level,loc=velocity_to_plot,scale=st.sem(these_angular_velocity))
             # w_y1=cl95[0][:]
             # w_y2=cl95[1][:]
@@ -229,40 +247,34 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
     #     xlabel="Time (s)",
     # )
     ax1.set(
-        ylabel=r'angular velocity (rad s$^{-1}$)',
+        #ylabel=r'angular velocity (rad s$^{-1}$)',
         xticks=xticks,
         yticks=[-1,0,1],
         #ylim=[-0.005,0.02],
-        ylim=[-1.2,1.2],
+        ylim=ylim_w,
         xticklabels=xticklabels,
         xlabel="Time (s)",
     )
+    ax1.set_ylabel(r'angular velocity (rad s$^{-1}$)', fontsize=18)
     ax2.set(
         ylabel=r'angular acceleration (rad s$^{-2}$)',
         xlabel="Time (s)",
+        xticks=xticks,
+        xticklabels=xticklabels,
     )
     subplots[len(df["stim_type"].unique())].set(
         xticks=xticks,
-        #yticks=[-2000,0,2000],
-        xticklabels=xticklabels,
-        xlabel="Time (s)")
+        ylim=[-50,50],
+        yticks=[-50,0,50],
+        xticklabels=xticklabels)
     tick_positions = np.linspace(0, 1, len(df["stim_type"].unique()))
     these_coherence=df["stim_type"].unique()
     these_coherence.sort()
     tick_labels = [str(value) for value in these_coherence]
-    cbar = plt.colorbar(sm, ax=[ax1,ax2], orientation="horizontal", location='top',ticks=tick_positions,aspect=80)
+    cbar = plt.colorbar(sm, ax=[ax1], orientation="horizontal", location='top',ticks=tick_positions,aspect=80)
     #cbar = plt.colorbar(sm, ax=[ax2], orientation="horizontal", location='top',ticks=tick_positions,aspect=60)
     cbar.set_ticklabels(tick_labels)
-    #cbar.ax.tick_params(labelsize=14)
-    if use_mean:
-        fig_name=f"{vr_no}_bonfic_{visual_paradigm_name}_mean_dynamics.png"
-        fig_tbt_name=f"{vr_no}_bonfic_{visual_paradigm_name}_mean_heading.png"
-    else:
-        fig_name=f"{vr_no}_bonfic_{visual_paradigm_name}_median_dynamics.png"
-        fig_tbt_name=f"{vr_no}_bonfic_{visual_paradigm_name}_median_heading.png"
-    if save_output==True:
-        fig.savefig(fig_name)
-        fig_tbt.savefig(fig_tbt_name)
+    return fig, fig_tbt
 
 def a_guest(x):
     # Initialize an array of zeros with the same shape as x
@@ -732,7 +744,7 @@ def identify_behavioural_states(travel_distance_fbf,angular_velocity,filter_meth
             turn_thresholds=[0.25,0.5]
             warnings.warn("sg filter is not applied to angular velocity. consider using use medfilt for that")
         elif skip_smoothing==False and filter_method=="sg_filter":
-            walk_thresholds=[0.001,0.003]
+            walk_thresholds=[0.01,0.02]
             turn_thresholds=[0.25,0.5]
         elif skip_smoothing==True:
             warnings.warn("no smoothing method is applied before classified state. The result will be susceptible to noise")
@@ -826,12 +838,12 @@ def classify_trial_type(summary_df, turning_threshold, running_speed_threshold):
 def plotting_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_marker=[],end_marker=[],yaw_angular_velocity=[]):
     markers_size=400
     camera_fps=100
-    trajectory_size=60
+    trajectory_size=40
     colormap_name = "viridis"
     COL = MplColorHelper(colormap_name, 0, 6)
     visualise_section_by_colour=True
-    fig, ax= plt.subplots(1, 1, figsize=(27, 7), tight_layout=True)
-    fig2,(ax2,ax3)= plt.subplots(2, 1, figsize=(27, 7),sharex=True,tight_layout=True)
+    fig, ax= plt.subplots(1, 1, figsize=(8, 8), tight_layout=True)
+    fig2,(ax2,ax3)= plt.subplots(2, 1, figsize=(12, 7),sharex=True,tight_layout=True)
     if end_frame==None:
         ax.scatter(y_all[start_frame:],x_all[start_frame:],c=np.arange(len(y_all[start_frame:])), marker=".", alpha=0.5)
     else:
@@ -870,14 +882,25 @@ def plotting_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_m
             ax2.plot(np.arange(relative_start,angular_velocity_interest.shape[0]+relative_start)/camera_fps,angular_velocity_interest,color='grey')
             ax3.plot(np.arange(relative_start,delta_angular_velocity.shape[0]+relative_start)/camera_fps,delta_angular_velocity,color='grey')
             ax2.set_ylim(-5.4, 5.4)
-            #ax2.set_yticks([-4,0,4])
-            ax2.set(yticks=[-4, 0, 4])
-            ax2.set_ylabel(r'Angular velocity (rad s$^{-1}$)')
+            ax2.set_yticks([-4,0,4],labels=[-4,0,4],rotation=90, rotation_mode="ytick",fontsize=14)
+            ax2.axhline(y=64*np.pi/180,ls='--', lw=0.5, c='k', alpha=1)
+            ax2.axhline(y=-64*np.pi/180,ls='--', lw=0.5, c='k', alpha=1)
+            ax2.set_ylabel('Angular velocity\n'+r'(rad s$^{-1}$)',fontsize=20)
             ax3.set_ylim(-350,350)
-            #ax3.set_yticks([-300,0,300])
-            ax3.set(yticks=[-300, 0, 300])
-            ax3.set_ylabel(r'Angular acceleration (rad s$^{-2}$)')
-            ax3.set_xlabel("Time (s)")
+            ax2.spines['bottom'].set_visible(False)
+            ax2.tick_params(axis='both', which='both', labelsize='large',
+                        bottom=False, top=False, labelbottom=False,
+                        left=True, right=False, labelleft=True)
+            ax3.tick_params(axis='both', which='both', labelsize='large',
+            bottom=False, top=False, labelbottom=True,
+            left=True, right=False, labelleft=True)
+            ax3.spines['top'].set_visible(False)
+            ax3.set_yticks([-300, 0, 300],labels=[-300, 0, 300],rotation=90, rotation_mode="ytick",fontsize=14)
+            ax3.set_ylabel('Angular acceleration\n'+r'(rad s$^{-2}$)',fontsize=20)
+            ax3.set_xticks([0,20,40,60,80],labels=[0,20,40,60,80],fontsize=16)
+            ax3.set_xlabel("Time (s)",fontsize=20)
+            # ax2.grid(True, 'major', 'y', ls='-', lw=1, c='k', alpha=0.5)
+            # ax3.grid(True, 'major', 'y', ls='-', lw=1, c='k', alpha=0.5)
             fig2.savefig("angular_velocity_example_trials.png")
         else:
             '''
@@ -891,6 +914,9 @@ def plotting_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_m
             fig.colorbar(line,ax=ax)
             '''
             ax.scatter(y_all[start_frame:end_frame],x_all[start_frame:end_frame],s=trajectory_size,color=np.arange(len(y_all[start_frame:end_frame])), marker=".", alpha=0.5)
+        #
+        ax.set_xlim(-160, -120)
+        ax.set_ylim(-320, -280)
         ax.axis('off')
     if type(start_marker) == list:
         if len(start_marker) > 0:
@@ -1027,20 +1053,20 @@ def main(thisDir, json_file):
 
     ##here to load tracking data
     if database is None and fictrac_posthoc_analysis is False:
-        df=pd.read_csv(tracking_file_directory,skiprows=0)
-        if df.shape[1]==4:
+        tracking_df=pd.read_csv(tracking_file_directory,skiprows=0)
+        if tracking_df.shape[1]==4:
             columns_name=["intergrated x position","intergrated y position",f"delta rotation vector lab {yaw_axis}","pd_phase"]
-        elif df.shape[1]==5:
+        elif tracking_df.shape[1]==5:
             columns_name=["intergrated x position","intergrated y position",f"delta rotation vector lab {yaw_axis}","frame_count","pd_phase"]
-        df.columns=columns_name
-        df[["intergrated x position","intergrated y position"]]=df[["intergrated x position","intergrated y position"]]*trackball_radius
-        df[f"delta rotation vector lab {yaw_axis}"] = df[f"delta rotation vector lab {yaw_axis}"] * camera_fps
+        tracking_df.columns=columns_name
+        tracking_df[["intergrated x position","intergrated y position"]]=tracking_df[["intergrated x position","intergrated y position"]]*trackball_radius
+        tracking_df[f"delta rotation vector lab {yaw_axis}"] = tracking_df[f"delta rotation vector lab {yaw_axis}"] * camera_fps
     elif database_file_pattern.endswith(".parquet.gzip"):
-        df=pd.read_parquet(database)
+        tracking_df=pd.read_parquet(database)
     else:
-        df=pd.read_pickle(database)
+        tracking_df=pd.read_pickle(database)
 
-    x_all,y_all,yaw_angular_velocity=preprocess_tracking_data(df,filtering_method,yaw_axis,smooth_window_length)
+    x_all,y_all,yaw_angular_velocity=preprocess_tracking_data(tracking_df,filtering_method,yaw_axis,smooth_window_length)
     travel_distance_fbf = euclidean_distance(x_all,y_all)
     walk_states,turn_states,turn_cw,turn_ccw,fig=identify_behavioural_states(travel_distance_fbf,yaw_angular_velocity,filtering_method,camera_fps,consecutive_duration=[2,0.5],smooth_window_length=smooth_window_length,skip_smoothing=False)
     plot_name = f"behavioural_states_classification.png"
@@ -1073,7 +1099,8 @@ def main(thisDir, json_file):
     travel_distance_whole_session = np.nansum(travel_distance_fbf)/camera_fps
     if analysis_methods.get("plotting_trajectory") == True:
         #fig=plotting_example_trajectory(x_all,y_all)
-        fig=plotting_example_trajectory(x_all,y_all,start_frame=154892,end_frame=163473,start_marker=[155901,159436],end_marker=[158426,161961],yaw_angular_velocity=yaw_angular_velocity)
+        #fig=plotting_example_trajectory(x_all,y_all,start_frame=154892,end_frame=163473,start_marker=[155901,159436],end_marker=[158426,161961],yaw_angular_velocity=yaw_angular_velocity)
+        fig=plotting_example_trajectory(x_all,y_all,start_frame=411341,end_frame=420430,start_marker=[412857,416894],end_marker=[415381,419418],yaw_angular_velocity=yaw_angular_velocity)
         fig.savefig(thisDir / "trajectory_plot_example_trials.png")
     if analysis_methods.get("analyse_spontaneous_activity")==True:
         
@@ -1139,9 +1166,9 @@ def main(thisDir, json_file):
                 if len(tem_df_after_exp) > 0:
                     frequency_milisecond = int(1000 / camera_fps)
                     tem_df_after_exp = tem_df_after_exp.resample(
-                        f"{frequency_milisecond}L"
+                        f"{frequency_milisecond}ms"
                     ).interpolate()
-                    tem_df_this_exp = tem_df_after_exp[: df.shape[0]].values[:, 0:2]
+                    tem_df_this_exp = tem_df_after_exp[: tracking_df.shape[0]].values[:, 0:2]
                 else:
                     print("Unable to find the corresponding time stamp")
             except:
@@ -1211,8 +1238,8 @@ def main(thisDir, json_file):
                 stim_info["Duration"] = duration_array
 
             stim_info["stim_onset"] = transition_onset
-    elif "pd_phase" in df.columns:##this was created for closed-loop choices assay
-        transition_values=np.diff(df['pd_phase'].values)
+    elif "pd_phase" in tracking_df.columns:##this was created for closed-loop choices assay
+        transition_values=np.diff(tracking_df['pd_phase'].values)
         if stim_info['PreMovDuration'].unique()==0:
             transition_onsets=np.where(transition_values)[0]
             stim_onset=transition_onsets[::2]
@@ -1227,9 +1254,9 @@ def main(thisDir, json_file):
             isi_onset=transition_to_off[1::2]
             stim_info["stim_onset"] = stim_onset
 
-    elif df["timestamp"][1] != df["timestamp"][2]:
+    elif tracking_df["timestamp"][1] != tracking_df["timestamp"][2]:
         # compare the timestamp between event file and dat file
-        data_timestamp = df.loc[:, "timestamp"]
+        data_timestamp = tracking_df.loc[:, "timestamp"]
         stimulus_timestamp_b = np.tile(stimulus_timestamp, (len(data_timestamp), 1))
         data_timestamp_b = np.tile(data_timestamp, (len(stimulus_timestamp), 1))
         timestamp_diff = data_timestamp_b > np.transpose(stimulus_timestamp_b)
@@ -1671,13 +1698,18 @@ def main(thisDir, json_file):
             fig5.savefig(thisDir / plot_name)
 
     if analysis_methods.get("plotting_optomotor_response") == True:
-        # if 'cw' in stim_type[0]:
-        #     colormap_name = "gnuplot"
-        #     sm = cm.ScalarMappable(cmap=colormap_name)            
-        #     COL = MplColorHelper(colormap_name, 0, len(stim_type)-1)
-        target_speed=64*np.pi/180 #unit in radian/s
-        fig2, (ax3,ax4,ax5,ax6) = plt.subplots(
-            nrows=1, ncols=4, figsize=(72, 14), tight_layout=True
+        c_name_list=column_name_list(angular_velocity_tbt.shape[1],"angular_velocity_f")
+        tmp=pd.DataFrame(angular_velocity_tbt,columns=c_name_list)
+        df_angular_speed=pd.concat([summary_df, tmp], axis=1)
+        fig,fig_tbt=plot_yaw_angular_velocity(df_angular_speed,analysis_methods,init_frame=init_frame,end_frame=init_frame+stim_duration*camera_fps,vr_no="single",colormap_name="coolwarm")
+                #cbar.ax.tick_params(labelsize=14)
+        fig_name=f"bonfic_{visual_paradigm_name}_dynamics.png"
+        fig_tbt_name=f"bonfic_{visual_paradigm_name}_heading.png"
+        if save_output==True:
+            fig.savefig(thisDir / fig_name)
+            fig_tbt.savefig(thisDir / fig_tbt_name)
+        fig2, ax3 = plt.subplots(
+            nrows=1, ncols=1, figsize=(18, 14), tight_layout=True
         )
         for i in range(len(stim_type)):
             this_stim_type = stim_type[i]
@@ -1702,114 +1734,6 @@ def main(thisDir, json_file):
                 elinewidth=2,
                 capsize=3,
             )
-            if type(stim_duration)==list:
-                this_heading_angle = heading_angle[(summary_df["stim_type"] == this_stim_type) & (summary_df['present_trial_duration']>=duration_for_optomotor_index),:]
-                this_angular_velocity=angular_velocity_tbt[(summary_df["stim_type"] == this_stim_type) & (summary_df['present_trial_duration']>=duration_for_optomotor_index),:]
-            else:
-                this_heading_angle = heading_angle[summary_df["stim_type"] == this_stim_type, :]
-                this_angular_velocity=angular_velocity_tbt[summary_df["stim_type"] == this_stim_type, :]
-            time_points = np.arange(this_heading_angle.shape[1])
-            time_points_2D = np.tile(time_points, (this_heading_angle.shape[0], 1))
-            ax4.scatter(time_points_2D, this_heading_angle, s=0.5, color=COL.get_rgb(i),label=this_stim_type)
-            #this_angular_velocity=np.diff(this_heading_angle)
-            
-            time_points = np.arange(this_angular_velocity.shape[1])
-            time_points_2D = np.tile(time_points, (this_angular_velocity.shape[0], 1))
-            ax5.plot(time_points, np.median(this_angular_velocity,axis=0),color=COL.get_rgb(i),label=this_stim_type)
-            #this_angular_acceleration=np.diff(this_angular_velocity)
-            this_angular_acceleration=np.gradient(this_angular_velocity, 1/camera_fps,axis=1)
-            time_points = np.arange(this_angular_acceleration.shape[1])
-            time_points_2D = np.tile(time_points, (this_angular_acceleration.shape[0], 1))
-            ax6.plot(time_points, np.median(this_angular_acceleration,axis=0),color=COL.get_rgb(i),label=this_stim_type)
-        
-        dif_tmp= np.full(this_angular_velocity.shape[1],np.nan)
-        stimulus_end_frame=(abs(analysis_window[0])+stim_duration)*camera_fps
-        stim_w_array=np.ones(stim_duration*camera_fps)*target_speed
-        dif_tmp[init_frame:stimulus_end_frame]=stim_w_array
-        
-        ax3.set_ylim(-1, 1)
-        if visual_paradigm_name=='sweeping' or visual_paradigm_name=='gratings':
-            ax3.tick_params("x", labelrotation=45)
-            ax3.set_xticks(stim_type)
-        ax3.set(
-            xlabel=visual_paradigm_name,
-            yticks=[-1, 0, 1],
-            ylabel="Optomotor Index during stimulus"
-        )
-        # xticks=[np.max(stim_type), 0, np.min(stim_type)], np.sort(summary_df.stim_type.unique())
-        ax4.axvline(
-            x=init_frame,
-            color="black",
-            linestyle="--",
-            label="Stimulus Starts",
-        )
-        ax4.axvline(
-            x=stimulus_end_frame,
-            color="black",
-            linestyle="--",
-            label="Stimulus Ends",
-        )
-        ax5.axvline(
-            x=init_frame,
-            color="black",
-            linestyle="--",
-            label="Stimulus Starts",
-        )
-        ax5.axvline(
-            x=stimulus_end_frame,
-            color="black",
-            linestyle="--",
-            label="Stimulus Ends",
-        )
-        ax6.axvline(
-            x=init_frame,
-            color="black",
-            linestyle="--",
-            label="Stimulus Starts",
-        )
-        ax6.axvline(
-            x=stimulus_end_frame,
-            color="black",
-            linestyle="--",
-            label="Stimulus Ends",
-        )
-        ax5.set_ylim(-4,4)
-        ax6.set_ylim(-40, 40)
-        ax5.plot(time_points,dif_tmp,color='k',linewidth=0.8)
-        ax5.plot(time_points,dif_tmp*-1,color='k',linewidth=0.8)
-        ax5.set(yticks=[-4, 0, 4])
-        ax5.set_ylabel(r'Median angular velocity (rad s$^{-1}$)')
-        ax6.set(yticks=[-50, 0, 50])
-        ax6.set_ylabel(r'Median angular acceleration (rad s$^{-2}$)')
-        yaw_orientation_limit = 180#only feasible if the animal turn a lot and the unit is in radian 
-        y_axis_lim = [yaw_orientation_limit * -1, yaw_orientation_limit]
-        # ax4.set_ylim(y_axis_lim[0], y_axis_lim[1])
-        # if stim duration is a list, plot the max and min values
-        if type(stim_duration) == list:
-            frame_difference = (max(stim_duration) - min(stim_duration)) * camera_fps
-            shortest_stim_end_frame = end_frame - frame_difference
-            xticks = [0, init_frame, shortest_stim_end_frame, end_frame]
-            xticklabels = [
-                str(analysis_window[0]),
-                "0",
-                str(min(stim_duration)),
-                str(max(stim_duration)),
-            ]
-        else:
-            xticks = [0, init_frame, end_frame]
-            xticklabels = [str(analysis_window[0]), "0", str(stim_duration)]
-        ax4.set(
-            #yticks=[y_axis_lim[0], 0, y_axis_lim[1]],
-            #ylim=[y_axis_lim[0], y_axis_lim[1]],
-            ylabel="Orientation (degree)",
-            xticks=xticks,
-            xticklabels=xticklabels,
-            xlabel="Time (s)",
-        )
-        tick_positions = np.linspace(0, 1, len(stim_type))
-        tick_labels = [str(value) for value in stim_type]
-        cbar = plt.colorbar(sm, ax=ax4, orientation="vertical", ticks=tick_positions)
-        cbar.set_ticklabels(tick_labels)
 
         plot_name = f"optomotor_analysis_until{duration_for_optomotor_index}s.png"
         if save_output == True:
@@ -1851,12 +1775,6 @@ def main(thisDir, json_file):
         plot_name = f"stop_distribution.png"
         if save_output == True:
             fig5.savefig(thisDir / plot_name)      
-        # dev_trial = trial_to_analyse[dev_trial_id, :]
-        # ##When analysing recover epochs, focus on the trials has similar deceleration dynamics
-        # index_list = recovery_detection(dev_trial, dev_timing_from_analysis_window)
-        # rec_array = (
-        #     index_list - dev_timing_from_analysis_window
-        # )  # this normalise the recovery duration from the first deceleration
 
     if save_output == True and overwrite_curated_dataset == True:
         parquet_directory = thisDir / "behavioural_summary.parquet.gzip"
@@ -1890,7 +1808,7 @@ if __name__ == "__main__":
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft, where 2 comes from
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24076/240804/coherence/session1"
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24084/240805/coherence/session1"# good for checking fft, where false nagative show up
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24114\240811\coherence\session1"
+    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24098\240810\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24098\240810\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24089\240810\coherence\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24036\240801\coherence\session1"
