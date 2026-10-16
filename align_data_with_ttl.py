@@ -24,6 +24,9 @@ def hardcode_customised_thresholds(on_thresholds, off_thresholds, animal_id):
     if animal_id == "GN24032":
         on_thresholds.append(198450)
         off_thresholds.append(198450)
+    elif animal_id == "GN24101":
+        on_thresholds.append(425000)
+        off_thresholds.append(425000)
     elif animal_id in ["GN24041", "GN24074", "GN24102"]:
         on_thresholds.append(429000)
         off_thresholds.append(429000)
@@ -174,7 +177,7 @@ def detect_transition(arr, on_threshold, off_threshold, analysis_methods,stim_in
     up_phase = np.append(
         pass_threshold_index[0],
         pass_threshold_index[1:][
-            np.diff(pass_threshold_index) > min_phase_duration[0] * 0.8 * sample_rate
+            np.diff(pass_threshold_index) > min_phase_duration[0] * 0.6 * sample_rate
         ],
     )
     b2w = up_phase[up_phase > sample_rate * (pre_stim_interval - 10)]
@@ -353,6 +356,7 @@ def analyse_led_signal(thisDir, json_file, stim_info):
                     "GN24090",
                     "GN24095",
                     "GN24102",
+                    "GN24101",
                     "GN24114",
                     "GN24136"
                 ]:
@@ -429,6 +433,8 @@ def analyse_led_signal(thisDir, json_file, stim_info):
             "GN24078",
             "GN24101",
             "GN24106",
+            "GN24113",
+            "GN24115",
         ]:
             b2w = fill_dropframe_ttl(b2w, stim_info, analysis_methods)
             w2b = fill_dropframe_ttl(w2b, stim_info, analysis_methods)
@@ -443,14 +449,19 @@ def analyse_led_signal(thisDir, json_file, stim_info):
                     w2b = w2b[:trial_num] 
 
         elif w2b[0]<b2w[0]:
+            print(f'ERROR. this animal {animal_id} has ISI onset shape {b2w.shape} later than stimulus presentation shape {w2b.shape}')
             b2w = b2w[: trial_num + 1]
             w2b = w2b[:trial_num]        
         elif w2b[0]>b2w[0] and visual_paradigm_name=='coherence' and exp_place!='MatrexVR':#coherence w2b is prior to ISI; b2w is prior to stimulus w2b-b2w shows stimulus duration b2w[1:]-w2b[:-1] shows ISI duration but b2w[:-1]-w2b[:] in r"Y:\GN25052\251102\coherence\session1" and r"Y:\GN25053\251108\coherence\session1" 
             b2w = b2w[1:trial_num + 1]## The stimulus selectivity takes 160 secs in full screen. The stimulus selectivity takes 175 secs in single monitor protocol.
             w2b = w2b[:trial_num]
         else:
+            print(f'this animal {animal_id} has ISI onset shape {b2w.shape} earlier than stimulus presentation shape {w2b.shape}')
             b2w = b2w[:trial_num]
             w2b = w2b[:trial_num]
+            frames_difference=w2b-b2w
+            if any(ele < 0 for ele in frames_difference):
+                print(f"Error frame difference:{frames_difference}")
 
     ## this probably means the same as dict fictrac_posthoc_analysis, if fictrac_vidLog exists, then probably do not posthoc analysis
     if fictrac_vidLog:
