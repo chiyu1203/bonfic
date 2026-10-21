@@ -194,56 +194,6 @@ def _(mo):
 
 
 @app.cell
-def _(mo):
-    form = mo.ui.form(
-        mo.ui.dictionary({
-            "sample_size": mo.ui.slider(start=1, stop=100,value=42,step=1,show_value=True),
-            "speed_thresholds": mo.ui.slider(start=0.1, stop=2, value=1,step=0.1,show_value=True),
-            "coherence_levels": mo.ui.slider(start=0, stop=3, value=1, step=1, show_value=True)},label="parameters"),
-        submit_button_label="Go, Hidden Scientists!",
-        bordered=False
-    )
-    form
-    return (form,)
-
-
-@app.cell
-def _(arr, df, form, mo, prepare_input):
-    mo.stop(form.value is None, mo.md("Click **Go, Hidden Scientists!** to fit a model to the data"))
-    _v = form.value
-    input_data = prepare_input(_v["sample_size"], _v["speed_thresholds"], _v["coherence_levels"],arr,df)
-    return (input_data,)
-
-
-@app.cell
-def _(boolean_array_to_event_table, camera_fps, np):
-    def prepare_input(
-        _this_sample_size: int,_this_target_speed: float, _coherence_index: int,arr:np.ndarray, df):
-        timepoints = np.arange(arr.shape[1]) / camera_fps
-        coherence_levels=[0,33,66,100]
-        _coherence_to_analyse=coherence_levels[_coherence_index]
-        _hit_target_epochs = arr > _this_target_speed
-        _trial_to_analyse = abs(df['stim_type']) == _coherence_to_analyse
-        _this_data = _hit_target_epochs[df[_trial_to_analyse].index,]
-        _output_table, _ = boolean_array_to_event_table(_this_data, timepoints=timepoints, stimulus_onset=0, consecutive_samples=_this_sample_size)
-        return _output_table
-
-    return (prepare_input,)
-
-
-@app.cell
-def _(mo):
-    censored_data = mo.ui.switch(value=True, label="include unsuccessful trials")
-    model_choice = mo.ui.dropdown(
-        options=["Weibull defective subpopulation","Weibull mixtures","Weibull","2-parameter Exponential","Exponential","All of the above"],
-        value="Exponential",
-        label="model choices",
-    )
-    mo.hstack([censored_data, model_choice], wrap=True, justify="start")
-    return censored_data, model_choice
-
-
-@app.cell
 def _(
     Fit_Exponential_1P,
     Fit_Exponential_2P,
@@ -252,15 +202,14 @@ def _(
     Fit_Weibull_Mixture,
     censored_data,
     model_choice,
-    output_table,
 ):
     def fit_model(input_data):
         output=[]
         if censored_data.value:
-            _faiures=output_table[output_table['event'] == 1]['time'].values
-            _right_censored=output_table[output_table['event'] == 0]['time'].values
+            _faiures=input_data[input_data['event'] == 1]['time'].values
+            _right_censored=input_data[input_data['event'] == 0]['time'].values
         else:
-            _faiures=output_table[output_table['event'] == 1]['time'].values
+            _faiures=input_data[input_data['event'] == 1]['time'].values
             _right_censored=None
         if model_choice.value=="All of the above":
             _1=Fit_Weibull_DS(failures=_faiures, right_censored=_right_censored, show_probability_plot=False)
@@ -286,7 +235,52 @@ def _(
 
 
 @app.cell
-def _(fit_model, input_data):
+def _(boolean_array_to_event_table, camera_fps, np):
+    def prepare_input(
+        _this_sample_size: int,_this_target_speed: float, _coherence_index: int,arr:np.ndarray, df):
+        timepoints = np.arange(arr.shape[1]) / camera_fps
+        coherence_levels=[0,33,66,100]
+        _coherence_to_analyse=coherence_levels[_coherence_index]
+        _hit_target_epochs = arr > _this_target_speed
+        _trial_to_analyse = abs(df['stim_type']) == _coherence_to_analyse
+        _this_data = _hit_target_epochs[df[_trial_to_analyse].index,]
+        _output_table, _ = boolean_array_to_event_table(_this_data, timepoints=timepoints, stimulus_onset=0, consecutive_samples=_this_sample_size)
+        return _output_table
+
+    return (prepare_input,)
+
+
+@app.cell
+def _(mo):
+    form = mo.ui.form(
+        mo.ui.dictionary({
+            "sample_size": mo.ui.slider(start=1, stop=100,value=42,step=1,show_value=True),
+            "speed_thresholds": mo.ui.slider(start=0.1, stop=2, value=1,step=0.1,show_value=True),
+            "coherence_levels": mo.ui.slider(start=0, stop=3, value=1, step=1, show_value=True)},label="parameters"),
+        submit_button_label="Go, Hidden Scientists!",
+        bordered=False
+    )
+    form
+    return (form,)
+
+
+@app.cell
+def _(mo):
+    censored_data = mo.ui.switch(value=True, label="include unsuccessful trials")
+    model_choice = mo.ui.dropdown(
+        options=["Weibull defective subpopulation","Weibull mixtures","Weibull","2-parameter Exponential","Exponential","All of the above"],
+        value="Exponential",
+        label="model choices",
+    )
+    mo.hstack([censored_data, model_choice], wrap=True, justify="start")
+    return censored_data, model_choice
+
+
+@app.cell
+def _(arr, df, fit_model, form, mo, prepare_input):
+    mo.stop(form.value is None, mo.md("Click **Go, Hidden Scientists!** to fit a model to the data"))
+    _v = form.value
+    input_data = prepare_input(_v["sample_size"], _v["speed_thresholds"], _v["coherence_levels"],arr,df)
     fit_model(input_data)
     return
 
@@ -316,18 +310,6 @@ def _(analysis_methods, arr, np):
     timepoints = np.arange(arr.shape[1]) / camera_fps
     post_times = timepoints[timepoints > onset_in_sec] - onset_in_sec
     return camera_fps, onset_in_sec, post_times, timepoints
-
-
-@app.cell
-def _(timepoints):
-    timepoints
-    return
-
-
-@app.cell
-def _(post_times):
-    post_times
-    return
 
 
 @app.cell
@@ -486,7 +468,7 @@ def _(
             ready_to_plot_kappa[_i, _j] = _wbf.beta
             ready_to_plot_kappa_lower[_i, _j] = _wbf.beta_lower
             ready_to_plot_kappa_upper[_i, _j] = _wbf.beta_upper
-    return output_table, ready_to_plot_kappa
+    return (ready_to_plot_kappa,)
 
 
 @app.cell(hide_code=True)
