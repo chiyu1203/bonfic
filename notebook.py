@@ -104,6 +104,37 @@ def _(json):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    Session 0.2: Download the database from Zenodo
+    """)
+    return
+
+
+@app.cell
+def _():
+    from zenodo_get import download
+
+    # Download all files from a record
+    download("10.5281/zenodo.1234567", output_dir="./data")
+
+    # Download only specific files using glob pattern
+    # download(
+    #     record_or_doi="1234567",
+    #     output_dir="./data",
+    #     file_glob="*.csv",
+    # )
+
+    # # Multiple glob patterns
+    # download(
+    #     record_or_doi="1234567",
+    #     output_dir="./data",
+    #     file_glob=["*.csv", "*.json"],
+    # )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ## Session 1: Loading dataset as pandas dataframe
     """)
     return
