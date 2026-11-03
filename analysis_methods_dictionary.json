@@ -1,8 +1,8 @@
 {
-    "exp_place": "MatrexVR",
-    "experiment_name": "coherence",
-    "temperature_data_options": "el_usb",
-    "overwrite_curated_dataset": true,
+    "exp_place": "VCCball",
+    "experiment_name": "sweeploom",
+    "temperature_data_options": null,
+    "overwrite_curated_dataset": false,
     "load_previous_methods": false,
     "graph_colour_code": [
         "r",
@@ -14,35 +14,49 @@
         "g",
         "r"
     ],
-    "save_output": true,
-    "fictrac_posthoc_analysis": true,
-    "use_led_to_align_stimulus_timing": true,
+    "save_output": false,
+    "fictrac_posthoc_analysis": false,
+    "use_led_to_align_stimulus_timing": false,
     "align_with_isi_onset": false,
     "mark_jump_as_nan": false,
     "active_trials_only": true,
     "filtering_method": "sg_filter",
-    "plotting_tbt_overview": true,
-    "plotting_trajectory": true,
+    "plotting_tbt_overview": false,
+    "plotting_trajectory": false,
     "plotting_event_related_trajectory": false,
-    "plotting_deceleration_accerleration": false,
+    "plotting_deceleration_accerleration": true,
     "plotting_position_dependant_fixation": false,
-    "plotting_optomotor_response": true,
+    "plotting_optomotor_response": false,
     "load_experiment_condition_from_database": true,
     "select_animals_by_condition": true,
-    "analysis_by_stimulus_type": false,
-    "duration_for_optomotor_index": 25,
+    "analysis_by_stimulus_type": true,
+    "duration_for_optomotor_index": 0,
     "yaw_axis": "z",
-    "camera_fps": 100,
-    "trackball_radius": 5,
-    "monitor_fps": 60,
-    "stim_duration": 25,
+    "camera_fps": 144,
+    "trackball_radius": 4,
+    "monitor_fps": 144,
+    "stim_duration": [
+        3,
+        4
+    ],
     "interval_duration": [
+        5,
         10,
-        15
+        15,
+        20,
+        25
     ],
+    "prestim_duration": 60,
     "analysis_window": [
-        -10,
-        35
+        -1,
+        5
     ],
-    "prestim_duration": 300
+    "stim_type": [
+        "c2b_f_sloom",
+        "c2b_s_sloom",
+        "c2f_f_sloom",
+        "c2f_s_sloom",
+        "c2c_f_loom",
+        "c2c_s_loom"
+    ]
 }

@@ -124,9 +124,6 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         #ylabel="Orientation (rad)",
         xticks=[init_frame, end_frame],
         xticklabels=["0", str(stim_duration)],
-        xticks=[init_frame, end_frame],
-        xticklabels=["0", str(stim_duration)],
-        #xlabel="Time (s)",
         yticks=[-100,0,100],
         ylim=ylim_heading,
     )
@@ -1371,7 +1368,7 @@ def main(thisDir, json_file):
     heading_prev_stim=heading_angle[:,:init_frame]-np.reshape(np.repeat(heading_at_stim,init_frame), (num_stim, init_frame))
     heading_post_stim=heading_angle[:,init_frame:]-np.reshape(np.repeat(heading_at_stim,end_frame-init_frame), (num_stim, end_frame-init_frame))
     distance_at_stim=cum_travel_distance[:,init_frame]
-    cum_distance_prev_stim=cum_travel_distance[:,init_frame:init_frame]-np.reshape(np.repeat(distance_at_stim,init_frame), (num_stim, init_frame))
+    cum_distance_prev_stim=cum_travel_distance[:,:init_frame]-np.reshape(np.repeat(distance_at_stim,init_frame), (num_stim, init_frame))
     cum_distance_post_stim=cum_travel_distance[:,init_frame:]-np.reshape(np.repeat(distance_at_stim,end_frame-init_frame), (num_stim, end_frame-init_frame))
     if cum_distance_prev_stim.shape[1]==0:
         total_distance_prev_stim=np.full((cum_distance_prev_stim.shape[0]), np.nan)
