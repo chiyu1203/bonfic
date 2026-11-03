@@ -53,15 +53,15 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
     analysis_window=analysis_methods.get("analysis_window")
     stim_duration=analysis_methods.get("stim_duration")
     if vr_no=='single':
-        ylim_w=(-5,5)
+        ylim_w=(-3,3)
         
     else:
         ylim_w=(-1.2,1.2)
     ylim_heading=(-150,150)
-    using_bs_ci=False
+    using_bs_ci=True
     use_mean=False
     stimulus_velocity=64 #unit degree/s
-    walk_threshold_tbt=10
+    walk_threshold_tbt=5
     premature_turn=0.25#set this criteria to remove animals starting to make turn turing ISI
     fig, axes = plt.subplots(
         nrows=1, ncols=2, figsize=(12, 8))
@@ -103,8 +103,8 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         #plot the whole area (not recommended for tbt)
         #ax.plot(time_points_2D, these_headings, linestyle='-',linewidth=0.1,color=COL.get_rgb(i)))
         subplots[i].scatter(time_points_2D, these_headings, s=0.01,alpha=0.1,color=COL.get_rgb(i))
-        subplots[i].plot(time_points,tmp,color='k',linewidth=0.8)
-        subplots[i].plot(time_points,tmp*-1,color='k',linewidth=0.8)
+        subplots[i].plot(time_points,tmp,color='k',linewidth=1)
+        subplots[i].plot(time_points,tmp*-1,color='k',linewidth=1)
         subplots[i].axvline(
         x=init_frame,
         color="black",
@@ -119,16 +119,21 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         )
         subplots[i].set(
         #ylabel="Orientation (rad)",
-        xticks=xticks,
-        xticklabels=xticklabels,
+        xticks=[init_frame, end_frame],
+        xticklabels=["0", str(stim_duration)],
         #xlabel="Time (s)",
         yticks=[-100,0,100],
         ylim=ylim_heading,
     )
+        for label in subplots[i].get_xticklabels():
+            label.set_fontsize(16)
+        for label in subplots[i].get_yticklabels():
+            label.set_fontsize(16)
+            label.set_rotation(90)
         if i==0:
-            subplots[i].set_ylabel(r'sum of turn (rad)', fontsize=18)
+            subplots[i].set_ylabel(r'sum of turn (rad)', fontsize=20)
         if i==3:
-            subplots[i].set_xlabel("Time (s)", fontsize=18)
+            subplots[i].set_xlabel("Time (s)", fontsize=20)
         #plot average response
         if use_mean==True:
             headings_to_plot = np.mean(these_headings, axis=0)
@@ -145,27 +150,14 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
 
         ##to plot distribution with bootstrap 95% confidence interval
         if using_bs_ci:
-            # data=(these_headings,)
-            # res=st.bootstrap(data,np.std,n_resamples=99,vectorized=True,random_state=1)
-            # y1=res.confidence_interval[0]
-            # y2=res.confidence_interval[1]
-            # del data
-            confidence_level = 0.95
-            #data=(these_angular_velocity,)
-            
-            res=st.bootstrap(data=(these_angular_velocity,),statistic=np.median,n_resamples=999,vectorized=True,batch=100,random_state=1)
+            confidence_level = 0.95            
+            res=st.bootstrap(data=(these_angular_velocity,),statistic=np.median,n_resamples=99,vectorized=True,batch=100,random_state=1)
             w_y1=res.confidence_interval[0]
             w_y2=res.confidence_interval[1]
             ##to plot distribution with 95% confidence interval with normal distribution because it is faster not because it is correct
-            res=st.bootstrap(data=(these_headings,),statistic=np.median,n_resamples=999,vectorized=True,batch=100,random_state=1)
-            #cl95=st.norm.interval(confidence_level,loc=headings_to_plot,scale=st.sem(these_headings))
-            # y1=cl95[0][:]
-            # y2=cl95[1][:]
+            res=st.bootstrap(data=(these_headings,),statistic=np.median,n_resamples=99,vectorized=True,batch=100,random_state=1)
             y1=res.confidence_interval[0]
             y2=res.confidence_interval[1]
-            #cl95=st.norm.interval(confidence_level,loc=velocity_to_plot,scale=st.sem(these_angular_velocity))
-            # w_y1=cl95[0][:]
-            # w_y2=cl95[1][:]
             cl95=st.norm.interval(confidence_level,loc=acceleration_to_plot,scale=st.sem(these_angular_acceleration))
             acc_y1=cl95[0][:]
             acc_y2=cl95[1][:]
@@ -188,10 +180,10 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         i=i+1
     # ax.plot(time_points,tmp,color='k',linewidth=0.8)
     # ax.plot(time_points,tmp*-1,color='k',linewidth=0.8)
-    ax1.plot(time_points,dif_tmp,color='k',linewidth=0.8)
-    ax1.plot(time_points,dif_tmp*-1,color='k',linewidth=0.8)
-    subplots[len(df["stim_type"].unique())].plot(time_points,tmp,color='k',linewidth=0.8)
-    subplots[len(df["stim_type"].unique())].plot(time_points,tmp*-1,color='k',linewidth=0.8)
+    ax1.plot(time_points,dif_tmp,color='k',linewidth=1)
+    ax1.plot(time_points,dif_tmp*-1,color='k',linewidth=1)
+    subplots[len(df["stim_type"].unique())].plot(time_points,tmp,color='k',linewidth=1)
+    subplots[len(df["stim_type"].unique())].plot(time_points,tmp*-1,color='k',linewidth=1)
     # ax.axvline(
     #     x=init_frame,
     #     color="black",
@@ -240,12 +232,18 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         linestyle="--",
         label="Stimulus Ends",
     )
-    # ax.set(
-    #     ylabel="Orientation (rad)",
-    #     xticks=xticks,
-    #     xticklabels=xticklabels,
-    #     xlabel="Time (s)",
-    # )
+    subplots[len(df["stim_type"].unique())].set(
+        xticks=[init_frame, end_frame],
+        xticklabels=["0", str(stim_duration)],
+        yticks=[-50,0,50],
+        ylim=[-50,50],
+    )
+    for label in subplots[len(df["stim_type"].unique())].get_xticklabels():
+        label.set_fontsize(16)
+    for label in subplots[len(df["stim_type"].unique())].get_yticklabels():
+        label.set_fontsize(16)
+        label.set_rotation(90)
+
     ax1.set(
         #ylabel=r'angular velocity (rad s$^{-1}$)',
         xticks=xticks,
@@ -253,20 +251,24 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         #ylim=[-0.005,0.02],
         ylim=ylim_w,
         xticklabels=xticklabels,
-        xlabel="Time (s)",
+        #xlabel="Time (s)",
     )
-    ax1.set_ylabel(r'angular velocity (rad s$^{-1}$)', fontsize=18)
+    ax1.set_ylabel(r'angular velocity (rad s$^{-1}$)', fontsize=22)
+    ax2.set_xlabel(r'angular velocity (rad s$^{-1}$)', fontsize=22)
+  
+
+
+    for label in ax1.get_xticklabels():
+        label.set_fontsize(16)
+
+    for label in ax1.get_yticklabels():
+        label.set_fontsize(16)
     ax2.set(
         ylabel=r'angular acceleration (rad s$^{-2}$)',
         xlabel="Time (s)",
         xticks=xticks,
         xticklabels=xticklabels,
-    )
-    subplots[len(df["stim_type"].unique())].set(
-        xticks=xticks,
-        ylim=[-50,50],
-        yticks=[-50,0,50],
-        xticklabels=xticklabels)
+    )  
     tick_positions = np.linspace(0, 1, len(df["stim_type"].unique()))
     these_coherence=df["stim_type"].unique()
     these_coherence.sort()
@@ -881,12 +883,12 @@ def plotting_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_m
             relative_start=end_marker[1]-start_frame
             ax2.plot(np.arange(relative_start,angular_velocity_interest.shape[0]+relative_start)/camera_fps,angular_velocity_interest,color='grey')
             ax3.plot(np.arange(relative_start,delta_angular_velocity.shape[0]+relative_start)/camera_fps,delta_angular_velocity,color='grey')
-            ax2.set_ylim(-5.4, 5.4)
-            ax2.set_yticks([-4,0,4],labels=[-4,0,4],rotation=90, rotation_mode="ytick",fontsize=14)
-            ax2.axhline(y=64*np.pi/180,ls='--', lw=0.5, c='k', alpha=1)
-            ax2.axhline(y=-64*np.pi/180,ls='--', lw=0.5, c='k', alpha=1)
-            ax2.set_ylabel('Angular velocity\n'+r'(rad s$^{-1}$)',fontsize=20)
-            ax3.set_ylim(-350,350)
+            ax2.set_ylim(-4, 4)
+            ax2.set_yticks([-2,0,2],labels=[-2,0,2],rotation=90, rotation_mode="ytick",fontsize=14)
+            ax2.axhline(y=64*np.pi/180,ls='--', lw=1, c='k', alpha=1)
+            ax2.axhline(y=-64*np.pi/180,ls='--', lw=1, c='k', alpha=1)
+            ax2.set_ylabel('angular velocity\n'+r'(rad s$^{-1}$)',fontsize=20)
+            ax3.set_ylim(-30,30)
             ax2.spines['bottom'].set_visible(False)
             ax2.tick_params(axis='both', which='both', labelsize='large',
                         bottom=False, top=False, labelbottom=False,
@@ -895,8 +897,8 @@ def plotting_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_m
             bottom=False, top=False, labelbottom=True,
             left=True, right=False, labelleft=True)
             ax3.spines['top'].set_visible(False)
-            ax3.set_yticks([-300, 0, 300],labels=[-300, 0, 300],rotation=90, rotation_mode="ytick",fontsize=14)
-            ax3.set_ylabel('Angular acceleration\n'+r'(rad s$^{-2}$)',fontsize=20)
+            ax3.set_yticks([-20, 0, 20],labels=[-20, 0, 20],rotation=90, rotation_mode="ytick",fontsize=14)
+            ax3.set_ylabel('angular acceleration\n'+r'(rad s$^{-2}$)',fontsize=20)
             ax3.set_xticks([0,20,40,60,80],labels=[0,20,40,60,80],fontsize=16)
             ax3.set_xlabel("Time (s)",fontsize=20)
             # ax2.grid(True, 'major', 'y', ls='-', lw=1, c='k', alpha=0.5)
@@ -965,11 +967,13 @@ def preprocess_tracking_data(df,filtering_method,yaw_axis,smooth_window_length):
         y_all = savgol_filter(df.loc[:, ["intergrated y position"]].values[:,0], smooth_window_length, 3, axis=0)
         yaw_angular_velocity =df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].values[:,0]
     elif filtering_method == "rolling_median":
-        x_all =df.loc[:, ["intergrated x position"]].rolling(smooth_window_length).median().values
-        y_all = df.loc[:, ["intergrated y position"]].rolling(smooth_window_length).median().values
+        # x_all =df.loc[:, ["intergrated x position"]].rolling(smooth_window_length).median().values
+        # y_all = df.loc[:, ["intergrated y position"]].rolling(smooth_window_length).median().values
+        # x_all=bfill(x_all[:,0])
+        # y_all=bfill(y_all[:,0])
+        x_all = savgol_filter(df.loc[:, ["intergrated x position"]].values[:,0], smooth_window_length, 3, axis=0)
+        y_all = savgol_filter(df.loc[:, ["intergrated y position"]].values[:,0], smooth_window_length, 3, axis=0)
         yaw_angular_velocity =df.loc[:, [f"delta rotation vector lab {yaw_axis}"]].rolling(smooth_window_length).median().values
-        x_all=bfill(x_all[:,0])
-        y_all=bfill(y_all[:,0])
         yaw_angular_velocity=bfill(yaw_angular_velocity[:,0])
     else:
         x_all = df.loc[:, ["intergrated x position"]].values[:,0]
@@ -1135,7 +1139,7 @@ def main(thisDir, json_file):
             f = gzip.GzipFile(this_temp_directory, "r")
             tem_df_this_exp = np.load(f)
         ### re-load temerature data if the user wants to overwrite the curated dataset or if temperature data is not available
-        elif temperature_data_options.lower().startswith("bon"):
+        elif temperature_data_options.lower().startswith("bon"):#this means using SHT40 module https://github.com/Sensirion/arduino-i2c-sht4x
             temperature_file_pattern = "lux*.csv"
             termperature_pattern_meta="meta*.csv"
             led_files = find_file(thisDir, temperature_file_pattern,termperature_pattern_meta)
@@ -1377,7 +1381,7 @@ def main(thisDir, json_file):
     heading_prev_stim=heading_angle[:,:init_frame]-np.reshape(np.repeat(heading_at_stim,init_frame), (num_stim, init_frame))
     heading_post_stim=heading_angle[:,init_frame:]-np.reshape(np.repeat(heading_at_stim,end_frame-init_frame), (num_stim, end_frame-init_frame))
     distance_at_stim=cum_travel_distance[:,init_frame]
-    cum_distance_prev_stim=cum_travel_distance[:,:init_frame]-np.reshape(np.repeat(distance_at_stim,init_frame), (num_stim, init_frame))
+    cum_distance_prev_stim=cum_travel_distance[:,init_frame-500:init_frame]-np.reshape(np.repeat(distance_at_stim,init_frame-500), (num_stim, init_frame-500))
     cum_distance_post_stim=cum_travel_distance[:,init_frame:]-np.reshape(np.repeat(distance_at_stim,end_frame-init_frame), (num_stim, end_frame-init_frame))
     if cum_distance_prev_stim.shape[1]==0:
         total_distance_prev_stim=np.full((cum_distance_prev_stim.shape[0]), np.nan)
