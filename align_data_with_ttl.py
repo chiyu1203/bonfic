@@ -129,9 +129,9 @@ def find_transitions(arr):
 
 
 # Example usage
-boolean_array = [False, False, True, False, True, True, False, True, False]
-transition_indices = find_transitions(boolean_array)
-print("Transition indices:", transition_indices)
+# boolean_array = [False, False, True, False, True, True, False, True, False]
+# transition_indices = find_transitions(boolean_array)
+# print("Transition indices:", transition_indices)
 
 
 def edge_detector(inp):

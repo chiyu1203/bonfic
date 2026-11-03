@@ -54,18 +54,19 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
     stim_duration=analysis_methods.get("stim_duration")
     if vr_no=='single':
         ylim_w=(-3,3)
+        ylim_w=(-3,3)
         
     else:
         ylim_w=(-1.2,1.2)
     ylim_heading=(-150,150)
     using_bs_ci=True
+    using_bs_ci=True
     use_mean=False
     stimulus_velocity=64 #unit degree/s
     walk_threshold_tbt=5
     premature_turn=0.25#set this criteria to remove animals starting to make turn turing ISI
-    fig, axes = plt.subplots(
-        nrows=1, ncols=2, figsize=(12, 8))
-    ax1, ax2 = axes.flatten()
+    fig, (ax1, ax2) = plt.subplots(
+        nrows=2, ncols=1, figsize=(6, 8),dpi=100,tight_layout=True,sharex=True)
 
     fig_tbt, subplots = plt.subplots(
         nrows=1, ncols=len(df["stim_type"].unique())+1, figsize=(15, 3), tight_layout=True,sharey=False
@@ -105,6 +106,8 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         subplots[i].scatter(time_points_2D, these_headings, s=0.01,alpha=0.1,color=COL.get_rgb(i))
         subplots[i].plot(time_points,tmp,color='k',linewidth=1)
         subplots[i].plot(time_points,tmp*-1,color='k',linewidth=1)
+        subplots[i].plot(time_points,tmp,color='k',linewidth=1)
+        subplots[i].plot(time_points,tmp*-1,color='k',linewidth=1)
         subplots[i].axvline(
         x=init_frame,
         color="black",
@@ -121,6 +124,8 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         #ylabel="Orientation (rad)",
         xticks=[init_frame, end_frame],
         xticklabels=["0", str(stim_duration)],
+        xticks=[init_frame, end_frame],
+        xticklabels=["0", str(stim_duration)],
         #xlabel="Time (s)",
         yticks=[-100,0,100],
         ylim=ylim_heading,
@@ -133,7 +138,7 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         if i==0:
             subplots[i].set_ylabel(r'sum of turn (rad)', fontsize=20)
         if i==3:
-            subplots[i].set_xlabel("Time (s)", fontsize=20)
+            subplots[i].set_xlabel("time (s)", fontsize=18)
         #plot average response
         if use_mean==True:
             headings_to_plot = np.mean(these_headings, axis=0)
@@ -180,6 +185,10 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         i=i+1
     # ax.plot(time_points,tmp,color='k',linewidth=0.8)
     # ax.plot(time_points,tmp*-1,color='k',linewidth=0.8)
+    ax1.plot(time_points,dif_tmp,color='k',linewidth=1)
+    ax1.plot(time_points,dif_tmp*-1,color='k',linewidth=1)
+    subplots[len(df["stim_type"].unique())].plot(time_points,tmp,color='k',linewidth=1)
+    subplots[len(df["stim_type"].unique())].plot(time_points,tmp*-1,color='k',linewidth=1)
     ax1.plot(time_points,dif_tmp,color='k',linewidth=1)
     ax1.plot(time_points,dif_tmp*-1,color='k',linewidth=1)
     subplots[len(df["stim_type"].unique())].plot(time_points,tmp,color='k',linewidth=1)
@@ -251,21 +260,16 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
         #ylim=[-0.005,0.02],
         ylim=ylim_w,
         xticklabels=xticklabels,
-        #xlabel="Time (s)",
+        xlabel="time (s)",
     )
     ax1.set_ylabel(r'angular velocity (rad s$^{-1}$)', fontsize=22)
-    ax2.set_xlabel(r'angular velocity (rad s$^{-1}$)', fontsize=22)
-  
-
-
     for label in ax1.get_xticklabels():
         label.set_fontsize(16)
-
     for label in ax1.get_yticklabels():
         label.set_fontsize(16)
     ax2.set(
         ylabel=r'angular acceleration (rad s$^{-2}$)',
-        xlabel="Time (s)",
+        xlabel="time (s)",
         xticks=xticks,
         xticklabels=xticklabels,
     )  
@@ -273,9 +277,9 @@ def plot_yaw_angular_velocity(df,analysis_methods,init_frame=1000,end_frame=3500
     these_coherence=df["stim_type"].unique()
     these_coherence.sort()
     tick_labels = [str(value) for value in these_coherence]
-    cbar = plt.colorbar(sm, ax=[ax1], orientation="horizontal", location='top',ticks=tick_positions,aspect=80)
+    #cbar = plt.colorbar(sm, ax=[ax1], orientation="horizontal", location='top',ticks=tick_positions,aspect=80)
     #cbar = plt.colorbar(sm, ax=[ax2], orientation="horizontal", location='top',ticks=tick_positions,aspect=60)
-    cbar.set_ticklabels(tick_labels)
+    #cbar.set_ticklabels(tick_labels)
     return fig, fig_tbt
 
 def a_guest(x):
@@ -837,9 +841,9 @@ def classify_trial_type(summary_df, turning_threshold, running_speed_threshold):
         follow_count_coherence = tmp.index.values
         follow_count = tmp.values[:, 0]
     return running_trials,stationary_trials,straight_walk_trials,turning_trials
-def plotting_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_marker=[],end_marker=[],yaw_angular_velocity=[]):
+def plot_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_marker=[],end_marker=[],yaw_angular_velocity=[],analysis_methods=None):
+    camera_fps=analysis_methods.get('camera_fps')
     markers_size=400
-    camera_fps=100
     trajectory_size=40
     colormap_name = "viridis"
     COL = MplColorHelper(colormap_name, 0, 6)
@@ -883,11 +887,10 @@ def plotting_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_m
             relative_start=end_marker[1]-start_frame
             ax2.plot(np.arange(relative_start,angular_velocity_interest.shape[0]+relative_start)/camera_fps,angular_velocity_interest,color='grey')
             ax3.plot(np.arange(relative_start,delta_angular_velocity.shape[0]+relative_start)/camera_fps,delta_angular_velocity,color='grey')
-            ax2.set_ylim(-4, 4)
-            ax2.set_yticks([-2,0,2],labels=[-2,0,2],rotation=90, rotation_mode="ytick",fontsize=14)
+            ax2.set_ylim(-5.4, 5.4)
             ax2.axhline(y=64*np.pi/180,ls='--', lw=1, c='k', alpha=1)
             ax2.axhline(y=-64*np.pi/180,ls='--', lw=1, c='k', alpha=1)
-            ax2.set_ylabel('angular velocity\n'+r'(rad s$^{-1}$)',fontsize=20)
+            ax2.set_ylabel('Angular velocity\n'+r'(rad s$^{-1}$)',fontsize=20)
             ax3.set_ylim(-30,30)
             ax2.spines['bottom'].set_visible(False)
             ax2.tick_params(axis='both', which='both', labelsize='large',
@@ -901,20 +904,7 @@ def plotting_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_m
             ax3.set_ylabel('angular acceleration\n'+r'(rad s$^{-2}$)',fontsize=20)
             ax3.set_xticks([0,20,40,60,80],labels=[0,20,40,60,80],fontsize=16)
             ax3.set_xlabel("Time (s)",fontsize=20)
-            # ax2.grid(True, 'major', 'y', ls='-', lw=1, c='k', alpha=0.5)
-            # ax3.grid(True, 'major', 'y', ls='-', lw=1, c='k', alpha=0.5)
-            fig2.savefig("angular_velocity_example_trials.png")
         else:
-            '''
-            cols = np.linspace(0,1,len(x_all[start_frame:end_frame]))
-            points = np.array([x_all[start_frame:end_frame], y_all[start_frame:end_frame]]).T.reshape(-1, 1, 2)
-            segments = np.concatenate([points[:-1], points[1:]], axis=1)
-            lc = LineCollection(segments, cmap='viridis')
-            lc.set_array(cols)
-            lc.set_linewidth(2)
-            line = ax.add_collection(lc)
-            fig.colorbar(line,ax=ax)
-            '''
             ax.scatter(y_all[start_frame:end_frame],x_all[start_frame:end_frame],s=trajectory_size,color=np.arange(len(y_all[start_frame:end_frame])), marker=".", alpha=0.5)
         #
         ax.set_xlim(-160, -120)
@@ -935,7 +925,7 @@ def plotting_example_trajectory(x_all,y_all,start_frame=0,end_frame=None,start_m
     else:
         if end_marker > 0:
             ax.scatter(y_all[end_marker],x_all[end_marker],s=markers_size,color=COL.get_rgb(0), marker="*",edgecolors='black')
-    return fig
+    return fig,fig2
 
 
 def generate_index_points(stim_to_analyse, analysis_window, camera_fps):
@@ -1102,10 +1092,10 @@ def main(thisDir, json_file):
         pass
     travel_distance_whole_session = np.nansum(travel_distance_fbf)/camera_fps
     if analysis_methods.get("plotting_trajectory") == True:
-        #fig=plotting_example_trajectory(x_all,y_all)
-        #fig=plotting_example_trajectory(x_all,y_all,start_frame=154892,end_frame=163473,start_marker=[155901,159436],end_marker=[158426,161961],yaw_angular_velocity=yaw_angular_velocity)
-        fig=plotting_example_trajectory(x_all,y_all,start_frame=411341,end_frame=420430,start_marker=[412857,416894],end_marker=[415381,419418],yaw_angular_velocity=yaw_angular_velocity)
+        #fig,fig2=plot_example_trajectory(x_all,y_all,analysis_methods=analysis_methods)
+        fig,fig2=plot_example_trajectory(x_all,y_all,start_frame=411341,end_frame=420430,start_marker=[412857,416894],end_marker=[415381,419418],yaw_angular_velocity=yaw_angular_velocity,analysis_methods=analysis_methods)
         fig.savefig(thisDir / "trajectory_plot_example_trials.png")
+        fig2.savefig(thisDir / "angular_velocity_example_trials.png")
     if analysis_methods.get("analyse_spontaneous_activity")==True:
         
         return
@@ -1705,12 +1695,11 @@ def main(thisDir, json_file):
         c_name_list=column_name_list(angular_velocity_tbt.shape[1],"angular_velocity_f")
         tmp=pd.DataFrame(angular_velocity_tbt,columns=c_name_list)
         df_angular_speed=pd.concat([summary_df, tmp], axis=1)
-        fig,fig_tbt=plot_yaw_angular_velocity(df_angular_speed,analysis_methods,init_frame=init_frame,end_frame=init_frame+stim_duration*camera_fps,vr_no="single",colormap_name="coolwarm")
-                #cbar.ax.tick_params(labelsize=14)
+        fig1,fig_tbt=plot_yaw_angular_velocity(df_angular_speed,analysis_methods,init_frame=init_frame,end_frame=init_frame+stim_duration*camera_fps,vr_no="single",colormap_name="coolwarm")
         fig_name=f"bonfic_{visual_paradigm_name}_dynamics.png"
         fig_tbt_name=f"bonfic_{visual_paradigm_name}_heading.png"
         if save_output==True:
-            fig.savefig(thisDir / fig_name)
+            fig1.savefig(thisDir / fig_name)
             fig_tbt.savefig(thisDir / fig_tbt_name)
         fig2, ax3 = plt.subplots(
             nrows=1, ncols=1, figsize=(18, 14), tight_layout=True
@@ -1802,7 +1791,7 @@ def main(thisDir, json_file):
     else:
         print("dont save anything")
 
-    return summary_df, velocity_arr, angular_velocity_tbt, travel_distance_whole_session,heading_angle_discretised_all,walk_states,turn_states,turn_cw,turn_ccw
+    return summary_df, velocity_arr, angular_velocity_tbt, travel_distance_whole_session,heading_angle_discretised_all
 
 
 if __name__ == "__main__":
@@ -1812,7 +1801,7 @@ if __name__ == "__main__":
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24078/240804/coherence/session1"  # good for checking fft, where 2 comes from
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24076/240804/coherence/session1"
     # thisDir = "Z:/DATA/experiment_trackball_Optomotor/MatrexVR/GN24084/240805/coherence/session1"# good for checking fft, where false nagative show up
-    thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24098\240810\coherence\session1"
+    #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24098\240810\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24098\240810\coherence\session1"
     # thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24089\240810\coherence\session1"
     #thisDir = r"Z:\DATA\experiment_trackball_Optomotor\MatrexVR\GN24036\240801\coherence\session1"
@@ -1930,6 +1919,7 @@ if __name__ == "__main__":
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L23063\230831\sweeploom"
     #thisDir =r"Y:\GN26056\260509\looming\session1"
     #thisDir ="/Users/chiyu_lee/OpenEphys/GN26063/260523/sweeping/session1"
+    thisDir ="/Volumes/AG_Couzin-Fuchs/DATA/experiment_trackball_Optomotor/MatrexVR/GN24098/240810/coherence/session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26192\260718\looming\session1"
     #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26187\260613\looming\session1"
     #thisDir =r"Y:\GN26063\260523\choices\session1"
