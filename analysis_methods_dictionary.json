@@ -2,7 +2,7 @@
     "exp_place": "VCCball",
     "experiment_name": "sweeploom",
     "temperature_data_options": null,
-    "overwrite_curated_dataset": false,
+    "overwrite_curated_dataset": true,
     "load_previous_methods": false,
     "graph_colour_code": [
         "r",
@@ -14,7 +14,7 @@
         "g",
         "r"
     ],
-    "save_output": false,
+    "save_output": true,
     "fictrac_posthoc_analysis": false,
     "use_led_to_align_stimulus_timing": false,
     "align_with_isi_onset": false,
@@ -36,8 +36,7 @@
     "trackball_radius": 4,
     "monitor_fps": 144,
     "stim_duration": [
-        3,
-        4
+        3
     ],
     "interval_duration": [
         5,
