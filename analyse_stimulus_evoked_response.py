@@ -405,6 +405,7 @@ def detect_stop_events(arr, analysis_methods,response_window=[-0.5,4],sustained_
     analysis_indices = np.where(analysis_mask)[0]
     if arr.dtype == 'float64':## feed raw velocity data. Otherwises, use boolean value of walk/stop states
         varying_deceleration_threshold=False
+        fixed_threshold=0.2#0.2 is an arbitary threshold, which should be adjusted based on the setup.walk_thresholds=[0.2,0.5]
         if varying_deceleration_threshold:
             baseline_mask = (relative_time >= -1.5) & (relative_time < response_window[0])
             baseline_data = arr[:, baseline_mask]
@@ -412,7 +413,7 @@ def detect_stop_events(arr, analysis_methods,response_window=[-0.5,4],sustained_
             baseline_std2 = 2 * baseline_data.std(axis=1, ddof=1)
             threshold = baseline_mean - baseline_std2
         else:
-            threshold = 0.5*np.ones(n_trials)
+            threshold = fixed_threshold*np.ones(n_trials)
         # ------------------------------------------------------------------
         # Detect sustained threshold crossing
         # ------------------------------------------------------------------
@@ -726,71 +727,74 @@ def identify_behavioural_states(travel_distance_fbf,angular_velocity,filter_meth
         else:
             skip_smoothing=False
     if skip_smoothing==True:      
-        speed_signal =  travel_distance_fbf
+        speed_signal =  travel_distance_fbf*camera_fps
         turn_signal =  angular_velocity
     else:
-        speed_signal =  medfilt(travel_distance_fbf, int(smooth_window_length))
+        speed_signal =  medfilt(travel_distance_fbf, int(smooth_window_length))*camera_fps
         turn_signal =  medfilt(angular_velocity, int(smooth_window_length))
     if type(walk_thresholds)==list and type(turn_thresholds)==list:
         print("use customised threshold")
         pass
     else:
         if skip_smoothing==True and filter_method=='rolling_median':
-            walk_thresholds=[0.001,0.005]
+            walk_thresholds=[0.1,0.5]
             turn_thresholds=[0.1,0.2]
             warnings.warn("rolling_median filter is not applied to speed. consider using use medfilt for that")
         elif skip_smoothing==False and filter_method=='rolling_median':
-            walk_thresholds=[0.005,0.008]#stop here
+            walk_thresholds=[0.5,0.8]#stop here
             turn_thresholds=[0.2,0.3]
         elif skip_smoothing==True and filter_method=="sg_filter":
-            walk_thresholds=[0.001,0.003]
+            walk_thresholds=[0.1,0.3]
             turn_thresholds=[0.25,0.5]
             warnings.warn("sg filter is not applied to angular velocity. consider using use medfilt for that")
         elif skip_smoothing==False and filter_method=="sg_filter":
-            walk_thresholds=[0.01,0.02]
+            walk_thresholds=[0.2,0.5]
             turn_thresholds=[0.25,0.5]
         elif skip_smoothing==True:
             warnings.warn("no smoothing method is applied before classified state. The result will be susceptible to noise")
-            walk_thresholds=[0.01,0.02]
+            walk_thresholds=[1,2]
             turn_thresholds=[0.25,0.5]
         else:
-            walk_thresholds=[0.003,0.01]
+            walk_thresholds=[0.3,1]
             turn_thresholds=[0.2,0.5]
 
     walk_states=find_states_with_debounce(speed_signal,thresholds=walk_thresholds,min_length=consecutive_length[0])
     turn_states=find_states_with_debounce(abs(turn_signal),thresholds=turn_thresholds,min_length=consecutive_length[1])
     turn_cw=find_states_with_debounce(turn_signal,thresholds=turn_thresholds,min_length=consecutive_length[1])
     turn_ccw=find_states_with_debounce(turn_signal*-1,thresholds=turn_thresholds,min_length=consecutive_length[1])
-    tmin_max=[20000,30000]#-1 for the entire trace or specify a frame number
-    #tmin_max=[0,-1]#-1 for the entire trace or specify a frame number
+    #tmin_max=[10000,20000]#-1 for the entire trace or specify a frame number
+    tmin_max=[0,-1]#-1 for the entire trace or specify a frame number
     run_time=np.arange(speed_signal.shape[0])
     if tmin_max[1]==-1:
-        section_length=speed_signal.shape[0]-2
+        section_length=speed_signal.shape[0]
+        if tmin_max[0]==0:
+            frame_no=np.arange(section_length)
     else:
         section_length=tmin_max[1]-tmin_max[0]-1
-
-    frame_no=run_time[tmin_max[0]:tmin_max[1]]
+        frame_no=run_time[tmin_max[0]:tmin_max[1]]
     fig, ((ax3,ax4),(ax5,ax6)) = plt.subplots(
             nrows=2, ncols=2, figsize=(18, 7), tight_layout=True
         )    
-    ax3.scatter(frame_no,speed_signal[tmin_max[0]:tmin_max[1]],s=0.1)
-    #ax3.scatter(frame_no,speed_signal,s=0.1)
+    #ax3.scatter(frame_no,speed_signal[tmin_max[0]:tmin_max[1]],s=0.1)
+    ax3.scatter(frame_no,speed_signal,s=0.1)
     ax3.set(title='after medfilt speed')
-    ax3.axhline(y=walk_thresholds[1],xmin=frame_no[0],xmax=frame_no[section_length],linewidth=3,color='r')
-    ax3.axhline(y=walk_thresholds[0],xmin=frame_no[0],xmax=frame_no[section_length],linewidth=3,color='k')
+    ax3.axhline(y=walk_thresholds[1],xmin=frame_no[0],xmax=frame_no[section_length-1],linewidth=3,color='r')
+    ax3.axhline(y=walk_thresholds[0],xmin=frame_no[0],xmax=frame_no[section_length-1],linewidth=3,color='k')
     ax5.scatter(np.where(walk_states[tmin_max[0]:tmin_max[1]]==0)[0],np.zeros((np.where(walk_states[tmin_max[0]:tmin_max[1]]==0)[0].shape)),s=0.1)
     ax5.scatter(np.where(walk_states[tmin_max[0]:tmin_max[1]]==1)[0],np.ones((np.where(walk_states[tmin_max[0]:tmin_max[1]]==1)[0].shape)),s=0.1)
     run_time=np.arange(turn_signal.shape[0])
     if tmin_max[1]==-1:
-        section_length=turn_signal.shape[0]-2
+        section_length=turn_signal.shape[0]
+        if tmin_max[0]==0:
+            frame_no=np.arange(section_length)
     else:
         section_length=tmin_max[1]-tmin_max[0]-1
-    frame_no=run_time[tmin_max[0]:tmin_max[1]]
-    ax4.scatter(frame_no,abs(turn_signal[tmin_max[0]:tmin_max[1]]),s=0.1)
-    #ax4.scatter(frame_no,abs(turn_signal),s=0.1)
+        frame_no=run_time[tmin_max[0]:tmin_max[1]]
+    #ax4.scatter(frame_no,abs(turn_signal[tmin_max[0]:tmin_max[1]]),s=0.1)
+    ax4.scatter(frame_no,abs(turn_signal),s=0.1)
     ax4.set(title='after medfilt abs rotational velocity')
-    ax4.axhline(y=turn_thresholds[1],xmin=frame_no[0],xmax=frame_no[section_length],linewidth=3,color='r')
-    ax4.axhline(y=turn_thresholds[0],xmin=frame_no[0],xmax=frame_no[section_length],linewidth=3,color='k')
+    ax4.axhline(y=turn_thresholds[1],xmin=frame_no[0],xmax=frame_no[section_length-1],linewidth=3,color='r')
+    ax4.axhline(y=turn_thresholds[0],xmin=frame_no[0],xmax=frame_no[section_length-1],linewidth=3,color='k')
     ax6.scatter(np.where(turn_states[tmin_max[0]:tmin_max[1]]==0)[0],np.zeros((np.where(turn_states[tmin_max[0]:tmin_max[1]]==0)[0].shape)),s=0.1)
     ax6.scatter(np.where(turn_states[tmin_max[0]:tmin_max[1]]==1)[0],np.ones((np.where(turn_states[tmin_max[0]:tmin_max[1]]==1)[0].shape)),s=0.1)    
     return walk_states,turn_states,turn_cw,turn_ccw,fig
@@ -1747,7 +1751,11 @@ def main(thisDir, json_file):
         walk_states_tbt=walk_states_tbt.astype(bool)
         turn_states_tbt=turn_states_tbt.astype(bool)
         #or use velocity_arr
-        stop_index = detect_stop_events(arr=velocity_arr, analysis_methods=analysis_methods,response_window=[-0.5,4.5],sustained_time_for_behaviour=0.5,save_path=thisDir)
+        if analysis_methods.get("experiment_name")=='sweeploom':
+            response_window=[0,2.5]
+        else:
+            response_window=[-0.5,4.5]
+        stop_index = detect_stop_events(arr=velocity_arr, analysis_methods=analysis_methods,response_window=response_window,sustained_time_for_behaviour=0.5,save_path=thisDir)
         summary_df['stop_index']=stop_index
         fig5, ax5 = plt.subplots(nrows=1, ncols=1, figsize=(36, 14), tight_layout=True)
         i=0
@@ -1792,8 +1800,8 @@ def main(thisDir, json_file):
 
 
 if __name__ == "__main__":
-    thisDir ="/Volumes/AG_Couzin-Fuchs/DATA/experiment_trackball_Optomotor/MatrexVR/GN24098/240810/coherence/session1"
-    #thisDir =r"Z:\DATA\experiment_trackball_Optomotor\Zball\GN26192\260718\looming\session1"
+    #thisDir ="/Volumes/AG_Couzin-Fuchs/DATA/experiment_trackball_Optomotor/MatrexVR/GN24098/240810/coherence/session1"
+    thisDir =r"Z:\DATA\experiment_trackball_Optomotor\VCCball\L22140\221103\sweeploom"
     json_file = "./analysis_methods_dictionary.json"
     tic = time.perf_counter()
     main(thisDir, json_file)
